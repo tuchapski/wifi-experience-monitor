@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -69,20 +69,39 @@ class WifiMetrics:
 
 
 @dataclass(slots=True)
+class NetworkMetrics:
+    interface: str
+
+    ipv4_address: str | None = None
+    prefix_length: int | None = None
+
+    gateway: str | None = None
+
+    dns_servers: list[str] = field(default_factory=list)
+
+    default_route_present: bool = False
+
+
+@dataclass(slots=True)
 class SensorSnapshot:
     timestamp: str
+
     wifi: WifiMetrics
+    network: NetworkMetrics
+
     collector_errors: list[str]
 
     @classmethod
     def create(
         cls,
         wifi: WifiMetrics,
+        network: NetworkMetrics,
         errors: list[str] | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
             wifi=wifi,
+            network=network,
             collector_errors=errors or [],
         )
 

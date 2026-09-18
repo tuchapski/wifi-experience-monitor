@@ -1,6 +1,7 @@
 import argparse
 import json
 
+from wem.collectors.network import NetworkCollector
 from wem.collectors.wifi import WifiCollector
 from wem.models.metrics import SensorSnapshot
 
@@ -16,13 +17,21 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    collector = WifiCollector(args.interface)
+    wifi_collector = WifiCollector(args.interface)
+    network_collector = NetworkCollector(args.interface)
 
-    wifi_metrics = collector.collect()
+    wifi_metrics = wifi_collector.collect()
+    network_metrics = network_collector.collect()
+
+    errors = [
+        *wifi_collector.errors,
+        *network_collector.errors,
+    ]
 
     snapshot = SensorSnapshot.create(
         wifi=wifi_metrics,
-        errors=collector.errors,
+        network=network_metrics,
+        errors=errors,
     )
 
     print(
