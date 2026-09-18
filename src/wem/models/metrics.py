@@ -83,25 +83,46 @@ class NetworkMetrics:
 
 
 @dataclass(slots=True)
+class ConnectivityMetrics:
+    gateway_reachable: bool | None = None
+    gateway_latency_ms: float | None = None
+
+    dns_success: bool | None = None
+    dns_latency_ms: float | None = None
+    dns_query: str | None = None
+    dns_result: str | None = None
+
+    internet_reachable: bool | None = None
+    internet_latency_ms: float | None = None
+
+    https_success: bool | None = None
+    https_status_code: int | None = None
+    https_total_time_ms: float | None = None
+
+
+@dataclass(slots=True)
 class SensorSnapshot:
     timestamp: str
 
     wifi: WifiMetrics
     network: NetworkMetrics
+    connectivity: ConnectivityMetrics
 
-    collector_errors: list[str]
+    collector_errors: list[str] = field(default_factory=list)
 
     @classmethod
     def create(
         cls,
         wifi: WifiMetrics,
         network: NetworkMetrics,
+        connectivity: ConnectivityMetrics,
         errors: list[str] | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
             wifi=wifi,
             network=network,
+            connectivity=connectivity,
             collector_errors=errors or [],
         )
 
