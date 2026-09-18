@@ -1,10 +1,7 @@
 import argparse
-import json
 
-from wem.collectors.network import NetworkCollector
-from wem.collectors.wifi import WifiCollector
-from wem.models.metrics import SensorSnapshot
-from wem.tests_engine.connectivity import ConnectivityTester
+from wem.runtime.console import ConsoleSensorRuntime
+from wem.runtime.sensor import RuntimeConfig
 
 
 def main() -> None:
@@ -16,42 +13,26 @@ def main() -> None:
         help="Wi-Fi interface to monitor",
     )
 
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=10.0,
+        help="Collection interval in seconds",
+    )
+
     args = parser.parse_args()
 
-    wifi_collector = WifiCollector(args.interface)
-
-    network_collector = NetworkCollector(args.interface)
-
-    wifi_metrics = wifi_collector.collect()
-    network_metrics = network_collector.collect()
-
-    connectivity_tester = ConnectivityTester(
+    config = RuntimeConfig(
         interface=args.interface,
-        gateway=network_metrics.gateway,
+        interval_seconds=args.interval,
     )
 
-    connectivity_metrics = connectivity_tester.run()
+    runtime = ConsoleSensorRuntime(config)
 
-    errors = [
-        *wifi_collector.errors,
-        *network_collector.errors,
-        *connectivity_tester.errors,
-    ]
-
-    snapshot = SensorSnapshot.create(
-        wifi=wifi_metrics,
-        network=network_metrics,
-        connectivity=connectivity_metrics,
-        errors=errors,
-    )
-
-    print(
-        json.dumps(
-            snapshot.to_dict(),
-            indent=2,
-            ensure_ascii=False,
-        )
-    )
+    try:
+        runtime.run_forever()
+    except KeyboardInterrupt:
+        print("\nSensor stopped.")
 
 
 if __name__ == "__main__":

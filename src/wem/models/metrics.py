@@ -132,6 +132,8 @@ class SensorSnapshot:
     timestamp: str
 
     wifi: WifiMetrics
+    wifi_delta: WifiDeltaMetrics | None
+
     network: NetworkMetrics
     connectivity: ConnectivityMetrics
 
@@ -143,11 +145,13 @@ class SensorSnapshot:
         wifi: WifiMetrics,
         network: NetworkMetrics,
         connectivity: ConnectivityMetrics,
+        wifi_delta: WifiDeltaMetrics | None = None,
         errors: list[str] | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
             wifi=wifi,
+            wifi_delta=wifi_delta,
             network=network,
             connectivity=connectivity,
             collector_errors=errors or [],
