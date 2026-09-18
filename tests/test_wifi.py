@@ -184,3 +184,103 @@ def test_wifi_collector_parses_ax201_output(mock_run_command) -> None:
     assert collector.errors == []
 
     assert mock_run_command.call_count == 4
+
+
+@patch("wem.collectors.wifi.run_command")
+def test_wifi_collector_handles_disconnected_interface(mock_run_command) -> None:
+    def side_effect(command: list[str], timeout: float = 5.0) -> CommandResult:
+        del timeout
+
+        if command == ["iw", "dev", "wlp0s20f3", "info"]:
+            return CommandResult(
+                stdout=IW_INFO_OUTPUT,
+                stderr="",
+                returncode=0,
+            )
+
+        if command == ["iw", "dev", "wlp0s20f3", "link"]:
+            return CommandResult(
+                stdout="Not connected.",
+                stderr="",
+                returncode=0,
+            )
+
+        if command == [
+            "iw",
+            "dev",
+            "wlp0s20f3",
+            "get",
+            "power_save",
+        ]:
+            return CommandResult(
+                stdout="Power save: on",
+                stderr="",
+                returncode=0,
+            )
+
+        if command == [
+            "iw",
+            "dev",
+            "wlp0s20f3",
+            "station",
+            "dump",
+        ]:
+            return CommandResult(
+                stdout="",
+                stderr="",
+                returncode=0,
+            )
+
+        return CommandResult(
+            stdout="",
+            stderr="unexpected command",
+            returncode=1,
+        )
+
+    mock_run_command.side_effect = side_effect
+
+    collector = WifiCollector("wlp0s20f3")
+
+    metrics = collector.collect()
+
+    assert metrics.interface == "wlp0s20f3"
+    assert metrics.ssid == "AeP"
+
+    assert metrics.bssid is None
+    assert metrics.signal_dbm is None
+
+    assert metrics.tx_bitrate_mbps is None
+    assert metrics.rx_bitrate_mbps is None
+
+    assert metrics.associated is None
+
+    assert collector.errors == ["wlp0s20f3 is not connected"]
+
+
+@patch("wem.collectors.wifi.run_command")
+def test_wifi_collector_handles_command_failures(mock_run_command) -> None:
+    mock_run_command.return_value = CommandResult(
+        stdout="",
+        stderr="command failed",
+        returncode=1,
+    )
+
+    collector = WifiCollector("wlp0s20f3")
+
+    metrics = collector.collect()
+
+    assert metrics.interface == "wlp0s20f3"
+
+    assert metrics.ssid is None
+    assert metrics.bssid is None
+    assert metrics.signal_dbm is None
+
+    assert metrics.tx_bitrate_mbps is None
+    assert metrics.rx_bitrate_mbps is None
+
+    assert collector.errors == [
+        "iw info failed: command failed",
+        "iw link failed: command failed",
+        "power save check failed: command failed",
+        "station dump failed: command failed",
+    ]
