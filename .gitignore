@@ -9,6 +9,9 @@ __pycache__/
 venv/
 env/
 
+# Database
+data/
+
 # Python tooling
 .pytest_cache/
 .mypy_cache/

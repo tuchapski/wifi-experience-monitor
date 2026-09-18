@@ -13,7 +13,9 @@ authors = [
     { name = "Andre Tuchapski" }
 ]
 
-dependencies = []
+dependencies = [
+	"sqlalchemy>=2.0",
+]
 
 [project.optional-dependencies]
 dev = [

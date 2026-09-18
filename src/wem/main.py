@@ -20,6 +20,12 @@ def main() -> None:
         help="Collection interval in seconds",
     )
 
+    parser.add_argument(
+        "--database",
+        default="data/wem.db",
+        help="SQLite database path",
+    )
+
     args = parser.parse_args()
 
     config = RuntimeConfig(
@@ -27,7 +33,10 @@ def main() -> None:
         interval_seconds=args.interval,
     )
 
-    runtime = ConsoleSensorRuntime(config)
+    runtime = ConsoleSensorRuntime(
+        config=config,
+        database_path=args.database,
+    )
 
     try:
         runtime.run_forever()
