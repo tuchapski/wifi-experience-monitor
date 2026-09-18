@@ -43,12 +43,23 @@ class ConnectivityTester:
             self.errors.append("gateway test skipped: no gateway configured")
             return
 
-        success, latency = self._ping(self.gateway)
+        (
+            reachable,
+            packet_loss,
+            latency_min,
+            latency_avg,
+            latency_max,
+            jitter,
+        ) = self._ping(self.gateway)
 
-        metrics.gateway_reachable = success
-        metrics.gateway_latency_ms = latency
+        metrics.gateway_reachable = reachable
+        metrics.gateway_packet_loss_percent = packet_loss
+        metrics.gateway_latency_min_ms = latency_min
+        metrics.gateway_latency_avg_ms = latency_avg
+        metrics.gateway_latency_max_ms = latency_max
+        metrics.gateway_jitter_ms = jitter
 
-        if not success:
+        if not reachable:
             self.errors.append(f"gateway unreachable: {self.gateway}")
 
     def _test_dns(
@@ -92,12 +103,23 @@ class ConnectivityTester:
         self,
         metrics: ConnectivityMetrics,
     ) -> None:
-        success, latency = self._ping(self.internet_target)
+        (
+            reachable,
+            packet_loss,
+            latency_min,
+            latency_avg,
+            latency_max,
+            jitter,
+        ) = self._ping(self.internet_target)
 
-        metrics.internet_reachable = success
-        metrics.internet_latency_ms = latency
+        metrics.internet_reachable = reachable
+        metrics.internet_packet_loss_percent = packet_loss
+        metrics.internet_latency_min_ms = latency_min
+        metrics.internet_latency_avg_ms = latency_avg
+        metrics.internet_latency_max_ms = latency_max
+        metrics.internet_jitter_ms = jitter
 
-        if not success:
+        if not reachable:
             self.errors.append(f"internet target unreachable: {self.internet_target}")
 
     def _test_https(
@@ -146,30 +168,65 @@ class ConnectivityTester:
     def _ping(
         self,
         target: str,
-    ) -> tuple[bool, float | None]:
+    ) -> tuple[
+        bool,
+        float | None,
+        float | None,
+        float | None,
+        float | None,
+        float | None,
+    ]:
         result = run_command(
             [
                 "ping",
                 "-I",
                 self.interface,
                 "-c",
-                "1",
+                "4",
+                "-i",
+                "0.2",
                 "-W",
                 "2",
                 target,
             ],
-            timeout=4,
+            timeout=6,
         )
 
-        if not result.success:
-            return False, None
+        output = result.stdout
 
-        match = re.search(
-            r"time[=<]([\d.]+)\s*ms",
-            result.stdout,
+        loss_match = re.search(
+            r"([\d.]+)% packet loss",
+            output,
         )
 
-        if not match:
-            return True, None
+        packet_loss = float(loss_match.group(1)) if loss_match else None
 
-        return True, float(match.group(1))
+        latency_match = re.search(
+            r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms",
+            output,
+        )
+
+        latency_min = None
+        latency_avg = None
+        latency_max = None
+        jitter = None
+
+        if latency_match:
+            latency_min = float(latency_match.group(1))
+
+            latency_avg = float(latency_match.group(2))
+
+            latency_max = float(latency_match.group(3))
+
+            jitter = float(latency_match.group(4))
+
+        reachable = result.success and packet_loss is not None and packet_loss < 100.0
+
+        return (
+            reachable,
+            packet_loss,
+            latency_min,
+            latency_avg,
+            latency_max,
+            jitter,
+        )

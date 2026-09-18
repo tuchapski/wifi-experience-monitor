@@ -83,9 +83,32 @@ class NetworkMetrics:
 
 
 @dataclass(slots=True)
+class WifiDeltaMetrics:
+    interval_seconds: float | None = None
+
+    tx_packets_delta: int | None = None
+    tx_retries_delta: int | None = None
+    tx_failed_delta: int | None = None
+
+    rx_packets_delta: int | None = None
+    rx_drop_misc_delta: int | None = None
+
+    tx_retries_per_100_packets: float | None = None
+    tx_failed_percent: float | None = None
+    rx_drop_percent: float | None = None
+
+    association_changed: bool = False
+    counter_reset_detected: bool = False
+
+
+@dataclass(slots=True)
 class ConnectivityMetrics:
     gateway_reachable: bool | None = None
-    gateway_latency_ms: float | None = None
+    gateway_packet_loss_percent: float | None = None
+    gateway_latency_min_ms: float | None = None
+    gateway_latency_avg_ms: float | None = None
+    gateway_latency_max_ms: float | None = None
+    gateway_jitter_ms: float | None = None
 
     dns_success: bool | None = None
     dns_latency_ms: float | None = None
@@ -93,7 +116,11 @@ class ConnectivityMetrics:
     dns_result: str | None = None
 
     internet_reachable: bool | None = None
-    internet_latency_ms: float | None = None
+    internet_packet_loss_percent: float | None = None
+    internet_latency_min_ms: float | None = None
+    internet_latency_avg_ms: float | None = None
+    internet_latency_max_ms: float | None = None
+    internet_jitter_ms: float | None = None
 
     https_success: bool | None = None
     https_status_code: int | None = None
