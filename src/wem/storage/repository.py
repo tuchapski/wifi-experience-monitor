@@ -63,3 +63,19 @@ class SnapshotRepository:
 
         with self.database.session() as session:
             return list(session.scalars(statement))
+
+    def latest_one(
+        self,
+    ) -> SnapshotRecord | None:
+        records = self.latest(limit=1)
+
+        if not records:
+            return None
+
+        return records[0]
+
+    def history(
+        self,
+        limit: int = 100,
+    ) -> list[SnapshotRecord]:
+        return self.latest(limit=limit)
