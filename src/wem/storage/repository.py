@@ -39,6 +39,12 @@ class SnapshotRepository:
             tx_retries_per_100_packets=(
                 wifi_delta.tx_retries_per_100_packets if wifi_delta is not None else None
             ),
+            overall_status=(
+                snapshot.diagnostic.overall_status if snapshot.diagnostic is not None else None
+            ),
+            probable_domain=(
+                snapshot.diagnostic.probable_domain if snapshot.diagnostic is not None else None
+            ),
             collector_errors=json.dumps(
                 snapshot.collector_errors,
             ),

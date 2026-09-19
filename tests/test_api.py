@@ -64,7 +64,24 @@ def test_health_without_snapshots(
         "status": "ok",
         "database": "ok",
         "has_snapshots": False,
+        "active_incidents": 0,
     }
+
+
+def test_health_reports_active_incidents(
+    tmp_path,
+) -> None:
+    database_path = str(tmp_path / "test.db")
+
+    app = create_app(database_path)
+
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    body = response.json()
+
+    assert body["active_incidents"] == 0
 
 
 def test_latest_snapshot(

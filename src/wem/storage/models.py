@@ -83,6 +83,18 @@ class SnapshotRecord(Base):
         nullable=True,
     )
 
+    overall_status: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        index=True,
+    )
+
+    probable_domain: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        index=True,
+    )
+
     collector_errors: Mapped[str] = mapped_column(
         Text,
         nullable=False,
@@ -92,4 +104,57 @@ class SnapshotRecord(Base):
     snapshot_json: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+    )
+
+
+class IncidentRecord(Base):
+    __tablename__ = "incidents"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    code: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        index=True,
+    )
+
+    domain: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+    )
+
+    severity: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+    )
+
+    message: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+    )
+
+    first_seen_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+    )
+
+    opened_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        index=True,
+    )
+
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        nullable=True,
+        index=True,
     )

@@ -1,9 +1,17 @@
 import json
 
 from wem.models.metrics import SensorSnapshot
-from wem.runtime.sensor import RuntimeConfig, SensorRuntime
+from wem.runtime.sensor import (
+    RuntimeConfig,
+    SensorRuntime,
+)
 from wem.storage.database import Database
-from wem.storage.repository import SnapshotRepository
+from wem.storage.incidents import (
+    IncidentRepository,
+)
+from wem.storage.repository import (
+    SnapshotRepository,
+)
 
 
 class ConsoleSensorRuntime(SensorRuntime):
@@ -18,13 +26,36 @@ class ConsoleSensorRuntime(SensorRuntime):
 
         self.database.initialize()
 
-        self.repository = SnapshotRepository(self.database)
+        self.snapshot_repository = SnapshotRepository(self.database)
+
+        self.incident_repository = IncidentRepository(self.database)
+
+        self._restore_active_incidents()
+
+    def _restore_active_incidents(
+        self,
+    ) -> None:
+        records = self.incident_repository.active()
+
+        for record in records:
+            self.incident_engine.restore_active_incident(
+                code=record.code,
+                domain=record.domain,
+                severity=record.severity,
+                message=record.message,
+                first_seen_at=(record.first_seen_at.isoformat()),
+                opened_at=(record.opened_at.isoformat()),
+            )
 
     def on_snapshot(
         self,
         snapshot: SensorSnapshot,
     ) -> None:
-        self.repository.save(snapshot)
+        self.snapshot_repository.save(snapshot)
+
+        if snapshot.incidents is not None:
+            for event in snapshot.incidents.events:
+                self.incident_repository.process_event(event)
 
         print(
             json.dumps(
