@@ -228,6 +228,15 @@ export interface DiagnosticResult {
   findings: DiagnosticFinding[];
 }
 
+export interface Recommendation {
+  code: string;
+  severity: string;
+  title: string;
+  action: string;
+  rationale: string;
+  evidence: string;
+}
+
 
 export interface Incident {
   code: string;
@@ -292,6 +301,8 @@ export interface SensorSnapshot {
   incidents: IncidentEvaluation | null;
 
   collector_errors: string[];
+
+  recommendations?: Recommendation[];
 }
 
 

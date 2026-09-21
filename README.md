@@ -141,3 +141,20 @@ are calculated from the raw readings inside each bucket using linear interpolati
 they are not estimated from bucket averages. P95/P99 help expose short spikes that
 an average can hide. A percentile is unavailable when the bucket has no valid
 readings, and values from different interfaces are never combined.
+
+## Evidence-based recommendations
+
+Each current snapshot can include a `recommendations` list derived from diagnostic
+findings, calibration state and environment-change events. The dashboard renders
+these as bounded next actions with a severity, rationale and the exact evidence
+that triggered the suggestion.
+
+Recommendations cover common Wi-Fi, gateway, DNS, Internet and HTTPS conditions,
+including low signal, retransmissions, packet loss, high latency, failed synthetic
+tests, power saving and collection errors. A BSSID change or roam suggests
+correlating metrics before and after the transition; it does not claim that roaming
+is the root cause. Unknown diagnostic codes are not turned into speculative advice.
+
+The recommendations are guidance, not an automated remediation or proof of root
+cause. Missing or incomplete measurements remain visible through calibration and
+collection-error evidence.

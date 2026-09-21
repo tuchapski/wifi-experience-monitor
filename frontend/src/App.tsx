@@ -642,6 +642,24 @@ function App() {
         </section>
       )}
 
+      {snapshot.recommendations && snapshot.recommendations.length > 0 && (
+        <section className="panel recommendations-panel">
+          <h2>Recommended actions</h2>
+          <p className="metric-note">Recommendations are evidence-based suggestions, not proof of root cause.</p>
+          <div className="recommendation-grid">
+            {snapshot.recommendations.map((item) => (
+              <article key={item.code} className={`recommendation-card recommendation-${item.severity}`}>
+                <span>{item.severity.toUpperCase()}</span>
+                <h3>{item.title}</h3>
+                <p><strong>Action:</strong> {item.action}</p>
+                <p><strong>Why:</strong> {item.rationale}</p>
+                <small><strong>Evidence:</strong> {item.evidence}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {snapshot.calibration && (
         <section className="panel">
 

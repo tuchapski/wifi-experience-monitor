@@ -604,4 +604,12 @@ tbody tr:hover {
 .history-inspection ul { padding-left: 18px; }
 .history-events { margin: 12px 0 0; padding-left: 18px; color: #7a271a; font-size: 12px; line-height: 1.6; }
 .history-events time { color: #667085; }
+.recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.recommendation-card { border: 1px solid #e4e7ec; border-left: 4px solid #667085; border-radius: 8px; padding: 16px; }
+.recommendation-card h3 { margin: 6px 0 12px; }
+.recommendation-card p { line-height: 1.5; }
+.recommendation-card small { color: #667085; line-height: 1.5; }
+.recommendation-warning { border-left-color: #d97706; }
+.recommendation-critical { border-left-color: #c62828; }
+.recommendation-info { border-left-color: #175cd3; }
 @media (max-width: 1000px) { .history-chart-grid { grid-template-columns: minmax(0, 1fr); } }

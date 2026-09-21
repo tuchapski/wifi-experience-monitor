@@ -199,6 +199,16 @@ class DiagnosticResult:
 
 
 @dataclass(slots=True)
+class Recommendation:
+    code: str
+    severity: str
+    title: str
+    action: str
+    rationale: str
+    evidence: str
+
+
+@dataclass(slots=True)
 class EnvironmentChange:
     """A change in the radio association or operating environment."""
 
@@ -262,6 +272,8 @@ class SensorSnapshot:
 
     environment_changes: list[EnvironmentChange] = field(default_factory=list)
 
+    recommendations: list[Recommendation] = field(default_factory=list)
+
     collector_errors: list[str] = field(default_factory=list)
 
     @classmethod
@@ -276,6 +288,7 @@ class SensorSnapshot:
         diagnostic: DiagnosticResult | None = None,
         incidents: IncidentEvaluation | None = None,
         environment_changes: list[EnvironmentChange] | None = None,
+        recommendations: list[Recommendation] | None = None,
         errors: list[str] | None = None,
     ) -> "SensorSnapshot":
         return cls(
@@ -289,6 +302,7 @@ class SensorSnapshot:
             diagnostic=diagnostic,
             incidents=incidents,
             environment_changes=environment_changes or [],
+            recommendations=recommendations or [],
             collector_errors=errors or [],
         )
 
