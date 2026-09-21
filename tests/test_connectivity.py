@@ -100,7 +100,7 @@ def test_connectivity_tester_gateway_failure(
         jitter,
     ) = tester._ping("192.168.15.1")
 
-    assert success is False
+    assert success is None
     assert packet_loss is None
     assert latency_min is None
     assert latency_avg is None
@@ -125,7 +125,8 @@ def test_connectivity_tester_without_gateway() -> None:
     assert metrics.gateway_latency_max_ms is None
     assert metrics.gateway_jitter_ms is None
 
-    assert tester.errors == ["gateway test skipped: no gateway configured"]
+    assert tester.errors == []
+    assert metrics.tests["gateway"].status == "skipped"
 
 
 @patch(
@@ -150,4 +151,6 @@ def test_connectivity_tester_dns_failure(
     assert metrics.dns_result is None
     assert metrics.dns_latency_ms is not None
 
-    assert any(error.startswith("dns resolution failed:") for error in tester.errors)
+    assert tester.errors == []
+    assert metrics.tests["dns"].status == "failed"
+    assert "dns failure" in metrics.tests["dns"].reason

@@ -8,7 +8,7 @@ from wem.collectors.network import NetworkCollector
 from wem.collectors.wifi import WifiCollector
 from wem.diagnostics.engine import DiagnosticEngine
 from wem.incidents.engine import IncidentEngine
-from wem.models.metrics import SensorSnapshot, WifiMetrics
+from wem.models.metrics import ConnectivityMetrics, SensorSnapshot, TestOutcome, WifiMetrics
 from wem.tests_engine.connectivity import ConnectivityTester
 
 
@@ -63,7 +63,27 @@ class SensorRuntime:
             https_url=self.config.https_url,
         )
 
-        connectivity_metrics = connectivity_tester.run()
+        blocked = (
+            health_metrics.interface_exists is not True
+            or health_metrics.wireless_interface is not True
+            or health_metrics.interface_up is False
+            or health_metrics.rfkill_soft_blocked is True
+            or health_metrics.rfkill_hard_blocked is True
+            or wifi_metrics.associated is False
+        )
+        if blocked:
+            connectivity_metrics = ConnectivityMetrics(
+                tests={
+                    name: TestOutcome(
+                        "skipped",
+                        "Interface unavailable, unverified, blocked or disconnected.",
+                        "host" if name in {"dns", "https"} else "selected_interface",
+                    )
+                    for name in ("gateway", "internet", "dns", "https")
+                }
+            )
+        else:
+            connectivity_metrics = connectivity_tester.run()
 
         wifi_delta = None
 
@@ -76,23 +96,25 @@ class SensorRuntime:
                 interval_seconds=interval,
             )
 
-        diagnostic = self.diagnostic_engine.analyze(
-            wifi=wifi_metrics,
-            wifi_delta=wifi_delta,
-            connectivity=connectivity_metrics,
-        )
-
-        incident_evaluation = self.incident_engine.evaluate(diagnostic=diagnostic)
-
-        self.previous_wifi = wifi_metrics
-        self.previous_timestamp = started
-
         errors = [
             *health_collector.errors,
             *wifi_collector.errors,
             *network_collector.errors,
             *connectivity_tester.errors,
         ]
+
+        diagnostic = self.diagnostic_engine.analyze(
+            wifi=wifi_metrics,
+            wifi_delta=wifi_delta,
+            connectivity=connectivity_metrics,
+            calibration=calibration,
+            collector_errors=errors,
+        )
+
+        incident_evaluation = self.incident_engine.evaluate(diagnostic=diagnostic)
+
+        self.previous_wifi = wifi_metrics
+        self.previous_timestamp = started
 
         return SensorSnapshot.create(
             health=health_metrics,

@@ -1,7 +1,9 @@
 import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
+from wem.collectors.interfaces import WirelessInterfaceDiscovery
 from wem.runtime.console import ConsoleSensorRuntime
 from wem.runtime.sensor import RuntimeConfig
 
@@ -31,6 +33,7 @@ class SensorController:
         self._running = False
 
         self._last_error: str | None = None
+        self._started_at: str | None = None
 
     def configure(
         self,
@@ -38,7 +41,7 @@ class SensorController:
         interval_seconds: float,
     ) -> None:
         with self._lock:
-            if self._running:
+            if self._running or (self._thread is not None and self._thread.is_alive()):
                 raise RuntimeError("Sensor configuration cannot be changed while running.")
 
             self.config.interface = interface
@@ -48,12 +51,17 @@ class SensorController:
         self,
     ) -> None:
         with self._lock:
-            if self._running:
+            if self._running or (self._thread is not None and self._thread.is_alive()):
                 raise RuntimeError("Sensor is already running.")
 
             if self.config.interface is None:
                 raise RuntimeError("No wireless interface configured.")
 
+            available = {item.name for item in WirelessInterfaceDiscovery().discover()}
+            if self.config.interface not in available:
+                raise RuntimeError("Selected interface is not an available wireless interface.")
+
+            self._started_at = datetime.now(UTC).isoformat()
             self._stop_event.clear()
 
             self._last_error = None
@@ -83,8 +91,9 @@ class SensorController:
             thread.join(timeout=15.0)
 
         with self._lock:
+            if thread is not None and thread.is_alive():
+                return
             self._running = False
-
             self._thread = None
 
     def _run(
@@ -98,15 +107,15 @@ class SensorController:
 
             return
 
-        runtime = ConsoleSensorRuntime(
-            RuntimeConfig(
-                interface=interface,
-                interval_seconds=(self.config.interval_seconds),
-            ),
-            database_path=self.database_path,
-        )
-
         try:
+            runtime = ConsoleSensorRuntime(
+                RuntimeConfig(
+                    interface=interface,
+                    interval_seconds=(self.config.interval_seconds),
+                ),
+                database_path=self.database_path,
+            )
+
             while not self._stop_event.is_set():
                 cycle_started = time.monotonic()
 
@@ -137,6 +146,7 @@ class SensorController:
         with self._lock:
             return {
                 "running": self._running,
+                "started_at": self._started_at,
                 "interface": (self.config.interface),
                 "interval_seconds": (self.config.interval_seconds),
                 "last_error": (self._last_error),

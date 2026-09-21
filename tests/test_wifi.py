@@ -252,7 +252,7 @@ def test_wifi_collector_handles_disconnected_interface(mock_run_command) -> None
     assert metrics.tx_bitrate_mbps is None
     assert metrics.rx_bitrate_mbps is None
 
-    assert metrics.associated is None
+    assert metrics.associated is False
 
     assert collector.errors == ["wlp0s20f3 is not connected"]
 

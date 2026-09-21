@@ -1,11 +1,29 @@
 from unittest.mock import patch
 
+import pytest
+
 from wem.models.metrics import (
     ConnectivityMetrics,
     NetworkMetrics,
+    SensorHealthMetrics,
     WifiMetrics,
 )
 from wem.runtime.sensor import RuntimeConfig, SensorRuntime
+
+
+@pytest.fixture(autouse=True)
+def mock_health_collector():
+    # Runtime unit tests must not inspect the machine's real wireless hardware.
+    with patch("wem.runtime.sensor.SensorHealthCollector") as collector:
+        collector.return_value.collect.return_value = SensorHealthMetrics(
+            interface="wlp0s20f3",
+            interface_exists=True,
+            interface_up=True,
+            wireless_interface=True,
+            driver="iwlwifi",
+        )
+        collector.return_value.errors = []
+        yield collector
 
 
 class DummyRuntime(SensorRuntime):

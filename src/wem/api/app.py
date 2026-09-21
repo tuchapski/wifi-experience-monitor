@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import (
@@ -96,7 +97,13 @@ def create_app(
 
     interface_discovery = WirelessInterfaceDiscovery()
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        sensor_controller.stop()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="Wi-Fi Experience Monitor API",
         description=("Local API for Wi-Fi and digital experience monitoring."),
         version="0.3.0",

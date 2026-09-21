@@ -111,10 +111,10 @@ def test_gateway_failure() -> None:
         ),
     )
 
-    assert result.overall_status == "critical"
+    assert result.overall_status == "warning"
     assert result.probable_domain == "gateway"
 
-    assert any(finding.code == "GATEWAY_UNREACHABLE" for finding in result.findings)
+    assert any(finding.code == "GATEWAY_ICMP_FAILED" for finding in result.findings)
 
 
 def test_dns_failure() -> None:

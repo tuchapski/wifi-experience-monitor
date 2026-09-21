@@ -1,3 +1,5 @@
+import math
+
 from wem.models.metrics import WifiDeltaMetrics, WifiMetrics
 
 
@@ -12,8 +14,36 @@ class WifiDeltaAnalyzer:
             interval_seconds=interval_seconds,
         )
 
+        if not math.isfinite(interval_seconds) or interval_seconds <= 0:
+            result.unavailable_reason = "Invalid measurement interval."
+            return result
+        if previous.interface != current.interface:
+            result.unavailable_reason = (
+                "Selected interface changed; waiting for comparable samples."
+            )
+            return result
+        if (
+            previous.associated is False
+            or current.associated is False
+            or previous.bssid is None
+            or current.bssid is None
+        ):
+            result.unavailable_reason = "Association could not be confirmed across both samples."
+            return result
         if self._association_changed(previous, current):
             result.association_changed = True
+            result.unavailable_reason = "Access point changed; waiting for comparable samples."
+            return result
+
+        if (
+            previous.connected_time_seconds is not None
+            and current.connected_time_seconds is not None
+            and current.connected_time_seconds < previous.connected_time_seconds
+        ):
+            result.counter_reset_detected = True
+            result.unavailable_reason = (
+                "Association duration restarted; counters are not comparable."
+            )
             return result
 
         tx_packets = self._delta(
@@ -51,6 +81,7 @@ class WifiDeltaAnalyzer:
 
         if any(delta == -1 for delta in deltas):
             result.counter_reset_detected = True
+            result.unavailable_reason = "Counters reset; waiting for comparable samples."
             return result
 
         result.tx_packets_delta = tx_packets

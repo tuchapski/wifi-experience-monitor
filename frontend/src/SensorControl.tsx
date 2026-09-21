@@ -92,12 +92,6 @@ function SensorControl({
         setIntervalSeconds(
           statusData.interval_seconds,
         );
-      } else if (
-        interfaceData.length > 0
-      ) {
-        setSelectedInterface(
-          interfaceData[0].name,
-        );
       }
 
       onStatusChange?.(
@@ -148,7 +142,7 @@ function SensorControl({
 
 
   async function handleStart() {
-    if (!selectedInterface) {
+    if (!interfaces.some((item) => item.name === selectedInterface)) {
       setError(
         "Select a wireless interface."
       );
@@ -291,11 +285,9 @@ function SensorControl({
             }}
           >
 
-            {interfaces.length === 0 && (
-              <option value="">
-                No Wi-Fi interfaces detected
-              </option>
-            )}
+            <option value="">
+              {interfaces.length === 0 ? "No Wi-Fi interfaces detected" : "Select a Wi-Fi interface"}
+            </option>
 
             {interfaces.map(
               (item) => (
@@ -404,7 +396,11 @@ function SensorControl({
             type="button"
             disabled={
               loading
-              || !selectedInterface
+              || !selectedDetails
+              || status === null
+              || !Number.isFinite(intervalSeconds)
+              || intervalSeconds < 1
+              || intervalSeconds > 3600
             }
             onClick={() => {
               void handleStart();

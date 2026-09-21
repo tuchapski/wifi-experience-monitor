@@ -30,6 +30,9 @@ class WifiMetrics:
     tx_bitrate_mbps: float | None = None
     rx_bitrate_mbps: float | None = None
 
+    tx_channel_width_mhz: int | None = None
+    rx_channel_width_mhz: int | None = None
+
     tx_mcs: int | None = None
     rx_mcs: int | None = None
 
@@ -78,6 +81,7 @@ class NetworkMetrics:
 
 @dataclass(slots=True)
 class WifiDeltaMetrics:
+    unavailable_reason: str | None = None
     interval_seconds: float | None = None
 
     tx_packets_delta: int | None = None
@@ -96,7 +100,16 @@ class WifiDeltaMetrics:
 
 
 @dataclass(slots=True)
+class TestOutcome:
+    status: str
+    reason: str
+    scope: str = "selected_interface"
+
+
+@dataclass(slots=True)
 class ConnectivityMetrics:
+    tests: dict[str, TestOutcome] = field(default_factory=dict)
+
     gateway_reachable: bool | None = None
 
     gateway_packet_loss_percent: float | None = None
@@ -131,7 +144,7 @@ class ConnectivityMetrics:
 class SensorHealthMetrics:
     interface: str
 
-    interface_exists: bool = False
+    interface_exists: bool | None = None
     interface_up: bool | None = None
 
     wireless_interface: bool | None = None
@@ -163,6 +176,8 @@ class CalibrationResult:
 
     calibrated: bool
 
+    checks: dict[str, TestOutcome] = field(default_factory=dict)
+
     findings: list[CalibrationFinding] = field(default_factory=list)
 
 
@@ -178,6 +193,7 @@ class DiagnosticFinding:
 class DiagnosticResult:
     overall_status: str
     probable_domain: str | None
+    complete: bool = True
 
     findings: list[DiagnosticFinding] = field(default_factory=list)
 

@@ -100,11 +100,17 @@ class IncidentEngine:
             events=events,
         )
 
-        self._process_missing_findings(
-            present_codes=set(relevant_findings),
-            timestamp=now,
-            events=events,
-        )
+        if diagnostic.complete:
+            self._process_missing_findings(
+                present_codes=set(relevant_findings),
+                timestamp=now,
+                events=events,
+            )
+        else:
+            for code, tracker in self._trackers.items():
+                if code not in relevant_findings:
+                    tracker.consecutive_recoveries = 0
+                    tracker.consecutive_occurrences = 0
 
         active_incidents = [
             self._tracker_to_incident(tracker)

@@ -5,7 +5,7 @@ import urllib.error
 import urllib.request
 
 from wem.collectors.command import run_command
-from wem.models.metrics import ConnectivityMetrics
+from wem.models.metrics import ConnectivityMetrics, TestOutcome
 
 
 class ConnectivityTester:
@@ -40,7 +40,7 @@ class ConnectivityTester:
         metrics: ConnectivityMetrics,
     ) -> None:
         if self.gateway is None:
-            self.errors.append("gateway test skipped: no gateway configured")
+            metrics.tests["gateway"] = TestOutcome("skipped", "No gateway was identified.")
             return
 
         (
@@ -59,8 +59,7 @@ class ConnectivityTester:
         metrics.gateway_latency_max_ms = latency_max
         metrics.gateway_jitter_ms = jitter
 
-        if not reachable:
-            self.errors.append(f"gateway unreachable: {self.gateway}")
+        metrics.tests["gateway"] = self._ping_outcome(reachable, self.gateway)
 
     def _test_dns(
         self,
@@ -68,6 +67,7 @@ class ConnectivityTester:
     ) -> None:
         metrics.dns_query = self.dns_query
 
+        failure_reason = "Test failed."
         started = time.perf_counter()
 
         try:
@@ -79,7 +79,7 @@ class ConnectivityTester:
 
             elapsed = (time.perf_counter() - started) * 1000
 
-            metrics.dns_success = True
+            metrics.dns_success = bool(result)
             metrics.dns_latency_ms = round(
                 elapsed,
                 3,
@@ -97,7 +97,13 @@ class ConnectivityTester:
                 3,
             )
 
-            self.errors.append(f"dns resolution failed: {exc}")
+            failure_reason = f"DNS resolution failed: {exc}"
+
+        metrics.tests["dns"] = TestOutcome(
+            "passed" if metrics.dns_success else "failed",
+            "System resolver returned an address." if metrics.dns_success else failure_reason,
+            "host",
+        )
 
     def _test_internet(
         self,
@@ -119,8 +125,7 @@ class ConnectivityTester:
         metrics.internet_latency_max_ms = latency_max
         metrics.internet_jitter_ms = jitter
 
-        if not reachable:
-            self.errors.append(f"internet target unreachable: {self.internet_target}")
+        metrics.tests["internet"] = self._ping_outcome(reachable, self.internet_target)
 
     def _test_https(
         self,
@@ -132,6 +137,7 @@ class ConnectivityTester:
             headers={"User-Agent": "wifi-experience-monitor/0.1"},
         )
 
+        failure_reason = "Test failed."
         started = time.perf_counter()
 
         try:
@@ -163,13 +169,33 @@ class ConnectivityTester:
                 3,
             )
 
-            self.errors.append(f"https test failed: {exc}")
+            failure_reason = f"HTTPS test failed: {exc}"
+            if isinstance(exc, urllib.error.HTTPError):
+                metrics.https_status_code = exc.code
+
+        metrics.tests["https"] = TestOutcome(
+            "passed" if metrics.https_success else "failed",
+            f"HTTPS response: {metrics.https_status_code}."
+            if metrics.https_success
+            else failure_reason,
+            "host",
+        )
+
+    def _ping_outcome(self, reachable: bool | None, target: str) -> TestOutcome:
+        if reachable is None:
+            return TestOutcome("error", getattr(self, "_ping_error", "Ping collection failed."))
+        return TestOutcome(
+            "passed" if reachable else "failed",
+            f"ICMP replies received from {target}."
+            if reachable
+            else f"No ICMP replies from {target}; this alone does not prove a network outage.",
+        )
 
     def _ping(
         self,
         target: str,
     ) -> tuple[
-        bool,
+        bool | None,
         float | None,
         float | None,
         float | None,
@@ -220,7 +246,11 @@ class ConnectivityTester:
 
             jitter = float(latency_match.group(4))
 
-        reachable = result.success and packet_loss is not None and packet_loss < 100.0
+        if packet_loss is None or result.returncode not in {0, 1}:
+            self._ping_error = result.stderr or "No valid ping statistics were returned."
+            self.errors.append(f"ping collection failed for {target}: {self._ping_error}")
+            return (None, None, None, None, None, None)
+        reachable = packet_loss < 100.0
 
         return (
             reachable,

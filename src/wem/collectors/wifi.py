@@ -38,13 +38,13 @@ class WifiCollector:
             metrics.ssid = ssid_match.group(1).strip()
 
         channel_match = re.search(
-            r"channel\s+(\d+)\s+\((\d+)\s+MHz\),\s+width:\s+(\d+)\s+MHz",
+            r"channel\s+(\d+)\s+\((\d+(?:\.\d+)?)\s+MHz\),\s+width:\s+(\d+(?:\.\d+)?)\s+MHz",
             output,
         )
 
         if channel_match:
             metrics.channel = int(channel_match.group(1))
-            metrics.frequency_mhz = int(channel_match.group(2))
+            metrics.frequency_mhz = int(float(channel_match.group(2)))
             metrics.channel_width_mhz = int(channel_match.group(3))
 
         tx_power_match = re.search(
@@ -65,6 +65,7 @@ class WifiCollector:
         output = result.stdout
 
         if "Not connected." in output:
+            metrics.associated = False
             self.errors.append(f"{self.interface} is not connected")
             return
 
@@ -75,6 +76,14 @@ class WifiCollector:
 
         if bssid_match:
             metrics.bssid = bssid_match.group(1).lower()
+            metrics.associated = True
+
+        ssid_match = re.search(r"^\s*SSID:\s+(.+)$", output, re.MULTILINE)
+        if ssid_match:
+            metrics.ssid = ssid_match.group(1).strip()
+        frequency_match = re.search(r"^\s*freq:\s+([\d.]+)", output, re.MULTILINE)
+        if frequency_match:
+            metrics.frequency_mhz = int(float(frequency_match.group(1)))
 
         signal_match = re.search(
             r"signal:\s+(-?\d+)\s+dBm",
@@ -84,21 +93,10 @@ class WifiCollector:
         if signal_match:
             metrics.signal_dbm = int(signal_match.group(1))
 
-        tx_match = re.search(
-            r"tx bitrate:\s+([\d.]+)\s+MBit/s",
-            output,
-        )
-
-        if tx_match:
-            metrics.tx_bitrate_mbps = float(tx_match.group(1))
-
-        rx_match = re.search(
-            r"rx bitrate:\s+([\d.]+)\s+MBit/s",
-            output,
-        )
-
-        if rx_match:
-            metrics.rx_bitrate_mbps = float(rx_match.group(1))
+        for direction in ("tx", "rx"):
+            match = re.search(rf"^\s*{direction} bitrate:\s+(.+)$", output, re.MULTILINE)
+            if match:
+                self._parse_bitrate(match.group(1), metrics, direction)
 
     def _collect_power_save(self, metrics: WifiMetrics) -> None:
         result = run_command(
@@ -138,6 +136,21 @@ class WifiCollector:
             return
 
         output = result.stdout
+        if metrics.associated is False or not output.strip():
+            return
+        stations = re.split(r"(?=^Station )", output, flags=re.MULTILINE)
+        stations = [block for block in stations if block.strip()]
+        if metrics.bssid is not None:
+            matching = [
+                block for block in stations if block.lower().startswith(f"station {metrics.bssid} ")
+            ]
+            if not matching:
+                self.errors.append("station dump did not contain the associated BSSID")
+                return
+            output = matching[0]
+        elif len(stations) > 1:
+            self.errors.append("station dump is ambiguous without an associated BSSID")
+            return
 
         def get_int(pattern: str) -> int | None:
             match = re.search(
@@ -172,10 +185,14 @@ class WifiCollector:
 
         metrics.authenticated = get_yes_no(r"^\s*authenticated:\s+(yes|no)")
 
-        metrics.associated = get_yes_no(r"^\s*associated:\s+(yes|no)")
+        associated = get_yes_no(r"^\s*associated:\s+(yes|no)")
+        if associated is not None:
+            metrics.associated = associated
 
         # Signal
-        metrics.signal_dbm = get_int(r"^\s*signal:\s+(-?\d+)")
+        signal = get_int(r"^\s*signal:\s+(-?\d+)")
+        if signal is not None:
+            metrics.signal_dbm = signal
 
         metrics.signal_avg_dbm = get_int(r"^\s*signal avg:\s+(-?\d+)")
 
@@ -250,27 +267,30 @@ class WifiCollector:
             line,
         )
 
+        if bitrate_match is None:
+            return
+
         mcs_match = re.search(
-            r"(?:VHT|HE|HT)-MCS\s+(\d+)",
+            r"\b(?:(?:EHT|VHT|HE|HT)-)?MCS\s+(\d+)",
             line,
         )
 
         nss_match = re.search(
-            r"(?:VHT|HE)-NSS\s+(\d+)",
+            r"(?:EHT|VHT|HE)-NSS\s+(\d+)",
             line,
         )
 
         phy_match = re.search(
-            r"\b(VHT|HE|HT)\b",
+            r"\b(EHT|VHT|HE|HT)\b",
             line,
         )
 
         width_match = re.search(
-            r"\b(20|40|80|160|320)MHz\b",
+            r"\b(20|40|80|160|320)\s*MHz\b",
             line,
         )
 
-        short_gi = "short GI" in line
+        short_gi = None
 
         bitrate = float(bitrate_match.group(1)) if bitrate_match else None
 
@@ -278,10 +298,13 @@ class WifiCollector:
 
         nss = int(nss_match.group(1)) if nss_match else None
 
-        phy_mode = phy_match.group(1) if phy_match else None
+        phy_mode = phy_match.group(1) if phy_match else ("HT" if mcs_match else None)
+        if phy_mode in {"HT", "VHT"}:
+            short_gi = "short GI" in line
 
-        if width_match:
-            metrics.channel_width_mhz = int(width_match.group(1))
+        # Interface operating width and the width of a reported TX/RX rate differ.
+        width = int(width_match.group(1)) if width_match else None
+        setattr(metrics, f"{direction}_channel_width_mhz", width)
 
         if direction == "tx":
             metrics.tx_bitrate_mbps = bitrate

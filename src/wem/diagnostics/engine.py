@@ -1,4 +1,5 @@
 from wem.models.metrics import (
+    CalibrationResult,
     ConnectivityMetrics,
     DiagnosticFinding,
     DiagnosticResult,
@@ -13,8 +14,44 @@ class DiagnosticEngine:
         wifi: WifiMetrics,
         wifi_delta: WifiDeltaMetrics | None,
         connectivity: ConnectivityMetrics,
+        calibration: CalibrationResult | None = None,
+        collector_errors: list[str] | None = None,
     ) -> DiagnosticResult:
         findings: list[DiagnosticFinding] = []
+        complete = (
+            all(
+                value is not None
+                for value in (
+                    wifi.associated,
+                    wifi.signal_dbm,
+                    connectivity.gateway_reachable,
+                    connectivity.internet_reachable,
+                    connectivity.dns_success,
+                    connectivity.https_success,
+                )
+            )
+            and not collector_errors
+        )
+        if calibration is not None:
+            complete = complete and calibration.calibrated
+            for finding in calibration.findings:
+                findings.append(
+                    DiagnosticFinding(
+                        severity=finding.severity,
+                        domain="sensor",
+                        code=finding.code,
+                        message=finding.message,
+                    )
+                )
+        if collector_errors:
+            findings.append(
+                DiagnosticFinding(
+                    severity="warning",
+                    domain="sensor",
+                    code="COLLECTION_ERROR",
+                    message="Some measurements could not be collected. Inspect Sensor Errors.",
+                )
+            )
 
         self._check_wifi(
             wifi,
@@ -44,10 +81,13 @@ class DiagnosticEngine:
 
         overall_status = self._overall_status(findings)
 
+        if not complete and overall_status in {"healthy", "info"}:
+            overall_status = "unknown"
         probable_domain = self._probable_domain(findings)
 
         return DiagnosticResult(
             overall_status=overall_status,
+            complete=bool(complete),
             probable_domain=probable_domain,
             findings=findings,
         )
@@ -68,16 +108,6 @@ class DiagnosticEngine:
                 )
             )
             return
-
-        if wifi.signal_dbm is not None and wifi.signal_dbm < -75:
-            findings.append(
-                DiagnosticFinding(
-                    severity="warning",
-                    domain="wifi",
-                    code="WIFI_LOW_SIGNAL",
-                    message=("Wi-Fi signal is below -75 dBm."),
-                )
-            )
 
         if wifi.signal_dbm is not None:
             if wifi.signal_dbm < -82:
@@ -165,10 +195,12 @@ class DiagnosticEngine:
         if connectivity.gateway_reachable is False:
             findings.append(
                 DiagnosticFinding(
-                    severity="critical",
+                    severity="warning",
                     domain="gateway",
-                    code="GATEWAY_UNREACHABLE",
-                    message=("The local gateway is unreachable."),
+                    code="GATEWAY_ICMP_FAILED",
+                    message=(
+                        "The gateway did not answer ICMP; filtering or rate limiting is possible."
+                    ),
                 )
             )
             return
@@ -244,10 +276,20 @@ class DiagnosticEngine:
         if connectivity.internet_reachable is False:
             findings.append(
                 DiagnosticFinding(
-                    severity="critical",
+                    severity="warning",
                     domain="internet",
-                    code="INTERNET_UNREACHABLE",
-                    message=("The Internet connectivity target is unreachable."),
+                    code="INTERNET_ICMP_FAILED",
+                    message=(
+                        "External ICMP test failed. "
+                        + (
+                            "DNS or HTTPS succeeded via the host route; "
+                            "general Internet failure is not established."
+                            if connectivity.dns_success is True
+                            or connectivity.https_success is True
+                            else "No independent success confirms connectivity; "
+                            "investigate the configured targets."
+                        )
+                    ),
                 )
             )
             return

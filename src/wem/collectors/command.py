@@ -1,3 +1,4 @@
+import os
 import subprocess
 from dataclasses import dataclass
 
@@ -21,6 +22,7 @@ def run_command(command: list[str], timeout: float = 5.0) -> CommandResult:
             text=True,
             timeout=timeout,
             check=False,
+            env={**os.environ, "LC_ALL": "C"},
         )
 
         return CommandResult(
@@ -28,6 +30,9 @@ def run_command(command: list[str], timeout: float = 5.0) -> CommandResult:
             stderr=result.stderr.strip(),
             returncode=result.returncode,
         )
+
+    except OSError as exc:
+        return CommandResult(stdout="", stderr=str(exc), returncode=127)
 
     except subprocess.TimeoutExpired:
         return CommandResult(

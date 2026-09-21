@@ -2,6 +2,7 @@ from wem.models.metrics import (
     CalibrationFinding,
     CalibrationResult,
     SensorHealthMetrics,
+    TestOutcome,
 )
 
 
@@ -37,9 +38,32 @@ class CalibrationEngine:
             findings,
         )
 
-        status = self._status(findings)
+        checks = {}
+        for name in (
+            "interface_exists",
+            "interface_up",
+            "wireless_interface",
+            "driver",
+            "firmware_version",
+            "rfkill_soft_blocked",
+            "rfkill_hard_blocked",
+            "network_manager_managed",
+            "power_save",
+        ):
+            value = getattr(health, name)
+            if value is None:
+                checks[name] = TestOutcome(
+                    "unavailable", "The sensor could not determine this value."
+                )
+            else:
+                checks[name] = TestOutcome("observed", str(value))
 
-        calibrated = not any(
+        status = self._status(findings)
+        incomplete = any(check.status == "unavailable" for check in checks.values())
+        if incomplete and status not in {"critical", "warning"}:
+            status = "inconclusive"
+
+        calibrated = not incomplete and not any(
             finding.severity
             in {
                 "critical",
@@ -50,6 +74,7 @@ class CalibrationEngine:
 
         return CalibrationResult(
             status=status,
+            checks=checks,
             calibrated=calibrated,
             findings=findings,
         )
@@ -59,7 +84,7 @@ class CalibrationEngine:
         health: SensorHealthMetrics,
         findings: list[CalibrationFinding],
     ) -> None:
-        if not health.interface_exists:
+        if health.interface_exists is False:
             findings.append(
                 CalibrationFinding(
                     severity="critical",
@@ -98,7 +123,7 @@ class CalibrationEngine:
         if health.driver is None:
             findings.append(
                 CalibrationFinding(
-                    severity="warning",
+                    severity="info",
                     code="DRIVER_UNKNOWN",
                     message=("Wi-Fi driver information could not be determined."),
                 )
@@ -107,7 +132,7 @@ class CalibrationEngine:
         if health.firmware_version is None:
             findings.append(
                 CalibrationFinding(
-                    severity="warning",
+                    severity="info",
                     code="FIRMWARE_UNKNOWN",
                     message=("Wi-Fi firmware version could not be determined."),
                 )

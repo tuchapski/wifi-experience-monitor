@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from wem.collectors.command import run_command
 from wem.models.metrics import SensorHealthMetrics
@@ -48,7 +49,11 @@ class SensorHealthCollector:
         )
 
         if not result.success:
-            metrics.interface_exists = False
+            metrics.interface_exists = (
+                False
+                if "does not exist" in result.stderr or "Cannot find device" in result.stderr
+                else None
+            )
 
             self.errors.append("Unable to read interface state")
 
@@ -86,7 +91,7 @@ class SensorHealthCollector:
         )
 
         if not result.success:
-            metrics.wireless_interface = False
+            metrics.wireless_interface = None
 
             self.errors.append("Interface was not recognized by iw")
 
@@ -151,34 +156,21 @@ class SensorHealthCollector:
         self,
         metrics: SensorHealthMetrics,
     ) -> None:
-        result = run_command(
-            [
-                "rfkill",
-                "list",
-                "wifi",
-            ]
-        )
-
-        if not result.success:
-            return
-
-        output = result.stdout.lower()
-
-        soft_match = re.search(
-            r"soft blocked:\s*(yes|no)",
-            output,
-        )
-
-        hard_match = re.search(
-            r"hard blocked:\s*(yes|no)",
-            output,
-        )
-
-        if soft_match is not None:
-            metrics.rfkill_soft_blocked = soft_match.group(1) == "yes"
-
-        if hard_match is not None:
-            metrics.rfkill_hard_blocked = hard_match.group(1) == "yes"
+        # Restrict rfkill evidence to the radio backing the selected interface.
+        radio = Path("/sys/class/net") / self.interface / "phy80211"
+        try:
+            entries = list(radio.glob("rfkill*"))
+            if len(entries) != 1:
+                return
+            for filename, attribute in (
+                ("soft", "rfkill_soft_blocked"),
+                ("hard", "rfkill_hard_blocked"),
+            ):
+                value = (entries[0] / filename).read_text().strip()
+                if value in {"0", "1"}:
+                    setattr(metrics, attribute, value == "1")
+        except OSError as exc:
+            self.errors.append(f"Unable to read radio block state: {exc}")
 
     def _collect_network_manager(
         self,

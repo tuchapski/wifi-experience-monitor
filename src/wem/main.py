@@ -1,50 +1,21 @@
 import argparse
 
-from wem.runtime.console import ConsoleSensorRuntime
-from wem.runtime.sensor import RuntimeConfig
+import uvicorn
+
+from wem.api.app import create_app
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=("Wi-Fi Experience Monitor sensor"))
-
-    parser.add_argument(
-        "--interface",
-        required=True,
-        help=("Wireless interface to monitor"),
-    )
-
-    parser.add_argument(
-        "--interval",
-        type=float,
-        default=5.0,
-        help=("Collection interval in seconds"),
-    )
-
-    parser.add_argument(
-        "--database",
-        default="data/wem.db",
-        help=("SQLite database path"),
-    )
-
+    parser = argparse.ArgumentParser(description="Wi-Fi Experience Monitor API")
+    parser.add_argument("--database", default="data/wem.db", help="SQLite database path")
+    parser.add_argument("--host", default="127.0.0.1", help="API listen address")
+    parser.add_argument("--port", type=int, default=8000, help="API listen port")
     return parser
 
 
 def main() -> None:
-    parser = build_parser()
-
-    args = parser.parse_args()
-
-    config = RuntimeConfig(
-        interface=args.interface,
-        interval_seconds=args.interval,
-    )
-
-    runtime = ConsoleSensorRuntime(
-        config=config,
-        database_path=args.database,
-    )
-
-    runtime.run_forever()
+    args = build_parser().parse_args()
+    uvicorn.run(create_app(args.database), host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

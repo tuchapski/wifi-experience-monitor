@@ -17,6 +17,7 @@ export interface SensorConfiguration {
 
 
 export interface SensorStatus {
+  started_at: string | null;
   running: boolean;
 
   interface: string | null;
@@ -53,6 +54,9 @@ export interface WifiMetrics {
   tx_bitrate_mbps: number | null;
   rx_bitrate_mbps: number | null;
 
+  tx_channel_width_mhz?: number | null;
+  rx_channel_width_mhz?: number | null;
+
   tx_mcs: number | null;
   rx_mcs: number | null;
 
@@ -87,6 +91,7 @@ export interface WifiMetrics {
 
 
 export interface WifiDeltaMetrics {
+  unavailable_reason?: string | null;
   interval_seconds: number | null;
 
   tx_packets_delta: number | null;
@@ -119,7 +124,15 @@ export interface NetworkMetrics {
 }
 
 
+export interface TestOutcome {
+  status: "passed" | "failed" | "error" | "skipped" | "unavailable" | "observed";
+  reason: string;
+  scope: string;
+}
+
 export interface ConnectivityMetrics {
+  tests?: Record<string, TestOutcome>;
+
   gateway_reachable: boolean | null;
 
   gateway_packet_loss_percent: number | null;
@@ -152,7 +165,7 @@ export interface ConnectivityMetrics {
 export interface SensorHealthMetrics {
   interface: string;
 
-  interface_exists: boolean;
+  interface_exists: boolean | null;
 
   interface_up: boolean | null;
 
@@ -186,6 +199,7 @@ export interface CalibrationFinding {
 
 
 export interface CalibrationResult {
+  checks?: Record<string, TestOutcome>;
   status: string;
 
   calibrated: boolean;
@@ -206,6 +220,7 @@ export interface DiagnosticFinding {
 
 
 export interface DiagnosticResult {
+  complete?: boolean;
   overall_status: string;
 
   probable_domain: string | null;

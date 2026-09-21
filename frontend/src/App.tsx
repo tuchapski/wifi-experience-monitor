@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import SensorControl from "./SensorControl";
+import WifiDetails from "./WifiDetails";
 
 import {
   getActiveIncidents,
@@ -13,6 +14,8 @@ import type {
   HistoryRecord,
   IncidentRecord,
   SensorSnapshot,
+  SensorStatus,
+  TestOutcome,
 } from "./types";
 
 import "./App.css";
@@ -22,8 +25,8 @@ function formatNumber(
   value: number | null,
   suffix = "",
 ): string {
-  if (value === null) {
-    return "N/A";
+  if (value == null || !Number.isFinite(value)) {
+    return "Unavailable";
   }
 
   return `${value}${suffix}`;
@@ -52,7 +55,21 @@ function formatDate(
 }
 
 
+function TestDetails({ outcome }: { outcome?: TestOutcome }) {
+  const labels: Record<string, string> = {
+    passed: "Passed", failed: "Failed", error: "Collection error",
+    skipped: "Not run", unavailable: "Unavailable", observed: "Observed",
+  };
+  return <small>
+    <strong>{outcome ? labels[outcome.status] ?? outcome.status : "Unavailable"}</strong>
+    {outcome && <><br />{outcome.reason}<br />
+      {outcome.scope === "host" ? "Host route (not bound to selected Wi-Fi)" : "Selected interface"}
+    </>}
+  </small>;
+}
+
 function App() {
+  const [sensorStatus, setSensorStatus] = useState<SensorStatus | null>(null);
   const [snapshot, setSnapshot] =
     useState<SensorSnapshot | null>(null);
 
@@ -128,7 +145,11 @@ function App() {
   }, []);
 
 
-  if (snapshot === null) {
+  const currentSnapshot = sensorStatus?.running && sensorStatus.started_at && snapshot
+    && snapshot.wifi.interface === sensorStatus.interface
+    && Date.parse(snapshot.timestamp) >= Date.parse(sensorStatus.started_at);
+
+  if (!currentSnapshot || snapshot === null) {
     return (
       <main className="page">
 
@@ -147,7 +168,7 @@ function App() {
         </header>
 
 
-        <SensorControl />
+        <SensorControl onStatusChange={setSensorStatus} />
 
 
         {error !== null && (
@@ -158,8 +179,10 @@ function App() {
 
 
         <div className="empty-state">
-          No monitoring data available yet.
-          Start the sensor to begin collecting data.
+          {sensorStatus?.running
+            ? "Waiting for the first sample of this monitoring session."
+            : "Monitoring stopped. Select a valid Wi-Fi interface and click Start Monitoring."}
+          <p>Stored samples preserved: {history.length}</p>
         </div>
 
       </main>
@@ -196,7 +219,7 @@ function App() {
       </header>
 
 
-      <SensorControl />
+      <SensorControl onStatusChange={setSensorStatus} />
 
 
       {error !== null && (
@@ -205,6 +228,13 @@ function App() {
         </div>
       )}
 
+
+      {snapshot.diagnostic?.complete === false && (
+        <div className="empty-state">
+          Assessment incomplete: missing measurements or unresolved sensor checks.
+          Available findings are shown below; missing data is not evidence of recovery.
+        </div>
+      )}
 
       <section className="diagnostic-overview">
 
@@ -298,6 +328,8 @@ function App() {
             )}
           </strong>
 
+          <TestDetails outcome={snapshot.connectivity.tests?.gateway} />
+
         </div>
 
 
@@ -314,6 +346,8 @@ function App() {
               " ms",
             )}
           </strong>
+
+          <TestDetails outcome={snapshot.connectivity.tests?.internet} />
 
         </div>
 
@@ -332,6 +366,8 @@ function App() {
             )}
           </strong>
 
+          <TestDetails outcome={snapshot.connectivity.tests?.dns} />
+
         </div>
 
 
@@ -348,6 +384,8 @@ function App() {
               " ms",
             )}
           </strong>
+
+          <TestDetails outcome={snapshot.connectivity.tests?.https} />
 
         </div>
 
@@ -480,6 +518,8 @@ function App() {
       </section>
 
 
+      <WifiDetails snapshot={snapshot} />
+
       {activeIncidents.length > 0 && (
         <section className="active-incidents">
 
@@ -597,6 +637,18 @@ function App() {
       </section>
 
 
+      {snapshot.diagnostic && snapshot.diagnostic.findings.length > 0 && (
+        <section className="panel">
+          <h2>Diagnostic evidence</h2>
+          <ul>{snapshot.diagnostic.findings.map((finding) => (
+            <li key={finding.code}>
+              <strong>{finding.severity.toUpperCase()} · {finding.domain}</strong>
+              {" — "}{finding.message}
+            </li>
+          ))}</ul>
+        </section>
+      )}
+
       {snapshot.calibration && (
         <section className="panel">
 
@@ -619,6 +671,23 @@ function App() {
                 : "No"}
             </strong>
           </p>
+          <p>These checks describe what the sensor could verify. They do not rule out every local cause.</p>
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Check</th><th>Result</th><th>Evidence</th></tr></thead>
+              <tbody>{Object.entries(snapshot.calibration.checks ?? {}).map(([name, check]) => (
+                <tr key={name}>
+                  <td>{name.replaceAll("_", " ")}</td>
+                  <td>{check.status === "unavailable" ? "Inconclusive" : "Observed"}</td>
+                  <td>{check.reason}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <ul>{snapshot.calibration.findings.map((finding) => (
+            <li key={finding.code}><strong>{finding.severity.toUpperCase()}</strong>{" — "}{finding.message}</li>
+          ))}</ul>
+
 
         </section>
       )}
