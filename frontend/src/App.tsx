@@ -5,6 +5,7 @@ import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
 
 import {
+  clearIncidentHistory,
   getActiveIncidents,
   getIncidentHistory,
   getLatestSnapshot,
@@ -53,6 +54,89 @@ function formatDate(
   return new Date(value).toLocaleString();
 }
 
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "Unavailable";
+  }
+  if (seconds < 60) {
+    return `${Math.round(seconds)} s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+  if (minutes < 60) {
+    return `${minutes}m ${remainder}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function incidentColor(severity: string): string {
+  if (severity === "critical") return "#b42318";
+  if (severity === "warning") return "#d97706";
+  return "#175cd3";
+}
+
+function IncidentTimeline({ incidents }: { incidents: IncidentRecord[] }) {
+  if (incidents.length === 0) {
+    return null;
+  }
+
+  const now = Date.now();
+  const timestamps = incidents.flatMap((incident) => [
+    new Date(incident.started_at).getTime(),
+    incident.ended_at ? new Date(incident.ended_at).getTime() : now,
+  ]);
+  const start = Math.min(...timestamps);
+  const end = Math.max(...timestamps);
+  const span = Math.max(1, end - start);
+  const left = 220;
+  const right = 20;
+  const width = 960;
+  const chartWidth = width - left - right;
+  const rowHeight = 38;
+  const top = 34;
+  const height = top + incidents.length * rowHeight + 32;
+  const x = (timestamp: number) => left + ((timestamp - start) / span) * chartWidth;
+
+  return (
+    <section className="incident-timeline panel" aria-labelledby="incident-timeline-title">
+      <h2 id="incident-timeline-title">Incident timeline</h2>
+      <p className="metric-note">
+        Each bar represents one incident interval. Open intervals extend to the current time.
+      </p>
+      <div className="incident-timeline-scroll">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Incident duration timeline">
+          {[0, 0.5, 1].map((fraction) => {
+            const timestamp = start + span * fraction;
+            return (
+              <g key={fraction}>
+                <line x1={x(timestamp)} x2={x(timestamp)} y1="20" y2={height - 24} stroke="#e4e7ec" />
+                <text x={x(timestamp)} y="14" textAnchor={fraction === 0 ? "start" : fraction === 1 ? "end" : "middle"}>
+                  {new Date(timestamp).toLocaleString()}
+                </text>
+              </g>
+            );
+          })}
+          {incidents.map((incident, index) => {
+            const incidentStart = new Date(incident.started_at).getTime();
+            const incidentEnd = incident.ended_at ? new Date(incident.ended_at).getTime() : now;
+            const barWidth = Math.max(5, x(incidentEnd) - x(incidentStart));
+            const y = top + index * rowHeight;
+            return (
+              <g key={incident.id}>
+                <text x="8" y={y + 16} dominantBaseline="middle">{incident.code}</text>
+                <rect x={x(incidentStart)} y={y} width={barWidth} height="20" rx="4" fill={incidentColor(incident.severity)}>
+                  <title>{`${incident.code}: ${formatDuration(incident.duration_seconds)} · ${incident.message}`}</title>
+                </rect>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 
 function TestDetails({ outcome }: { outcome?: TestOutcome }) {
   const labels: Record<string, string> = {
@@ -82,6 +166,8 @@ function App() {
     incidentHistory,
     setIncidentHistory,
   ] = useState<IncidentRecord[]>([]);
+
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   const [error, setError] =
     useState<string | null>(null);
@@ -117,6 +203,23 @@ function App() {
           ? err.message
           : "Unknown error",
       );
+    }
+  }
+
+  async function clearHistory() {
+    if (incidentHistory.length === 0 || !window.confirm(
+      "Clear ended incidents from Incident History? Currently open incidents will be preserved.",
+    )) {
+      return;
+    }
+    setClearingHistory(true);
+    try {
+      await clearIncidentHistory();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to clear incident history.");
+    } finally {
+      setClearingHistory(false);
     }
   }
 
@@ -559,9 +662,12 @@ function App() {
 
       <section className="incident-history">
 
-        <h2>
-          Incident History
-        </h2>
+        <div className="incident-history-heading">
+          <h2>Incident History</h2>
+          <button type="button" onClick={() => void clearHistory()} disabled={clearingHistory || incidentHistory.length === 0}>
+            {clearingHistory ? "Clearing…" : "Clear history"}
+          </button>
+        </div>
 
         {incidentHistory.length === 0 ? (
 
@@ -577,11 +683,12 @@ function App() {
 
               <thead>
                 <tr>
-                  <th>Status</th>
                   <th>Severity</th>
                   <th>Domain</th>
                   <th>Code</th>
-                  <th>Opened</th>
+                  <th>Started</th>
+                  <th>Ended</th>
+                  <th>Duration</th>
                 </tr>
               </thead>
 
@@ -591,10 +698,6 @@ function App() {
                   (incident) => (
 
                     <tr key={incident.id}>
-
-                      <td>
-                        {incident.status}
-                      </td>
 
                       <td>
                         {incident.severity}
@@ -610,9 +713,13 @@ function App() {
 
                       <td>
                         {formatDate(
-                          incident.opened_at,
+                          incident.started_at,
                         )}
                       </td>
+
+                      <td>{incident.is_open ? "Ongoing" : formatDate(incident.ended_at)}</td>
+
+                      <td>{formatDuration(incident.duration_seconds)}</td>
 
                     </tr>
 
@@ -628,6 +735,8 @@ function App() {
         )}
 
       </section>
+
+      <IncidentTimeline incidents={incidentHistory} />
 
 
       {snapshot.diagnostic && snapshot.diagnostic.findings.length > 0 && (

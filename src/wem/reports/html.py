@@ -99,14 +99,15 @@ def render_html_report(window: dict[str, Any], incidents: list[dict[str, Any]]) 
     )
     incident_rows = (
         "".join(
-            f"<tr><td>{escape(str(item.get('status', '')))}</td>"
-            f"<td>{escape(str(item.get('severity', '')))}</td>"
+            f"<tr><td>{escape(str(item.get('severity', '')))}</td>"
             f"<td>{escape(str(item.get('domain', '')))}</td>"
             f"<td>{escape(str(item.get('code', '')))}</td>"
-            f"<td>{escape(str(item.get('opened_at', '')))}</td></tr>"
+            f"<td>{escape(str(item.get('started_at', '')))}</td>"
+            f"<td>{escape(str(item.get('ended_at', 'Ongoing')))}</td>"
+            f"<td>{escape(str(item.get('duration_seconds', '')))} s</td></tr>"
             for item in incidents
         )
-        or '<tr><td colspan="5">No incidents recorded.</td></tr>'
+        or '<tr><td colspan="6">No incidents recorded.</td></tr>'
     )
     samples = sum(point.get("sample_count", 0) for point in points)
     return f"""<!doctype html>
@@ -124,6 +125,6 @@ th{{color:#667085}}@media(max-width:800px){{main{{padding:16px}}.summary,.charts
 <section><h2>Summary</h2><div class="summary"><div class="card">Stored samples<strong>{samples}</strong></div><div class="card">History buckets<strong>{len(points)}</strong></div><div class="card">Environment changes<strong>{len(events)}</strong></div><div class="card">Incidents<strong>{len(incidents)}</strong></div></div></section>
 <section><h2>Measurements</h2><div class="charts">{charts}</div></section>
 <section><h2>Environment changes</h2><table><thead><tr><th>Time</th><th>Field</th><th>Evidence</th></tr></thead><tbody>{event_rows}</tbody></table></section>
-<section><h2>Incidents</h2><table><thead><tr><th>Status</th><th>Severity</th><th>Domain</th><th>Code</th><th>Opened</th></tr></thead><tbody>{incident_rows}</tbody></table></section>
+<section><h2>Incidents</h2><table><thead><tr><th>Severity</th><th>Domain</th><th>Code</th><th>Started</th><th>Ended</th><th>Duration (s)</th></tr></thead><tbody>{incident_rows}</tbody></table></section>
 <section><h2>Interpretation and limitations</h2><ul><li>PHY rates are radio rates, not application throughput.</li><li>DNS and HTTPS use the host route and are not proof that those tests used the selected Wi-Fi interface.</li><li>Empty buckets and unavailable values remain missing data.</li><li>An AP or channel change is evidence of an environment change, not by itself proof of a fault.</li></ul></section>
 </main></body></html>"""

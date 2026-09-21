@@ -624,4 +624,10 @@ tbody tr:hover {
 .history-comparison-card.trend-worse { border-left-color: #b42318; }
 .history-comparison-card.trend-worse em { color: #b42318; }
 .history-comparison-card.trend-flat em { color: #667085; }
+.incident-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.incident-history-heading button { padding: 8px 12px; border: 1px solid #b42318; border-radius: 6px; color: #b42318; background: #fff; cursor: pointer; font: inherit; }
+.incident-history-heading button:disabled { opacity: 0.5; cursor: not-allowed; }
+.incident-timeline-scroll { overflow-x: auto; }
+.incident-timeline svg { width: 100%; min-width: 760px; display: block; }
+.incident-timeline svg text { font-size: 11px; fill: #475467; }
 @media (max-width: 1000px) { .history-chart-grid { grid-template-columns: minmax(0, 1fr); } }

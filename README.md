@@ -171,3 +171,17 @@ visual bucket averages. A positive RSSI delta is generally better because the
 value is less negative; lower latency, packet loss and retry deltas are generally
 better. Missing readings do not become zero and are shown as unavailable. The
 comparison is descriptive evidence, not a causal attribution.
+
+## Incident intervals and history cleanup
+
+Incident history is presented as time intervals. Each entry exposes its start,
+optional end and calculated duration; an open incident has no end timestamp and
+its duration is calculated up to the current time. The dashboard no longer uses
+`active` or `resolved` as the history label, although the runtime still tracks
+open findings internally so that an interval can be closed after recovery.
+
+The Incident timeline chart shows each interval as a colored bar: critical,
+warning or informational. The tooltip includes the incident code, duration and
+evidence message. The **Clear history** action deletes only ended intervals and
+preserves currently open incidents. This prevents a cleanup action from losing
+the interval that is still being measured.

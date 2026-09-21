@@ -352,15 +352,15 @@ export interface IncidentRecord {
 
   message: string;
 
-  status: string;
-
   first_seen_at: string;
 
-  opened_at: string;
+  started_at: string;
 
-  resolved_at: string | null;
+  ended_at: string | null;
 
-  duration_seconds: number | null;
+  duration_seconds: number;
+
+  is_open: boolean;
 }
 
 

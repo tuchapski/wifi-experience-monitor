@@ -4,6 +4,7 @@ from wem.api.app import create_app
 from wem.models.metrics import (
     CalibrationResult,
     ConnectivityMetrics,
+    IncidentEvent,
     NetworkMetrics,
     SensorHealthMetrics,
     SensorSnapshot,
@@ -11,6 +12,7 @@ from wem.models.metrics import (
     WifiMetrics,
 )
 from wem.storage.database import Database
+from wem.storage.incidents import IncidentRepository
 from wem.storage.repository import SnapshotRepository
 
 
@@ -169,3 +171,47 @@ def test_history(
     assert records[0]["signal_dbm"] == -64
 
     assert records[0]["tx_retries_per_100_packets"] == 8.5
+
+
+def test_incident_history_exposes_interval_and_can_be_cleared(tmp_path) -> None:
+    database_path = str(tmp_path / "incidents.db")
+    database = Database(database_path)
+    database.initialize()
+    repository = IncidentRepository(database)
+    repository.process_event(
+        IncidentEvent(
+            action="opened",
+            code="DNS_FAILURE",
+            domain="dns",
+            severity="critical",
+            message="DNS failed",
+            first_seen_at="2026-09-18T10:00:00+00:00",
+            opened_at="2026-09-18T10:00:10+00:00",
+            resolved_at=None,
+        )
+    )
+    repository.process_event(
+        IncidentEvent(
+            action="resolved",
+            code="DNS_FAILURE",
+            domain="dns",
+            severity="critical",
+            message="DNS failed",
+            first_seen_at="2026-09-18T10:00:00+00:00",
+            opened_at="2026-09-18T10:00:10+00:00",
+            resolved_at="2026-09-18T10:01:10+00:00",
+        )
+    )
+
+    with TestClient(create_app(database_path)) as client:
+        history = client.get("/incidents/history").json()
+        assert history[0]["started_at"] == "2026-09-18T10:00:10+00:00"
+        assert history[0]["ended_at"] == "2026-09-18T10:01:10+00:00"
+        assert history[0]["duration_seconds"] == 60.0
+        assert history[0]["is_open"] is False
+        assert "status" not in history[0]
+
+        response = client.delete("/incidents/history")
+        assert response.status_code == 200
+        assert response.json() == {"deleted": 1}
+        assert client.get("/incidents/history").json() == []

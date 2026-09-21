@@ -177,6 +177,13 @@ export function getIncidentHistory(
   );
 }
 
+export function clearIncidentHistory(): Promise<{ deleted: number }> {
+  return request<{ deleted: number }>(
+    "/incidents/history",
+    { method: "DELETE" },
+  );
+}
+
 
 export function getHistoryInterfaces(): Promise<string[]> {
   return request<string[]>("/history/interfaces");

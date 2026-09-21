@@ -64,12 +64,8 @@ def _record_to_summary(
 def _incident_to_dict(
     record: IncidentRecord,
 ) -> dict[str, object]:
-    duration_seconds: float | None = None
-
-    end_time: datetime | None = record.resolved_at
-
-    if end_time is not None:
-        duration_seconds = (end_time - record.opened_at).total_seconds()
+    end_time = record.resolved_at or datetime.now(UTC).replace(tzinfo=None)
+    duration_seconds = max(0.0, (end_time - record.opened_at).total_seconds())
 
     return {
         "id": record.id,
@@ -77,12 +73,20 @@ def _incident_to_dict(
         "domain": record.domain,
         "severity": record.severity,
         "message": record.message,
-        "status": record.status,
-        "first_seen_at": (record.first_seen_at.isoformat()),
-        "opened_at": (record.opened_at.isoformat()),
-        "resolved_at": (record.resolved_at.isoformat() if record.resolved_at is not None else None),
-        "duration_seconds": (duration_seconds),
+        "first_seen_at": (_incident_timestamp(record.first_seen_at)),
+        "started_at": (_incident_timestamp(record.opened_at)),
+        "ended_at": (
+            _incident_timestamp(record.resolved_at) if record.resolved_at is not None else None
+        ),
+        "duration_seconds": duration_seconds,
+        "is_open": record.resolved_at is None,
     }
+
+
+def _incident_timestamp(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
 
 
 def create_app(
@@ -123,6 +127,7 @@ def create_app(
             "GET",
             "POST",
             "PUT",
+            "DELETE",
         ],
         allow_headers=[
             "*",
@@ -297,6 +302,10 @@ def create_app(
         records = incident_repository.history(limit=limit)
 
         return [_incident_to_dict(record) for record in records]
+
+    @app.delete("/incidents/history")
+    def clear_incident_history() -> dict[str, int]:
+        return {"deleted": incident_repository.clear_history()}
 
     return app
 

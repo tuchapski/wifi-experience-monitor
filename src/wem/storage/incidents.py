@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 
 from wem.models.metrics import IncidentEvent
 from wem.storage.database import Database
@@ -74,7 +74,7 @@ class IncidentRepository:
                 select(IncidentRecord)
                 .where(
                     IncidentRecord.code == event.code,
-                    IncidentRecord.status == "active",
+                    IncidentRecord.resolved_at.is_(None),
                 )
                 .order_by(desc(IncidentRecord.opened_at))
                 .limit(1)
@@ -102,7 +102,7 @@ class IncidentRepository:
                 select(IncidentRecord)
                 .where(
                     IncidentRecord.code == code,
-                    IncidentRecord.status == "active",
+                    IncidentRecord.resolved_at.is_(None),
                 )
                 .order_by(desc(IncidentRecord.opened_at))
                 .limit(1)
@@ -116,11 +116,24 @@ class IncidentRepository:
         with self.database.session() as session:
             statement = (
                 select(IncidentRecord)
-                .where(IncidentRecord.status == "active")
+                .where(IncidentRecord.resolved_at.is_(None))
                 .order_by(desc(IncidentRecord.opened_at))
             )
 
             return list(session.scalars(statement))
+
+    def clear_history(self) -> int:
+        """Delete ended incidents while preserving currently open intervals."""
+        with self.database.session() as session:
+            ended_ids = list(
+                session.scalars(
+                    select(IncidentRecord.id).where(IncidentRecord.resolved_at.is_not(None))
+                )
+            )
+            if ended_ids:
+                session.execute(delete(IncidentRecord).where(IncidentRecord.id.in_(ended_ids)))
+            session.commit()
+            return len(ended_ids)
 
     def history(
         self,
