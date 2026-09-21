@@ -158,3 +158,16 @@ is the root cause. Unknown diagnostic codes are not turned into speculative advi
 The recommendations are guidance, not an automated remediation or proof of root
 cause. Missing or incomplete measurements remain visible through calibration and
 collection-error evidence.
+
+## Historical period comparison
+
+The historical dashboard compares the selected window with the immediately
+preceding window of the same duration and interface. It reports the current and
+previous averages for RSSI, gateway and Internet latency, packet loss and TX
+retries, along with the signed delta.
+
+The comparison uses all available raw readings in each period rather than the
+visual bucket averages. A positive RSSI delta is generally better because the
+value is less negative; lower latency, packet loss and retry deltas are generally
+better. Missing readings do not become zero and are shown as unavailable. The
+comparison is descriptive evidence, not a causal attribution.

@@ -24,6 +24,14 @@ const groups: { title: string; unit: string; series: Series[] }[] = [
 const format = (value: number | null | undefined) => value == null
   ? "Unavailable" : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 const date = (value: string) => new Date(value).toLocaleString();
+const comparisonMetrics = [
+  { key: "signal_dbm", label: "RSSI", unit: "dBm", higherIsBetter: true },
+  { key: "gateway_latency_avg_ms", label: "Gateway latency", unit: "ms", higherIsBetter: false },
+  { key: "internet_latency_avg_ms", label: "Internet latency", unit: "ms", higherIsBetter: false },
+  { key: "gateway_packet_loss_percent", label: "Gateway packet loss", unit: "%", higherIsBetter: false },
+  { key: "internet_packet_loss_percent", label: "Internet packet loss", unit: "%", higherIsBetter: false },
+  { key: "tx_retries_per_100_packets", label: "TX retries", unit: "/ 100 TX", higherIsBetter: false },
+];
 
 function HistoryChart({ data, title, unit, series }: { data: HistoryWindow; title: string; unit: string; series: Series[] }) {
   const [hidden, setHidden] = useState<string[]>([]);
@@ -220,6 +228,26 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Lines show averages of available readings per bucket. Hover or use the time slider
         to inspect min/max and available counts. Empty buckets are gaps, not zeros. Samples from different interfaces
         are never combined. DNS/HTTPS use the host route; retry ratios can exceed 100.</p>
+      {data.comparison && <section className="history-comparison" aria-labelledby="history-comparison-title">
+        <h3 id="history-comparison-title">Compared with the previous equivalent period</h3>
+        <p className="metric-note">Previous period: {date(data.comparison.previous_start)} – {date(data.comparison.previous_end)}.
+          Values use all available readings; unavailable metrics remain unavailable.</p>
+        <div className="history-comparison-grid">
+          {comparisonMetrics.map(item => {
+            const current = data.comparison?.current.metrics[item.key]?.avg;
+            const previous = data.comparison?.previous.metrics[item.key]?.avg;
+            const delta = current != null && previous != null ? current - previous : null;
+            const trend = delta == null || Math.abs(delta) < 0.005 ? "flat" :
+              ((item.higherIsBetter && delta > 0) || (!item.higherIsBetter && delta < 0) ? "improved" : "worse");
+            return <article key={item.key} className={`history-comparison-card trend-${trend}`}>
+              <span>{item.label}</span>
+              <strong>{format(current)} {item.unit}</strong>
+              <small>{delta == null ? "No comparable readings" : `${delta >= 0 ? "+" : ""}${format(delta)} ${item.unit} vs previous`}</small>
+              <em>{trend === "improved" ? "Improved" : trend === "worse" ? "Worse" : "Stable / unavailable"}</em>
+            </article>;
+          })}
+        </div>
+      </section>}
       {data.total_samples === 0 ? <div className="empty-state">No samples for this interface and period.</div> :
         <div className="history-chart-grid">{groups.map(group => <HistoryChart key={group.title} data={data} {...group} />)}</div>}
     </>}

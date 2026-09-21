@@ -186,6 +186,7 @@ export function getHistoryWindow(
   interfaceName: string, start: string, end: string, signal?: AbortSignal,
 ): Promise<HistoryWindow> {
   const query = new URLSearchParams({ interface: interfaceName, start, end, max_points: "600" });
+  query.set("compare", "true");
   return request<HistoryWindow>(`/history/window?${query}`, { signal });
 }
 

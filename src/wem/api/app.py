@@ -231,9 +231,16 @@ def create_app(
         end: datetime,
         interface: str = Query(min_length=1, max_length=64),
         max_points: int = Query(default=600, ge=10, le=1200),
+        compare: bool = Query(default=True),
     ) -> dict[str, object]:
         try:
-            return HistoryRepository(database).window(interface, start, end, max_points)
+            return HistoryRepository(database).window(
+                interface,
+                start,
+                end,
+                max_points,
+                include_comparison=compare,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

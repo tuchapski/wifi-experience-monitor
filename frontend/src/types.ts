@@ -374,6 +374,18 @@ export interface HistoryAggregate {
   p99: number | null;
 }
 
+export interface HistorySummary {
+  sample_count: number;
+  metrics: Record<string, HistoryAggregate>;
+}
+
+export interface HistoryComparison {
+  current: HistorySummary;
+  previous: HistorySummary;
+  previous_start: string;
+  previous_end: string;
+}
+
 export interface HistoryPoint {
   timestamp: string;
   sample_count: number;
@@ -388,6 +400,8 @@ export interface HistoryWindow {
   total_samples: number;
   points: HistoryPoint[];
   events: EnvironmentChange[];
+  summary?: HistorySummary;
+  comparison?: HistoryComparison;
 }
 
 export interface EnvironmentChange {

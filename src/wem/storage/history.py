@@ -48,6 +48,7 @@ class HistoryRepository:
         start: datetime,
         end: datetime,
         max_points: int = 600,
+        include_comparison: bool = False,
     ) -> dict[str, object]:
         if start.tzinfo is None or end.tzinfo is None:
             raise ValueError("Start and end must include a timezone.")
@@ -107,6 +108,7 @@ class HistoryRepository:
             ).all()
 
         values_by_bucket: dict[int, dict[str, list[float]]] = {}
+        summary_values: dict[str, list[float]] = {name: [] for name in METRICS}
         start_naive = start.replace(tzinfo=None)
         for raw_row in raw_rows:
             timestamp = raw_row[0]
@@ -115,7 +117,9 @@ class HistoryRepository:
             for offset, name in enumerate(METRICS, start=1):
                 value = raw_row[offset]
                 if value is not None:
-                    bucket_values.setdefault(name, []).append(float(value))
+                    numeric_value = float(value)
+                    bucket_values.setdefault(name, []).append(numeric_value)
+                    summary_values[name].append(numeric_value)
 
         events: list[dict[str, object]] = []
         for timestamp, snapshot_json in event_rows:
@@ -151,7 +155,8 @@ class HistoryRepository:
                     "metrics": metrics,
                 }
             )
-        return {
+        summary = self._summary(summary_values, len(raw_rows))
+        result: dict[str, object] = {
             "interface": interface,
             "start": start.isoformat(),
             "end": end.isoformat(),
@@ -159,4 +164,38 @@ class HistoryRepository:
             "total_samples": sum(typing_cast(int, point["sample_count"]) for point in points),
             "points": points,
             "events": events,
+            "summary": summary,
         }
+        if include_comparison:
+            previous = self.window(
+                interface,
+                start - timedelta(seconds=duration),
+                start,
+                max_points,
+                include_comparison=False,
+            )
+            result["comparison"] = {
+                "current": summary,
+                "previous": previous["summary"],
+                "previous_start": previous["start"],
+                "previous_end": previous["end"],
+            }
+        return result
+
+    @staticmethod
+    def _summary(
+        values_by_metric: dict[str, list[float]],
+        sample_count: int,
+    ) -> dict[str, object]:
+        metrics: dict[str, dict[str, float | int | None]] = {}
+        for name, values in values_by_metric.items():
+            metrics[name] = {
+                "avg": round(sum(values) / len(values), 3) if values else None,
+                "min": min(values) if values else None,
+                "max": max(values) if values else None,
+                "count": len(values),
+                "p50": _percentile(values, 0.50),
+                "p95": _percentile(values, 0.95),
+                "p99": _percentile(values, 0.99),
+            }
+        return {"sample_count": sample_count, "metrics": metrics}

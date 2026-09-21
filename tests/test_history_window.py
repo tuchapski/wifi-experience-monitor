@@ -83,6 +83,31 @@ def test_all_samples_are_included_without_last_100_limit(database):
     assert len(result["points"]) == 10
 
 
+def test_comparison_returns_previous_equivalent_period(database):
+    add_samples(
+        database,
+        [
+            (-50, "wlan0", -70),
+            (10, "wlan0", -50),
+            (20, "wlan0", -50),
+        ],
+    )
+    result = HistoryRepository(database).window(
+        "wlan0",
+        START,
+        START + timedelta(seconds=60),
+        10,
+        include_comparison=True,
+    )
+
+    comparison = result["comparison"]
+    assert comparison["previous_start"] == (START - timedelta(seconds=60)).isoformat()
+    assert comparison["current"]["sample_count"] == 2
+    assert comparison["previous"]["sample_count"] == 1
+    assert comparison["current"]["metrics"]["signal_dbm"]["avg"] == -50
+    assert comparison["previous"]["metrics"]["signal_dbm"]["avg"] == -70
+
+
 def test_saved_offset_timestamp_is_normalized_to_utc(database):
     snapshot = SensorSnapshot.create(
         health=SensorHealthMetrics("wlan0"),

@@ -612,4 +612,16 @@ tbody tr:hover {
 .recommendation-warning { border-left-color: #d97706; }
 .recommendation-critical { border-left-color: #c62828; }
 .recommendation-info { border-left-color: #175cd3; }
+.history-comparison { margin: 18px 0; padding: 16px; border: 1px solid #d0d5dd; border-radius: 10px; background: #f9fafb; }
+.history-comparison h3 { margin: 0 0 6px; }
+.history-comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.history-comparison-card { display: flex; flex-direction: column; gap: 5px; padding: 12px; border-left: 4px solid #98a2b3; border-radius: 6px; background: #fff; }
+.history-comparison-card strong { font-size: 18px; }
+.history-comparison-card small { color: #667085; }
+.history-comparison-card em { font-size: 12px; font-style: normal; font-weight: 600; }
+.history-comparison-card.trend-improved { border-left-color: #17803d; }
+.history-comparison-card.trend-improved em { color: #17803d; }
+.history-comparison-card.trend-worse { border-left-color: #b42318; }
+.history-comparison-card.trend-worse em { color: #b42318; }
+.history-comparison-card.trend-flat em { color: #667085; }
 @media (max-width: 1000px) { .history-chart-grid { grid-template-columns: minmax(0, 1fr); } }
