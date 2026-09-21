@@ -21,6 +21,17 @@ METRICS = (
 )
 
 
+def _percentile(values: list[float], fraction: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = position - lower
+    return round(ordered[lower] + (ordered[upper] - ordered[lower]) * weight, 3)
+
+
 class HistoryRepository:
     def __init__(self, database: Database):
         self.database = database
@@ -69,6 +80,15 @@ class HistoryRepository:
         )
         with self.database.session() as session:
             rows = {row["bucket"]: row for row in session.execute(statement).mappings()}
+            raw_statement = select(
+                SnapshotRecord.timestamp,
+                *(getattr(SnapshotRecord, name) for name in METRICS),
+            ).where(
+                SnapshotRecord.interface == interface,
+                SnapshotRecord.timestamp >= start.replace(tzinfo=None),
+                SnapshotRecord.timestamp < end.replace(tzinfo=None),
+            )
+            raw_rows = session.execute(raw_statement).all()
             event_rows = session.execute(
                 select(SnapshotRecord.timestamp, SnapshotRecord.snapshot_json)
                 .where(
@@ -78,6 +98,17 @@ class HistoryRepository:
                 )
                 .order_by(SnapshotRecord.timestamp)
             ).all()
+
+        values_by_bucket: dict[int, dict[str, list[float]]] = {}
+        start_naive = start.replace(tzinfo=None)
+        for raw_row in raw_rows:
+            timestamp = raw_row[0]
+            bucket_index = int((timestamp - start_naive).total_seconds() // seconds)
+            bucket_values = values_by_bucket.setdefault(bucket_index, {})
+            for offset, name in enumerate(METRICS, start=1):
+                value = raw_row[offset]
+                if value is not None:
+                    bucket_values.setdefault(name, []).append(float(value))
 
         events = []
         for timestamp, snapshot_json in event_rows:
@@ -92,12 +123,20 @@ class HistoryRepository:
             row = rows.get(index)
             metrics = {}
             for name in METRICS:
+                values = values_by_bucket.get(index, {}).get(name, [])
                 metrics[name] = {
                     stat: row[f"{name}_{stat}"]
                     if row is not None
                     else (0 if stat == "count" else None)
                     for stat in ("avg", "min", "max", "count")
                 }
+                metrics[name].update(
+                    {
+                        "p50": _percentile(values, 0.50),
+                        "p95": _percentile(values, 0.95),
+                        "p99": _percentile(values, 0.99),
+                    }
+                )
             points.append(
                 {
                     "timestamp": (start + timedelta(seconds=index * seconds)).isoformat(),

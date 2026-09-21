@@ -135,3 +135,9 @@ period through `GET /reports/html`. The report is self-contained: it includes
 inline SVG charts, stored sample counts, environment changes, incidents and
 interpretation limitations. It can be printed to PDF from the browser without
 requiring a server-side PDF dependency.
+
+History buckets also expose P50, P95 and P99 for every numeric metric. Percentiles
+are calculated from the raw readings inside each bucket using linear interpolation;
+they are not estimated from bucket averages. P95/P99 help expose short spikes that
+an average can hide. A percentile is unavailable when the bucket has no valid
+readings, and values from different interfaces are never combined.

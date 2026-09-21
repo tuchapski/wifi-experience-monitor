@@ -62,7 +62,15 @@ def test_aggregation_is_filtered_and_preserves_nulls_and_extremes(database):
     assert len(result["points"]) == 10
     first = result["points"][0]
     assert first["sample_count"] == 3
-    assert first["metrics"]["signal_dbm"] == {"avg": -70, "min": -80, "max": -60, "count": 2}
+    assert first["metrics"]["signal_dbm"] == {
+        "avg": -70,
+        "min": -80,
+        "max": -60,
+        "count": 2,
+        "p50": -70,
+        "p95": -61,
+        "p99": -60.2,
+    }
     assert result["points"][1]["metrics"]["signal_dbm"]["avg"] is None
     assert result["points"][1]["sample_count"] == 0
     assert first["metrics"]["gateway_packet_loss_percent"]["avg"] is None

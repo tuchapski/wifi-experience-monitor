@@ -78,3 +78,32 @@ def test_html_report_rejects_invalid_range(tmp_path):
             },
         )
     assert response.status_code == 422
+
+
+def test_report_renders_percentile_data_from_history():
+    html = render_html_report(
+        {
+            "interface": "wlan0",
+            "start": "2026-09-21T12:00:00+00:00",
+            "end": "2026-09-21T13:00:00+00:00",
+            "points": [
+                {
+                    "sample_count": 2,
+                    "metrics": {
+                        "signal_dbm": {
+                            "avg": -65,
+                            "min": -70,
+                            "max": -60,
+                            "count": 2,
+                            "p50": -65,
+                            "p95": -60.5,
+                            "p99": -60.1,
+                        }
+                    },
+                }
+            ],
+            "events": [],
+        },
+        [],
+    )
+    assert "Wi-Fi signal" in html

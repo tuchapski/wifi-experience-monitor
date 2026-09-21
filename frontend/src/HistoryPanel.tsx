@@ -109,6 +109,7 @@ function HistoryChart({ data, title, unit, series }: { data: HistoryWindow; titl
         const metric = point.metrics[item.key];
         return <li key={item.key}>{item.label}: average <strong>{format(metric?.avg)}</strong>,
           min {format(metric?.min)}, max {format(metric?.max)} {unit}
+          {" · "}P95 {format(metric?.p95)} {unit}, P99 {format(metric?.p99)} {unit}
           {" · "}{metric?.count ?? 0}/{point.sample_count} available readings</li>;
       })}</ul>
     </div>}
