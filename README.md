@@ -65,6 +65,25 @@ The backend rechecks that the interface is available before starting. Stop ends
 collection; each new Start creates a new runtime and resets metric deltas.
 Historical samples remain stored but are not displayed as a current session.
 
+## Environment-change events
+
+Each comparable sample is checked for radio and association changes. The sensor
+records changes to SSID, BSSID, channel, frequency, operating channel width,
+TX/RX PHY mode and association state. The first sample and transitions involving
+unknown values do not create an event, avoiding false changes after a collector
+failure.
+
+Environment changes are stored inside the snapshot JSON and returned with the
+time-range history response. The dashboard renders them as red vertical markers
+and lists the exact sample time and old/new values. A BSSID change is evidence of
+a different access point; it does not by itself prove a roaming problem. Channel,
+frequency, width and PHY changes may be caused by AP steering, channel selection,
+band changes or renegotiation and should be correlated with RSSI, retries and
+latency.
+
+The event list is bounded by the selected history window and interface. Old
+snapshots created before this feature simply have no events and remain valid.
+
 
 ## Calibration and diagnostic evidence
 

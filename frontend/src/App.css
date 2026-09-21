@@ -601,4 +601,6 @@ tbody tr:hover {
 .history-inspector input { flex: 1; min-width: 60px; }
 .history-inspection { font-size: 12px; color: #475467; line-height: 1.6; min-height: 80px; margin-top: 12px; }
 .history-inspection ul { padding-left: 18px; }
+.history-events { margin: 12px 0 0; padding-left: 18px; color: #7a271a; font-size: 12px; line-height: 1.6; }
+.history-events time { color: #667085; }
 @media (max-width: 1000px) { .history-chart-grid { grid-template-columns: minmax(0, 1fr); } }

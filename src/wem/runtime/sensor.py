@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 
+from wem.analysis.environment import EnvironmentChangeAnalyzer
 from wem.analysis.wifi_delta import WifiDeltaAnalyzer
 from wem.calibration.engine import CalibrationEngine
 from wem.collectors.health import SensorHealthCollector
@@ -33,6 +34,7 @@ class SensorRuntime:
         self.previous_timestamp: float | None = None
 
         self.delta_analyzer = WifiDeltaAnalyzer()
+        self.environment_analyzer = EnvironmentChangeAnalyzer()
         self.calibration_engine = CalibrationEngine()
         self.diagnostic_engine = DiagnosticEngine()
         self.incident_engine = IncidentEngine()
@@ -86,6 +88,7 @@ class SensorRuntime:
             connectivity_metrics = connectivity_tester.run()
 
         wifi_delta = None
+        environment_changes = []
 
         if self.previous_wifi is not None and self.previous_timestamp is not None:
             interval = started - self.previous_timestamp
@@ -94,6 +97,11 @@ class SensorRuntime:
                 previous=self.previous_wifi,
                 current=wifi_metrics,
                 interval_seconds=interval,
+            )
+
+            environment_changes = self.environment_analyzer.compare(
+                previous=self.previous_wifi,
+                current=wifi_metrics,
             )
 
         errors = [
@@ -125,6 +133,7 @@ class SensorRuntime:
             connectivity=connectivity_metrics,
             diagnostic=diagnostic,
             incidents=incident_evaluation,
+            environment_changes=environment_changes,
             errors=errors,
         )
 

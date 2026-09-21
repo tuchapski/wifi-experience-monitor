@@ -1,5 +1,6 @@
 """Bounded, time-bucketed history queries over the existing SQLite schema."""
 
+import json
 import math
 from datetime import UTC, datetime, timedelta
 
@@ -68,6 +69,24 @@ class HistoryRepository:
         )
         with self.database.session() as session:
             rows = {row["bucket"]: row for row in session.execute(statement).mappings()}
+            event_rows = session.execute(
+                select(SnapshotRecord.timestamp, SnapshotRecord.snapshot_json)
+                .where(
+                    SnapshotRecord.interface == interface,
+                    SnapshotRecord.timestamp >= start.replace(tzinfo=None),
+                    SnapshotRecord.timestamp < end.replace(tzinfo=None),
+                )
+                .order_by(SnapshotRecord.timestamp)
+            ).all()
+
+        events = []
+        for timestamp, snapshot_json in event_rows:
+            try:
+                changes = json.loads(snapshot_json).get("environment_changes", [])
+            except (TypeError, json.JSONDecodeError):
+                changes = []
+            for change in changes:
+                events.append({"timestamp": timestamp.replace(tzinfo=UTC).isoformat(), **change})
         points = []
         for index in range(math.ceil(duration / seconds)):
             row = rows.get(index)
@@ -93,4 +112,5 @@ class HistoryRepository:
             "bucket_seconds": seconds,
             "total_samples": sum(point["sample_count"] for point in points),
             "points": points,
+            "events": events,
         }

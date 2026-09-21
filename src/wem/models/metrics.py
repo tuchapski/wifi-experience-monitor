@@ -199,6 +199,18 @@ class DiagnosticResult:
 
 
 @dataclass(slots=True)
+class EnvironmentChange:
+    """A change in the radio association or operating environment."""
+
+    code: str
+    field: str
+    previous: str | int | float | bool
+    current: str | int | float | bool
+    message: str
+    severity: str = "info"
+
+
+@dataclass(slots=True)
 class Incident:
     code: str
     domain: str
@@ -248,6 +260,8 @@ class SensorSnapshot:
     diagnostic: DiagnosticResult | None
     incidents: IncidentEvaluation | None
 
+    environment_changes: list[EnvironmentChange] = field(default_factory=list)
+
     collector_errors: list[str] = field(default_factory=list)
 
     @classmethod
@@ -261,6 +275,7 @@ class SensorSnapshot:
         wifi_delta: WifiDeltaMetrics | None = None,
         diagnostic: DiagnosticResult | None = None,
         incidents: IncidentEvaluation | None = None,
+        environment_changes: list[EnvironmentChange] | None = None,
         errors: list[str] | None = None,
     ) -> "SensorSnapshot":
         return cls(
@@ -273,6 +288,7 @@ class SensorSnapshot:
             connectivity=connectivity,
             diagnostic=diagnostic,
             incidents=incidents,
+            environment_changes=environment_changes or [],
             collector_errors=errors or [],
         )
 

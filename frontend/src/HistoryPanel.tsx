@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getHistoryInterfaces, getHistoryWindow } from "./api";
-import type { HistoryWindow } from "./types";
+import type { EnvironmentChange, HistoryWindow } from "./types";
 
 interface Series { key: string; label: string; color: string }
 const groups: { title: string; unit: string; series: Series[] }[] = [
@@ -43,6 +43,12 @@ function HistoryChart({ data, title, unit, series }: { data: HistoryWindow; titl
   const y = (value: number) => 175 - (value - low) * 145 / (high - low);
   const selected = Math.min(cursor, data.points.length - 1);
   const point = data.points[selected];
+  const chartStart = new Date(data.start).getTime();
+  const chartEnd = new Date(data.end).getTime();
+  const eventPosition = (event: EnvironmentChange) => {
+    const timestamp = event.timestamp ? new Date(event.timestamp).getTime() : chartStart;
+    return 62 + Math.max(0, Math.min(1, (timestamp - chartStart) / Math.max(1, chartEnd - chartStart))) * 710;
+  };
   function segments(key: string): string[] {
     const result: string[] = [];
     let segment: string[] = [];
@@ -83,6 +89,11 @@ function HistoryChart({ data, title, unit, series }: { data: HistoryWindow; titl
         {data.points.map((entry, index) => entry.metrics[item.key]?.avg == null ? null :
           <circle key={index} cx={x(index)} cy={y(entry.metrics[item.key].avg!)} r="1.6" fill={item.color} />)}
       </g>)}
+      {data.events.map((event, index) => <g key={`${event.code}-${event.timestamp}-${index}`}>
+        <line x1={eventPosition(event)} x2={eventPosition(event)} y1="25" y2="175"
+          stroke="#b42318" strokeDasharray="3 3" />
+        <title>{event.message}</title>
+      </g>)}
       {point && <line x1={x(selected)} x2={x(selected)} y1="25" y2="175" stroke="#667085" strokeDasharray="4 4" />}
       {!hasValues && <text x="420" y="100" textAnchor="middle">No available values for selected series</text>}
       <text x="62" y="208">{date(data.start)}</text>
@@ -101,6 +112,12 @@ function HistoryChart({ data, title, unit, series }: { data: HistoryWindow; titl
           {" · "}{metric?.count ?? 0}/{point.sample_count} available readings</li>;
       })}</ul>
     </div>}
+    {data.events.length > 0 && <ul className="history-events">
+      {data.events.map((event, index) => <li key={`${event.code}-${event.timestamp}-${index}`}>
+        <time>{event.timestamp ? date(event.timestamp) : "Unknown time"}</time>{" · "}
+        <strong>{event.field}</strong>{" — "}{event.message}
+      </li>)}
+    </ul>}
   </section>;
 }
 

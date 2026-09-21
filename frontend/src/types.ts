@@ -373,4 +373,15 @@ export interface HistoryWindow {
   bucket_seconds: number;
   total_samples: number;
   points: HistoryPoint[];
+  events: EnvironmentChange[];
+}
+
+export interface EnvironmentChange {
+  code: string;
+  field: string;
+  previous: string | number | boolean;
+  current: string | number | boolean;
+  message: string;
+  severity: string;
+  timestamp?: string;
 }
