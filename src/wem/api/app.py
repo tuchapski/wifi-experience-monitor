@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -100,7 +101,7 @@ def create_app(
     interface_discovery = WirelessInterfaceDiscovery()
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
         sensor_controller.stop()
 
@@ -230,7 +231,7 @@ def create_app(
         end: datetime,
         interface: str = Query(min_length=1, max_length=64),
         max_points: int = Query(default=600, ge=10, le=1200),
-    ) -> dict:
+    ) -> dict[str, object]:
         try:
             return HistoryRepository(database).window(interface, start, end, max_points)
         except ValueError as exc:

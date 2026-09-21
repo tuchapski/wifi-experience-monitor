@@ -13,12 +13,15 @@ def _value(value: Any) -> str:
     return str(value)
 
 
+def _metric_value(point: dict[str, Any], metric: str) -> float | None:
+    value = point.get("metrics", {}).get(metric, {}).get("avg")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def _chart(title: str, unit: str, points: list[dict[str, Any]], metric: str) -> str:
-    values = [
-        point["metrics"].get(metric, {}).get("avg")
-        for point in points
-        if point["metrics"].get(metric, {}).get("avg") is not None
-    ]
+    values = [value for point in points if (value := _metric_value(point, metric)) is not None]
     if not values:
         return (
             f"<article class='chart'><h3>{escape(title)}</h3><p>No available values.</p></article>"
@@ -38,7 +41,7 @@ def _chart(title: str, unit: str, points: list[dict[str, Any]], metric: str) -> 
     segments: list[list[str]] = []
     current: list[str] = []
     for index, point in enumerate(points):
-        value = point["metrics"].get(metric, {}).get("avg")
+        value = _metric_value(point, metric)
         if value is None:
             if current:
                 segments.append(current)

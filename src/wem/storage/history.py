@@ -3,6 +3,7 @@
 import json
 import math
 from datetime import UTC, datetime, timedelta
+from typing import cast as typing_cast
 
 from sqlalchemy import Integer, cast, func, select
 
@@ -41,7 +42,13 @@ class HistoryRepository:
         with self.database.session() as session:
             return list(session.scalars(statement))
 
-    def window(self, interface: str, start: datetime, end: datetime, max_points: int = 600):
+    def window(
+        self,
+        interface: str,
+        start: datetime,
+        end: datetime,
+        max_points: int = 600,
+    ) -> dict[str, object]:
         if start.tzinfo is None or end.tzinfo is None:
             raise ValueError("Start and end must include a timezone.")
         start = start.astimezone(UTC).replace(microsecond=0)
@@ -110,7 +117,7 @@ class HistoryRepository:
                 if value is not None:
                     bucket_values.setdefault(name, []).append(float(value))
 
-        events = []
+        events: list[dict[str, object]] = []
         for timestamp, snapshot_json in event_rows:
             try:
                 changes = json.loads(snapshot_json).get("environment_changes", [])
@@ -118,7 +125,7 @@ class HistoryRepository:
                 changes = []
             for change in changes:
                 events.append({"timestamp": timestamp.replace(tzinfo=UTC).isoformat(), **change})
-        points = []
+        points: list[dict[str, object]] = []
         for index in range(math.ceil(duration / seconds)):
             row = rows.get(index)
             metrics = {}
@@ -149,7 +156,7 @@ class HistoryRepository:
             "start": start.isoformat(),
             "end": end.isoformat(),
             "bucket_seconds": seconds,
-            "total_samples": sum(point["sample_count"] for point in points),
+            "total_samples": sum(typing_cast(int, point["sample_count"]) for point in points),
             "points": points,
             "events": events,
         }
