@@ -2,16 +2,15 @@ import { useEffect, useState } from "react";
 
 import SensorControl from "./SensorControl";
 import WifiDetails from "./WifiDetails";
+import HistoryPanel from "./HistoryPanel";
 
 import {
   getActiveIncidents,
-  getHistory,
   getIncidentHistory,
   getLatestSnapshot,
 } from "./api";
 
 import type {
-  HistoryRecord,
   IncidentRecord,
   SensorSnapshot,
   SensorStatus,
@@ -73,8 +72,6 @@ function App() {
   const [snapshot, setSnapshot] =
     useState<SensorSnapshot | null>(null);
 
-  const [history, setHistory] =
-    useState<HistoryRecord[]>([]);
 
   const [
     activeIncidents,
@@ -94,21 +91,16 @@ function App() {
     try {
       const [
         latestData,
-        historyData,
         activeIncidentData,
         incidentHistoryData,
       ] = await Promise.all([
         getLatestSnapshot(),
-        getHistory(100),
         getActiveIncidents(),
         getIncidentHistory(50),
       ]);
 
       setSnapshot(latestData);
 
-      setHistory(
-        [...historyData].reverse(),
-      );
 
       setActiveIncidents(
         activeIncidentData,
@@ -182,8 +174,9 @@ function App() {
           {sensorStatus?.running
             ? "Waiting for the first sample of this monitoring session."
             : "Monitoring stopped. Select a valid Wi-Fi interface and click Start Monitoring."}
-          <p>Stored samples preserved: {history.length}</p>
+
         </div>
+        <HistoryPanel currentInterface={sensorStatus?.interface} />
 
       </main>
     );
@@ -718,21 +711,7 @@ function App() {
       )}
 
 
-      <section className="panel">
-
-        <h2>
-          History
-        </h2>
-
-        <p>
-          Stored samples loaded:
-          {" "}
-          <strong>
-            {history.length}
-          </strong>
-        </p>
-
-      </section>
+      <HistoryPanel currentInterface={sensorStatus?.interface} />
 
     </main>
   );

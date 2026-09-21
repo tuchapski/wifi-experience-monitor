@@ -1,5 +1,6 @@
 import type {
   HistoryRecord,
+  HistoryWindow,
   IncidentRecord,
   SensorConfiguration,
   SensorSnapshot,
@@ -174,4 +175,16 @@ export function getIncidentHistory(
   return request<IncidentRecord[]>(
     `/incidents/history?limit=${limit}`,
   );
+}
+
+
+export function getHistoryInterfaces(): Promise<string[]> {
+  return request<string[]>("/history/interfaces");
+}
+
+export function getHistoryWindow(
+  interfaceName: string, start: string, end: string, signal?: AbortSignal,
+): Promise<HistoryWindow> {
+  const query = new URLSearchParams({ interface: interfaceName, start, end, max_points: "600" });
+  return request<HistoryWindow>(`/history/window?${query}`, { signal });
 }

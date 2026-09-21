@@ -17,6 +17,7 @@ from wem.collectors.interfaces import (
 )
 from wem.runtime.controller import SensorController
 from wem.storage.database import Database
+from wem.storage.history import HistoryRepository
 from wem.storage.incidents import IncidentRepository
 from wem.storage.models import (
     IncidentRecord,
@@ -217,6 +218,22 @@ def create_app(
         snapshot = json.loads(record.snapshot_json)
 
         return JSONResponse(content=snapshot)
+
+    @app.get("/history/interfaces")
+    def history_interfaces() -> list[str]:
+        return HistoryRepository(database).interfaces()
+
+    @app.get("/history/window")
+    def history_window(
+        start: datetime,
+        end: datetime,
+        interface: str = Query(min_length=1, max_length=64),
+        max_points: int = Query(default=600, ge=10, le=1200),
+    ) -> dict:
+        try:
+            return HistoryRepository(database).window(interface, start, end, max_points)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/history")
     def history(

@@ -351,3 +351,26 @@ export interface IncidentRecord {
 
   duration_seconds: number | null;
 }
+
+
+export interface HistoryAggregate {
+  avg: number | null;
+  min: number | null;
+  max: number | null;
+  count: number;
+}
+
+export interface HistoryPoint {
+  timestamp: string;
+  sample_count: number;
+  metrics: Record<string, HistoryAggregate>;
+}
+
+export interface HistoryWindow {
+  interface: string;
+  start: string;
+  end: string;
+  bucket_seconds: number;
+  total_samples: number;
+  points: HistoryPoint[];
+}

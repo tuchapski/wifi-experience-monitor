@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
 
@@ -20,6 +20,9 @@ class SnapshotRepository:
         snapshot: SensorSnapshot,
     ) -> SnapshotRecord:
         timestamp = datetime.fromisoformat(snapshot.timestamp)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        timestamp = timestamp.astimezone(UTC).replace(tzinfo=None)
 
         wifi_delta = snapshot.wifi_delta
 
