@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getHistoryInterfaces, getHistoryWindow } from "./api";
+import { getHistoryInterfaces, getHistoryWindow, getReportUrl } from "./api";
 import type { EnvironmentChange, HistoryWindow } from "./types";
 
 interface Series { key: string; label: string; color: string }
@@ -202,6 +202,8 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <label className="history-auto"><input type="checkbox" checked={auto} disabled={period === "custom"}
         onChange={event => setAuto(event.target.checked)} /> Refresh every 30 seconds</label>
       <button type="button" onClick={() => setRevision(value => value + 1)} disabled={loading}>Refresh</button>
+      {data && <button type="button" onClick={() => window.open(
+        getReportUrl(selectedInterface, data.start, data.end), "_blank", "noopener,noreferrer")}>Open HTML report</button>}
     </div>
     {period === "custom" && <div className="history-controls">
       <label>Start · local time<input type="datetime-local" value={customStart} onChange={event => setCustomStart(event.target.value)} /></label>

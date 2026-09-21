@@ -127,3 +127,11 @@ are available again. These checks cannot detect every unreported driver reset.
 
 New fields are stored in the existing snapshot JSON; no database reset or schema
 migration is required. Older snapshots may lack the new directional width fields.
+
+## HTML reports
+
+The historical dashboard can open an HTML report for the selected interface and
+period through `GET /reports/html`. The report is self-contained: it includes
+inline SVG charts, stored sample counts, environment changes, incidents and
+interpretation limitations. It can be printed to PDF from the browser without
+requiring a server-side PDF dependency.

@@ -188,3 +188,8 @@ export function getHistoryWindow(
   const query = new URLSearchParams({ interface: interfaceName, start, end, max_points: "600" });
   return request<HistoryWindow>(`/history/window?${query}`, { signal });
 }
+
+export function getReportUrl(interfaceName: string, start: string, end: string): string {
+  const query = new URLSearchParams({ interface: interfaceName, start, end });
+  return `${API_URL}/reports/html?${query}`;
+}

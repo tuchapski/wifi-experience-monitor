@@ -1,7 +1,7 @@
 import json
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import (
     FastAPI,
@@ -9,12 +9,13 @@ from fastapi import (
     Query,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from wem.collectors.interfaces import (
     WirelessInterfaceDiscovery,
 )
+from wem.reports.html import render_html_report
 from wem.runtime.controller import SensorController
 from wem.storage.database import Database
 from wem.storage.history import HistoryRepository
@@ -234,6 +235,30 @@ def create_app(
             return HistoryRepository(database).window(interface, start, end, max_points)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.get("/reports/html", response_class=HTMLResponse)
+    def html_report(
+        start: datetime,
+        end: datetime,
+        interface: str = Query(min_length=1, max_length=64),
+    ) -> HTMLResponse:
+        try:
+            window = HistoryRepository(database).window(interface, start, end, max_points=600)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        start_utc = start.astimezone(UTC).replace(tzinfo=None)
+        end_utc = end.astimezone(UTC).replace(tzinfo=None)
+        incidents = [
+            _incident_to_dict(record)
+            for record in incident_repository.history(limit=1000)
+            if record.opened_at < end_utc
+            and (record.resolved_at is None or record.resolved_at >= start_utc)
+        ]
+        return HTMLResponse(
+            content=render_html_report(window, incidents),
+            headers={"Content-Disposition": 'inline; filename="wifi-experience-report.html"'},
+        )
 
     @app.get("/history")
     def history(
