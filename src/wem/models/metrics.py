@@ -102,9 +102,7 @@ class ConnectivityMetrics:
     gateway_packet_loss_percent: float | None = None
 
     gateway_latency_min_ms: float | None = None
-
     gateway_latency_avg_ms: float | None = None
-
     gateway_latency_max_ms: float | None = None
 
     gateway_jitter_ms: float | None = None
@@ -119,9 +117,7 @@ class ConnectivityMetrics:
     internet_packet_loss_percent: float | None = None
 
     internet_latency_min_ms: float | None = None
-
     internet_latency_avg_ms: float | None = None
-
     internet_latency_max_ms: float | None = None
 
     internet_jitter_ms: float | None = None
@@ -129,6 +125,45 @@ class ConnectivityMetrics:
     https_success: bool | None = None
     https_status_code: int | None = None
     https_total_time_ms: float | None = None
+
+
+@dataclass(slots=True)
+class SensorHealthMetrics:
+    interface: str
+
+    interface_exists: bool = False
+    interface_up: bool | None = None
+
+    wireless_interface: bool | None = None
+
+    driver: str | None = None
+    firmware_version: str | None = None
+
+    kernel_version: str | None = None
+
+    rfkill_soft_blocked: bool | None = None
+    rfkill_hard_blocked: bool | None = None
+
+    network_manager_state: str | None = None
+    network_manager_managed: bool | None = None
+
+    power_save: bool | None = None
+
+
+@dataclass(slots=True)
+class CalibrationFinding:
+    severity: str
+    code: str
+    message: str
+
+
+@dataclass(slots=True)
+class CalibrationResult:
+    status: str
+
+    calibrated: bool
+
+    findings: list[CalibrationFinding] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -185,16 +220,16 @@ class IncidentEvaluation:
 class SensorSnapshot:
     timestamp: str
 
-    wifi: WifiMetrics
+    health: SensorHealthMetrics
+    calibration: CalibrationResult
 
+    wifi: WifiMetrics
     wifi_delta: WifiDeltaMetrics | None
 
     network: NetworkMetrics
-
     connectivity: ConnectivityMetrics
 
     diagnostic: DiagnosticResult | None
-
     incidents: IncidentEvaluation | None
 
     collector_errors: list[str] = field(default_factory=list)
@@ -202,6 +237,8 @@ class SensorSnapshot:
     @classmethod
     def create(
         cls,
+        health: SensorHealthMetrics,
+        calibration: CalibrationResult,
         wifi: WifiMetrics,
         network: NetworkMetrics,
         connectivity: ConnectivityMetrics,
@@ -212,6 +249,8 @@ class SensorSnapshot:
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
+            health=health,
+            calibration=calibration,
             wifi=wifi,
             wifi_delta=wifi_delta,
             network=network,

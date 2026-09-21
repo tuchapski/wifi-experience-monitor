@@ -1,3 +1,32 @@
+export interface WirelessInterface {
+  name: string;
+
+  phy: string | null;
+
+  mac_address: string | null;
+
+  interface_type: string | null;
+}
+
+
+export interface SensorConfiguration {
+  interface: string | null;
+
+  interval_seconds: number;
+}
+
+
+export interface SensorStatus {
+  running: boolean;
+
+  interface: string | null;
+
+  interval_seconds: number;
+
+  last_error: string | null;
+}
+
+
 export interface WifiMetrics {
   interface: string;
 
@@ -92,6 +121,7 @@ export interface NetworkMetrics {
 
 export interface ConnectivityMetrics {
   gateway_reachable: boolean | null;
+
   gateway_packet_loss_percent: number | null;
 
   gateway_latency_min_ms: number | null;
@@ -105,6 +135,7 @@ export interface ConnectivityMetrics {
   dns_result: string | null;
 
   internet_reachable: boolean | null;
+
   internet_packet_loss_percent: number | null;
 
   internet_latency_min_ms: number | null;
@@ -118,24 +149,120 @@ export interface ConnectivityMetrics {
 }
 
 
+export interface SensorHealthMetrics {
+  interface: string;
+
+  interface_exists: boolean;
+
+  interface_up: boolean | null;
+
+  wireless_interface: boolean | null;
+
+  driver: string | null;
+
+  firmware_version: string | null;
+
+  kernel_version: string | null;
+
+  rfkill_soft_blocked: boolean | null;
+
+  rfkill_hard_blocked: boolean | null;
+
+  network_manager_state: string | null;
+
+  network_manager_managed: boolean | null;
+
+  power_save: boolean | null;
+}
+
+
+export interface CalibrationFinding {
+  severity: string;
+
+  code: string;
+
+  message: string;
+}
+
+
+export interface CalibrationResult {
+  status: string;
+
+  calibrated: boolean;
+
+  findings: CalibrationFinding[];
+}
+
+
 export interface DiagnosticFinding {
   severity: string;
+
   domain: string;
+
   code: string;
+
   message: string;
 }
 
 
 export interface DiagnosticResult {
   overall_status: string;
+
   probable_domain: string | null;
 
   findings: DiagnosticFinding[];
 }
 
 
+export interface Incident {
+  code: string;
+
+  domain: string;
+
+  severity: string;
+
+  message: string;
+
+  first_seen_at: string;
+
+  opened_at: string | null;
+
+  consecutive_occurrences: number;
+}
+
+
+export interface IncidentEvent {
+  action: string;
+
+  code: string;
+
+  domain: string;
+
+  severity: string;
+
+  message: string;
+
+  first_seen_at: string;
+
+  opened_at: string | null;
+
+  resolved_at: string | null;
+}
+
+
+export interface IncidentEvaluation {
+  active_incidents: Incident[];
+
+  events: IncidentEvent[];
+}
+
+
 export interface SensorSnapshot {
   timestamp: string;
+
+  health: SensorHealthMetrics;
+
+  calibration: CalibrationResult;
 
   wifi: WifiMetrics;
 
@@ -146,6 +273,8 @@ export interface SensorSnapshot {
   connectivity: ConnectivityMetrics;
 
   diagnostic: DiagnosticResult | null;
+
+  incidents: IncidentEvaluation | null;
 
   collector_errors: string[];
 }
@@ -159,15 +288,19 @@ export interface HistoryRecord {
   interface: string;
 
   ssid: string | null;
+
   bssid: string | null;
 
   signal_dbm: number | null;
+
   signal_avg_dbm: number | null;
 
   gateway_latency_avg_ms: number | null;
+
   gateway_packet_loss_percent: number | null;
 
   internet_latency_avg_ms: number | null;
+
   internet_packet_loss_percent: number | null;
 
   dns_latency_ms: number | null;
@@ -179,4 +312,27 @@ export interface HistoryRecord {
   overall_status: string | null;
 
   probable_domain: string | null;
+}
+
+
+export interface IncidentRecord {
+  id: number;
+
+  code: string;
+
+  domain: string;
+
+  severity: string;
+
+  message: string;
+
+  status: string;
+
+  first_seen_at: string;
+
+  opened_at: string;
+
+  resolved_at: string | null;
+
+  duration_seconds: number | null;
 }

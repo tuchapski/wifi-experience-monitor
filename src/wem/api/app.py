@@ -2,21 +2,36 @@ import json
 import os
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
-from wem.storage.database import Database
-from wem.storage.incidents import (
-    IncidentRepository,
+from wem.collectors.interfaces import (
+    WirelessInterfaceDiscovery,
 )
+from wem.runtime.controller import SensorController
+from wem.storage.database import Database
+from wem.storage.incidents import IncidentRepository
 from wem.storage.models import (
     IncidentRecord,
     SnapshotRecord,
 )
-from wem.storage.repository import (
-    SnapshotRepository,
-)
+from wem.storage.repository import SnapshotRepository
+
+
+class SensorConfigRequest(BaseModel):
+    interface: str
+
+    interval_seconds: float = Field(
+        default=5.0,
+        ge=1.0,
+        le=3600.0,
+    )
 
 
 def _record_to_summary(
@@ -25,7 +40,7 @@ def _record_to_summary(
     return {
         "id": record.id,
         "timestamp": (record.timestamp.isoformat()),
-        "interface": record.interface,
+        "interface": (record.interface),
         "ssid": record.ssid,
         "bssid": record.bssid,
         "signal_dbm": (record.signal_dbm),
@@ -77,10 +92,14 @@ def create_app(
 
     incident_repository = IncidentRepository(database)
 
+    sensor_controller = SensorController(database_path=database_path)
+
+    interface_discovery = WirelessInterfaceDiscovery()
+
     app = FastAPI(
-        title=("Wi-Fi Experience Monitor API"),
+        title="Wi-Fi Experience Monitor API",
         description=("Local API for Wi-Fi and digital experience monitoring."),
-        version="0.2.0",
+        version="0.3.0",
     )
 
     app.add_middleware(
@@ -92,6 +111,8 @@ def create_app(
         allow_credentials=False,
         allow_methods=[
             "GET",
+            "POST",
+            "PUT",
         ],
         allow_headers=[
             "*",
@@ -108,8 +129,73 @@ def create_app(
             "status": "ok",
             "database": "ok",
             "has_snapshots": (latest is not None),
-            "active_incidents": (len(active_incidents)),
+            "active_incidents": len(active_incidents),
         }
+
+    @app.get("/interfaces")
+    def wireless_interfaces() -> list[dict[str, str | None]]:
+        return interface_discovery.discover_dicts()
+
+    @app.get("/config")
+    def get_config() -> dict[str, object]:
+        status = sensor_controller.status()
+
+        return {
+            "interface": (status["interface"]),
+            "interval_seconds": (status["interval_seconds"]),
+        }
+
+    @app.put("/config")
+    def configure_sensor(
+        request: SensorConfigRequest,
+    ) -> dict[str, object]:
+        available_interfaces = {interface.name for interface in interface_discovery.discover()}
+
+        if request.interface not in available_interfaces:
+            raise HTTPException(
+                status_code=400,
+                detail=("Selected interface is not an available wireless interface."),
+            )
+
+        try:
+            sensor_controller.configure(
+                interface=request.interface,
+                interval_seconds=(request.interval_seconds),
+            )
+
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=str(exc),
+            ) from exc
+
+        return {
+            "interface": (request.interface),
+            "interval_seconds": (request.interval_seconds),
+        }
+
+    @app.post("/sensor/start")
+    def start_sensor() -> dict[str, object]:
+        try:
+            sensor_controller.start()
+
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=str(exc),
+            ) from exc
+
+        return sensor_controller.status()
+
+    @app.post("/sensor/stop")
+    def stop_sensor() -> dict[str, object]:
+        sensor_controller.stop()
+
+        return sensor_controller.status()
+
+    @app.get("/sensor/status")
+    def sensor_status() -> dict[str, object]:
+        return sensor_controller.status()
 
     @app.get("/snapshot/latest")
     def latest_snapshot() -> JSONResponse:

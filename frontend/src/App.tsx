@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import Plot from "react-plotly.js";
+
+import SensorControl from "./SensorControl";
 
 import {
+  getActiveIncidents,
   getHistory,
+  getIncidentHistory,
   getLatestSnapshot,
 } from "./api";
 
 import type {
   HistoryRecord,
+  IncidentRecord,
   SensorSnapshot,
 } from "./types";
 
@@ -37,12 +41,33 @@ function formatStatus(
 }
 
 
+function formatDate(
+  value: string | null,
+): string {
+  if (value === null) {
+    return "—";
+  }
+
+  return new Date(value).toLocaleString();
+}
+
+
 function App() {
   const [snapshot, setSnapshot] =
     useState<SensorSnapshot | null>(null);
 
   const [history, setHistory] =
     useState<HistoryRecord[]>([]);
+
+  const [
+    activeIncidents,
+    setActiveIncidents,
+  ] = useState<IncidentRecord[]>([]);
+
+  const [
+    incidentHistory,
+    setIncidentHistory,
+  ] = useState<IncidentRecord[]>([]);
 
   const [error, setError] =
     useState<string | null>(null);
@@ -53,17 +78,27 @@ function App() {
       const [
         latestData,
         historyData,
+        activeIncidentData,
+        incidentHistoryData,
       ] = await Promise.all([
         getLatestSnapshot(),
         getHistory(100),
+        getActiveIncidents(),
+        getIncidentHistory(50),
       ]);
 
-      setSnapshot(
-        latestData,
-      );
+      setSnapshot(latestData);
 
       setHistory(
         [...historyData].reverse(),
+      );
+
+      setActiveIncidents(
+        activeIncidentData,
+      );
+
+      setIncidentHistory(
+        incidentHistoryData,
       );
 
       setError(null);
@@ -97,47 +132,39 @@ function App() {
     return (
       <main className="page">
 
-        <h1>
-          Wi-Fi Experience Monitor
-        </h1>
+        <header className="header">
 
-        {error !== null ? (
+          <div>
+            <h1>
+              Wi-Fi Experience Monitor
+            </h1>
+
+            <p>
+              Configure the monitoring sensor.
+            </p>
+          </div>
+
+        </header>
+
+
+        <SensorControl />
+
+
+        {error !== null && (
           <div className="error">
             {error}
           </div>
-        ) : (
-          <p>
-            Loading sensor data...
-          </p>
         )}
+
+
+        <div className="empty-state">
+          No monitoring data available yet.
+          Start the sensor to begin collecting data.
+        </div>
 
       </main>
     );
   }
-
-
-  const timestamps = history.map(
-    (item) => item.timestamp,
-  );
-
-  const signalHistory = history.map(
-    (item) => item.signal_dbm,
-  );
-
-  const gatewayHistory = history.map(
-    (item) =>
-      item.gateway_latency_avg_ms,
-  );
-
-  const internetHistory = history.map(
-    (item) =>
-      item.internet_latency_avg_ms,
-  );
-
-  const retriesHistory = history.map(
-    (item) =>
-      item.tx_retries_per_100_packets,
-  );
 
 
   return (
@@ -146,19 +173,19 @@ function App() {
       <header className="header">
 
         <div>
+
           <h1>
             Wi-Fi Experience Monitor
           </h1>
 
           <p>
-            {snapshot.wifi.ssid ??
-              "Unknown SSID"}
-
+            {snapshot.wifi.ssid ?? "Unknown SSID"}
             {" · "}
-
             {snapshot.wifi.interface}
           </p>
+
         </div>
+
 
         <div className="timestamp">
           {new Date(
@@ -169,6 +196,9 @@ function App() {
       </header>
 
 
+      <SensorControl />
+
+
       {error !== null && (
         <div className="error">
           {error}
@@ -176,45 +206,70 @@ function App() {
       )}
 
 
-      {snapshot.diagnostic !== null && (
-        <section className="diagnostic-overview">
+      <section className="diagnostic-overview">
 
-          <div>
-            <span>
-              Overall Experience
-            </span>
+        <div>
 
-            <strong
-              className={
-                `status-${snapshot.diagnostic.overall_status}`
-              }
-            >
-              {formatStatus(
-                snapshot.diagnostic.overall_status,
-              )}
-            </strong>
-          </div>
+          <span>
+            Overall Experience
+          </span>
+
+          <strong
+            className={
+              snapshot.diagnostic
+                ? `status-${snapshot.diagnostic.overall_status}`
+                : ""
+            }
+          >
+            {snapshot.diagnostic
+              ? formatStatus(
+                  snapshot.diagnostic.overall_status,
+                )
+              : "UNKNOWN"}
+          </strong>
+
+        </div>
 
 
-          <div>
-            <span>
-              Probable Domain
-            </span>
+        <div>
 
-            <strong>
-              {snapshot.diagnostic
-                .probable_domain ??
-                "None"}
-            </strong>
-          </div>
+          <span>
+            Probable Domain
+          </span>
 
-        </section>
-      )}
+          <strong>
+            {snapshot.diagnostic
+              ?.probable_domain ?? "None"}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            Active Incidents
+          </span>
+
+          <strong
+            className={
+              activeIncidents.length > 0
+                ? "status-critical"
+                : "status-healthy"
+            }
+          >
+            {activeIncidents.length}
+          </strong>
+
+        </div>
+
+      </section>
 
 
       <section className="cards">
 
         <div className="card">
+
           <span>
             RSSI
           </span>
@@ -226,17 +281,11 @@ function App() {
             )}
           </strong>
 
-          <small>
-            Avg{" "}
-            {formatNumber(
-              snapshot.wifi.signal_avg_dbm,
-              " dBm",
-            )}
-          </small>
         </div>
 
 
         <div className="card">
+
           <span>
             Gateway
           </span>
@@ -249,18 +298,11 @@ function App() {
             )}
           </strong>
 
-          <small>
-            Loss{" "}
-            {formatNumber(
-              snapshot.connectivity
-                .gateway_packet_loss_percent,
-              "%",
-            )}
-          </small>
         </div>
 
 
         <div className="card">
+
           <span>
             Internet
           </span>
@@ -273,18 +315,11 @@ function App() {
             )}
           </strong>
 
-          <small>
-            Loss{" "}
-            {formatNumber(
-              snapshot.connectivity
-                .internet_packet_loss_percent,
-              "%",
-            )}
-          </small>
         </div>
 
 
         <div className="card">
+
           <span>
             DNS
           </span>
@@ -297,16 +332,11 @@ function App() {
             )}
           </strong>
 
-          <small>
-            {snapshot.connectivity
-              .dns_success
-              ? "OK"
-              : "FAILED"}
-          </small>
         </div>
 
 
         <div className="card">
+
           <span>
             HTTPS
           </span>
@@ -319,16 +349,11 @@ function App() {
             )}
           </strong>
 
-          <small>
-            HTTP{" "}
-            {snapshot.connectivity
-              .https_status_code ??
-              "N/A"}
-          </small>
         </div>
 
 
         <div className="card">
+
           <span>
             TX Retries
           </span>
@@ -336,14 +361,11 @@ function App() {
           <strong>
             {formatNumber(
               snapshot.wifi_delta
-                ?.tx_retries_per_100_packets ??
-                null,
+                ?.tx_retries_per_100_packets
+                ?? null,
             )}
           </strong>
 
-          <small>
-            retries / 100 TX packets
-          </small>
         </div>
 
       </section>
@@ -360,12 +382,29 @@ function App() {
           <dl>
 
             <dt>
+              Interface
+            </dt>
+
+            <dd>
+              {snapshot.wifi.interface}
+            </dd>
+
+
+            <dt>
+              SSID
+            </dt>
+
+            <dd>
+              {snapshot.wifi.ssid ?? "N/A"}
+            </dd>
+
+
+            <dt>
               BSSID
             </dt>
 
             <dd>
-              {snapshot.wifi.bssid ??
-                "N/A"}
+              {snapshot.wifi.bssid ?? "N/A"}
             </dd>
 
 
@@ -374,108 +413,19 @@ function App() {
             </dt>
 
             <dd>
-              {snapshot.wifi.channel ??
-                "N/A"}
-
-              {" / "}
-
-              {snapshot.wifi
-                .channel_width_mhz ??
-                "N/A"}
-
-              MHz
+              {snapshot.wifi.channel ?? "N/A"}
             </dd>
 
 
             <dt>
-              Frequency
+              Signal
             </dt>
 
             <dd>
               {formatNumber(
-                snapshot.wifi.frequency_mhz,
-                " MHz",
+                snapshot.wifi.signal_dbm,
+                " dBm",
               )}
-            </dd>
-
-
-            <dt>
-              PHY
-            </dt>
-
-            <dd>
-              {snapshot.wifi.tx_phy_mode ??
-                "N/A"}
-            </dd>
-
-
-            <dt>
-              TX Rate
-            </dt>
-
-            <dd>
-              {formatNumber(
-                snapshot.wifi
-                  .tx_bitrate_mbps,
-                " Mbps",
-              )}
-            </dd>
-
-
-            <dt>
-              RX Rate
-            </dt>
-
-            <dd>
-              {formatNumber(
-                snapshot.wifi
-                  .rx_bitrate_mbps,
-                " Mbps",
-              )}
-            </dd>
-
-
-            <dt>
-              MCS
-            </dt>
-
-            <dd>
-              TX{" "}
-              {snapshot.wifi.tx_mcs ??
-                "N/A"}
-
-              {" / "}
-
-              RX{" "}
-              {snapshot.wifi.rx_mcs ??
-                "N/A"}
-            </dd>
-
-
-            <dt>
-              NSS
-            </dt>
-
-            <dd>
-              TX{" "}
-              {snapshot.wifi.tx_nss ??
-                "N/A"}
-
-              {" / "}
-
-              RX{" "}
-              {snapshot.wifi.rx_nss ??
-                "N/A"}
-            </dd>
-
-
-            <dt>
-              Beacon Loss
-            </dt>
-
-            <dd>
-              {snapshot.wifi.beacon_loss ??
-                "N/A"}
             </dd>
 
           </dl>
@@ -497,14 +447,7 @@ function App() {
 
             <dd>
               {snapshot.network
-                .ipv4_address ??
-                "N/A"}
-
-              /
-
-              {snapshot.network
-                .prefix_length ??
-                "N/A"}
+                .ipv4_address ?? "N/A"}
             </dd>
 
 
@@ -513,8 +456,8 @@ function App() {
             </dt>
 
             <dd>
-              {snapshot.network.gateway ??
-                "N/A"}
+              {snapshot.network
+                .gateway ?? "N/A"}
             </dd>
 
 
@@ -530,73 +473,6 @@ function App() {
                 : "N/A"}
             </dd>
 
-
-            <dt>
-              Internet
-            </dt>
-
-            <dd>
-              {snapshot.connectivity
-                .internet_reachable
-                ? "Reachable"
-                : "Unavailable"}
-            </dd>
-
-
-            <dt>
-              Association
-            </dt>
-
-            <dd>
-              {snapshot.wifi.associated
-                ? "Associated"
-                : "Disconnected"}
-            </dd>
-
-
-            <dt>
-              Authentication
-            </dt>
-
-            <dd>
-              {snapshot.wifi.authenticated
-                ? "Authenticated"
-                : "Not authenticated"}
-            </dd>
-
-
-            <dt>
-              WMM
-            </dt>
-
-            <dd>
-              {snapshot.wifi.wmm_enabled
-                ? "Enabled"
-                : "Disabled"}
-            </dd>
-
-
-            <dt>
-              MFP
-            </dt>
-
-            <dd>
-              {snapshot.wifi.mfp_enabled
-                ? "Enabled"
-                : "Disabled"}
-            </dd>
-
-
-            <dt>
-              Power Save
-            </dt>
-
-            <dd>
-              {snapshot.wifi.power_save
-                ? "Enabled"
-                : "Disabled"}
-            </dd>
-
           </dl>
 
         </div>
@@ -604,181 +480,151 @@ function App() {
       </section>
 
 
-      <section className="chart">
+      {activeIncidents.length > 0 && (
+        <section className="active-incidents">
 
-        <h2>
-          Wi-Fi Signal History
-        </h2>
+          <h2>
+            Active Incidents
+          </h2>
 
-        <Plot
-          data={[
-            {
-              x: timestamps,
-              y: signalHistory,
-              type: "scatter",
-              mode: "lines",
-              name: "RSSI",
-            },
-          ]}
-          layout={{
-            autosize: true,
-            height: 320,
+          <div className="incident-grid">
 
-            margin: {
-              l: 60,
-              r: 20,
-              t: 20,
-              b: 50,
-            },
+            {activeIncidents.map(
+              (incident) => (
 
-            yaxis: {
-              title: {
-                text: "dBm",
-              },
-            },
-          }}
-          useResizeHandler
-          style={{
-            width: "100%",
-          }}
-        />
+                <article
+                  key={incident.id}
+                  className={
+                    `incident-card incident-${incident.severity}`
+                  }
+                >
 
-      </section>
+                  <strong>
+                    {incident.code}
+                  </strong>
 
+                  <p>
+                    {incident.message}
+                  </p>
 
-      <section className="chart">
-
-        <h2>
-          Network Latency History
-        </h2>
-
-        <Plot
-          data={[
-            {
-              x: timestamps,
-              y: gatewayHistory,
-              type: "scatter",
-              mode: "lines",
-              name: "Gateway",
-            },
-            {
-              x: timestamps,
-              y: internetHistory,
-              type: "scatter",
-              mode: "lines",
-              name: "Internet",
-            },
-          ]}
-          layout={{
-            autosize: true,
-            height: 320,
-
-            margin: {
-              l: 60,
-              r: 20,
-              t: 20,
-              b: 50,
-            },
-
-            yaxis: {
-              title: {
-                text: "Latency (ms)",
-              },
-            },
-          }}
-          useResizeHandler
-          style={{
-            width: "100%",
-          }}
-        />
-
-      </section>
-
-
-      <section className="chart">
-
-        <h2>
-          Wi-Fi Retransmission History
-        </h2>
-
-        <Plot
-          data={[
-            {
-              x: timestamps,
-              y: retriesHistory,
-              type: "scatter",
-              mode: "lines",
-              name: "TX retries",
-            },
-          ]}
-          layout={{
-            autosize: true,
-            height: 320,
-
-            margin: {
-              l: 60,
-              r: 20,
-              t: 20,
-              b: 50,
-            },
-
-            yaxis: {
-              title: {
-                text: "Retries / 100 TX packets",
-              },
-            },
-          }}
-          useResizeHandler
-          style={{
-            width: "100%",
-          }}
-        />
-
-      </section>
-
-
-      {snapshot.diagnostic !== null &&
-        snapshot.diagnostic.findings.length > 0 && (
-
-          <section className="diagnostic-panel">
-
-            <h2>
-              Diagnostic Findings
-            </h2>
-
-            <ul>
-
-              {snapshot.diagnostic.findings.map(
-                (finding) => (
-
-                  <li key={finding.code}>
-
-                    <strong>
-                      {finding.severity.toUpperCase()}
-                    </strong>
-
+                  <small>
+                    {incident.domain}
                     {" · "}
+                    {incident.severity}
+                  </small>
 
-                    {finding.domain}
+                </article>
 
-                    {" · "}
+              ),
+            )}
 
-                    {finding.message}
+          </div>
 
-                  </li>
+        </section>
+      )}
 
-                ),
-              )}
 
-            </ul>
+      <section className="incident-history">
 
-          </section>
+        <h2>
+          Incident History
+        </h2>
+
+        {incidentHistory.length === 0 ? (
+
+          <div className="empty-state">
+            No incidents recorded.
+          </div>
+
+        ) : (
+
+          <div className="table-wrapper">
+
+            <table>
+
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Severity</th>
+                  <th>Domain</th>
+                  <th>Code</th>
+                  <th>Opened</th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {incidentHistory.map(
+                  (incident) => (
+
+                    <tr key={incident.id}>
+
+                      <td>
+                        {incident.status}
+                      </td>
+
+                      <td>
+                        {incident.severity}
+                      </td>
+
+                      <td>
+                        {incident.domain}
+                      </td>
+
+                      <td>
+                        {incident.code}
+                      </td>
+
+                      <td>
+                        {formatDate(
+                          incident.opened_at,
+                        )}
+                      </td>
+
+                    </tr>
+
+                  ),
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
 
         )}
 
+      </section>
+
+
+      {snapshot.calibration && (
+        <section className="panel">
+
+          <h2>
+            Sensor Calibration
+          </h2>
+
+          <p>
+            Status:{" "}
+            <strong>
+              {snapshot.calibration.status}
+            </strong>
+          </p>
+
+          <p>
+            Calibrated:{" "}
+            <strong>
+              {snapshot.calibration.calibrated
+                ? "Yes"
+                : "No"}
+            </strong>
+          </p>
+
+        </section>
+      )}
+
 
       {snapshot.collector_errors.length > 0 && (
-
         <section className="errors-panel">
 
           <h2>
@@ -800,8 +646,24 @@ function App() {
           </ul>
 
         </section>
-
       )}
+
+
+      <section className="panel">
+
+        <h2>
+          History
+        </h2>
+
+        <p>
+          Stored samples loaded:
+          {" "}
+          <strong>
+            {history.length}
+          </strong>
+        </p>
+
+      </section>
 
     </main>
   );

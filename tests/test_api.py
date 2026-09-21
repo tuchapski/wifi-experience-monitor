@@ -2,8 +2,10 @@ from fastapi.testclient import TestClient
 
 from wem.api.app import create_app
 from wem.models.metrics import (
+    CalibrationResult,
     ConnectivityMetrics,
     NetworkMetrics,
+    SensorHealthMetrics,
     SensorSnapshot,
     WifiDeltaMetrics,
     WifiMetrics,
@@ -14,6 +16,19 @@ from wem.storage.repository import SnapshotRepository
 
 def create_test_snapshot() -> SensorSnapshot:
     return SensorSnapshot.create(
+        health=SensorHealthMetrics(
+            interface="wlp0s20f3",
+            interface_exists=True,
+            interface_up=True,
+            wireless_interface=True,
+            driver="iwlwifi",
+            rfkill_soft_blocked=False,
+            rfkill_hard_blocked=False,
+        ),
+        calibration=CalibrationResult(
+            status="ok",
+            calibrated=True,
+        ),
         wifi=WifiMetrics(
             interface="wlp0s20f3",
             ssid="AeP",

@@ -1,8 +1,10 @@
 import json
 
 from wem.models.metrics import (
+    CalibrationResult,
     ConnectivityMetrics,
     NetworkMetrics,
+    SensorHealthMetrics,
     SensorSnapshot,
     WifiDeltaMetrics,
     WifiMetrics,
@@ -21,6 +23,19 @@ def test_snapshot_repository_save(
     repository = SnapshotRepository(database)
 
     snapshot = SensorSnapshot.create(
+        health=SensorHealthMetrics(
+            interface="wlp0s20f3",
+            interface_exists=True,
+            interface_up=True,
+            wireless_interface=True,
+            driver="iwlwifi",
+            rfkill_soft_blocked=False,
+            rfkill_hard_blocked=False,
+        ),
+        calibration=CalibrationResult(
+            status="ok",
+            calibrated=True,
+        ),
         wifi=WifiMetrics(
             interface="wlp0s20f3",
             ssid="AeP",
@@ -83,6 +98,19 @@ def test_repository_latest(
 
     for signal in [-60, -61, -62]:
         snapshot = SensorSnapshot.create(
+            health=SensorHealthMetrics(
+                interface="wlp0s20f3",
+                interface_exists=True,
+                interface_up=True,
+                wireless_interface=True,
+                driver="iwlwifi",
+                rfkill_soft_blocked=False,
+                rfkill_hard_blocked=False,
+            ),
+            calibration=CalibrationResult(
+                status="ok",
+                calibrated=True,
+            ),
             wifi=WifiMetrics(
                 interface="wlp0s20f3",
                 signal_dbm=signal,
