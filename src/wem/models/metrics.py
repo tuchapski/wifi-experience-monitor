@@ -125,6 +125,9 @@ class TestOutcome:
     status: str
     reason: str
     scope: str = "selected_interface"
+    observed_at: str | None = None
+    fresh: bool = True
+    age_seconds: float | None = 0.0
 
 
 @dataclass(slots=True)
@@ -315,6 +318,20 @@ class ExperienceScore:
 
 
 @dataclass(slots=True)
+class ProfileReference:
+    profile_id: int
+    profile_version_id: int
+    name: str
+    version: int
+
+
+@dataclass(slots=True)
+class MonitoringContext:
+    session_id: int
+    profile: ProfileReference
+
+
+@dataclass(slots=True)
 class SensorSnapshot:
     timestamp: str
 
@@ -337,6 +354,7 @@ class SensorSnapshot:
     collector_errors: list[str] = field(default_factory=list)
 
     experience_score: ExperienceScore | None = None
+    monitoring: MonitoringContext | None = None
 
     @classmethod
     def create(
@@ -353,6 +371,7 @@ class SensorSnapshot:
         recommendations: list[Recommendation] | None = None,
         errors: list[str] | None = None,
         experience_score: ExperienceScore | None = None,
+        monitoring: MonitoringContext | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
@@ -368,6 +387,7 @@ class SensorSnapshot:
             recommendations=recommendations or [],
             collector_errors=errors or [],
             experience_score=experience_score,
+            monitoring=monitoring,
         )
 
     def to_dict(

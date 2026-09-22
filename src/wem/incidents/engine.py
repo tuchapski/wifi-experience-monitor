@@ -79,6 +79,7 @@ class IncidentEngine:
         self,
         diagnostic: DiagnosticResult,
         timestamp: str | None = None,
+        fresh_domains: set[str] | None = None,
     ) -> IncidentEvaluation:
         now = timestamp or datetime.now(UTC).isoformat()
 
@@ -98,6 +99,7 @@ class IncidentEngine:
             findings=relevant_findings,
             timestamp=now,
             events=events,
+            fresh_domains=fresh_domains,
         )
 
         if diagnostic.complete:
@@ -105,10 +107,13 @@ class IncidentEngine:
                 present_codes=set(relevant_findings),
                 timestamp=now,
                 events=events,
+                fresh_domains=fresh_domains,
             )
         else:
             for code, tracker in self._trackers.items():
-                if code not in relevant_findings:
+                if code not in relevant_findings and (
+                    fresh_domains is None or tracker.domain in fresh_domains
+                ):
                     tracker.consecutive_recoveries = 0
                     tracker.consecutive_occurrences = 0
 
@@ -139,11 +144,14 @@ class IncidentEngine:
         ],
         timestamp: str,
         events: list[IncidentEvent],
+        fresh_domains: set[str] | None,
     ) -> None:
         for (
             code,
             finding,
         ) in findings.items():
+            if fresh_domains is not None and finding.domain not in fresh_domains:
+                continue
             tracker = self._trackers.get(code)
 
             if tracker is None:
@@ -197,12 +205,16 @@ class IncidentEngine:
         present_codes: set[str],
         timestamp: str,
         events: list[IncidentEvent],
+        fresh_domains: set[str] | None,
     ) -> None:
         for (
             code,
             tracker,
         ) in list(self._trackers.items()):
             if code in present_codes:
+                continue
+
+            if fresh_domains is not None and tracker.domain not in fresh_domains:
                 continue
 
             if not tracker.active:

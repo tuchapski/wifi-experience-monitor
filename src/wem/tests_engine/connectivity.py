@@ -6,6 +6,7 @@ import urllib.request
 
 from wem.collectors.command import run_command
 from wem.models.metrics import ConnectivityMetrics, TestOutcome
+from wem.profiles.models import TestConfigurations
 
 
 class ConnectivityTester:
@@ -16,30 +17,58 @@ class ConnectivityTester:
         dns_query: str = "example.com",
         internet_target: str = "1.1.1.1",
         https_url: str = "https://example.com",
+        tests: TestConfigurations | None = None,
     ):
         self.interface = interface
         self.gateway = gateway
-        self.dns_query = dns_query
-        self.internet_target = internet_target
-        self.https_url = https_url
+        self.tests = tests.model_copy(deep=True) if tests is not None else TestConfigurations()
+        if tests is None:
+            self.tests.dns.query = dns_query
+            self.tests.internet.target = internet_target
+            self.tests.https.url = https_url
+
+        self.dns_query = self.tests.dns.query
+        self.internet_target = self.tests.internet.target
+        self.https_url = self.tests.https.url
 
         self.errors: list[str] = []
 
     def run(self) -> ConnectivityMetrics:
         metrics = ConnectivityMetrics()
 
-        self._test_gateway(metrics)
-        self._test_dns(metrics)
-        self._test_internet(metrics)
-        self._test_https(metrics)
+        for name in ("gateway", "dns", "internet", "https"):
+            config = getattr(self.tests, name)
+            if config.enabled:
+                partial = self.run_test(name)
+                metrics.tests.update(partial.tests)
+                for field_name in _TEST_FIELDS[name]:
+                    setattr(metrics, field_name, getattr(partial, field_name))
+            else:
+                metrics.tests[name] = TestOutcome("disabled", "Test disabled by profile.")
 
+        return metrics
+
+    def run_test(self, name: str) -> ConnectivityMetrics:
+        metrics = ConnectivityMetrics()
+        runners = {
+            "gateway": self._test_gateway,
+            "dns": self._test_dns,
+            "internet": self._test_internet,
+            "https": self._test_https,
+        }
+        try:
+            runner = runners[name]
+        except KeyError as exc:
+            raise ValueError(f"Unknown connectivity test: {name}") from exc
+        runner(metrics)
         return metrics
 
     def _test_gateway(
         self,
         metrics: ConnectivityMetrics,
     ) -> None:
-        if self.gateway is None:
+        target = self.gateway if self.tests.gateway.automatic_gateway else self.tests.gateway.target
+        if target is None:
             metrics.tests["gateway"] = TestOutcome("skipped", "No gateway was identified.")
             return
 
@@ -50,7 +79,7 @@ class ConnectivityTester:
             latency_avg,
             latency_max,
             jitter,
-        ) = self._ping(self.gateway)
+        ) = self._ping(target, timeout=self.tests.gateway.timeout_seconds)
 
         metrics.gateway_reachable = reachable
         metrics.gateway_packet_loss_percent = packet_loss
@@ -59,7 +88,7 @@ class ConnectivityTester:
         metrics.gateway_latency_max_ms = latency_max
         metrics.gateway_jitter_ms = jitter
 
-        metrics.tests["gateway"] = self._ping_outcome(reachable, self.gateway)
+        metrics.tests["gateway"] = self._ping_outcome(reachable, target)
 
     def _test_dns(
         self,
@@ -71,24 +100,35 @@ class ConnectivityTester:
         started = time.perf_counter()
 
         try:
-            result = socket.getaddrinfo(
-                self.dns_query,
-                None,
-                family=socket.AF_INET,
-            )
+            timeout = self.tests.dns.timeout_seconds
+            if timeout is None:
+                result = socket.getaddrinfo(
+                    self.dns_query,
+                    None,
+                    family=socket.AF_INET,
+                )
+                address = str(result[0][4][0]) if result else None
+            else:
+                command_result = run_command(
+                    ["getent", "ahostsv4", self.dns_query],
+                    timeout=timeout,
+                )
+                if not command_result.success:
+                    raise OSError(command_result.stderr or "No IPv4 address was returned.")
+                first_line = command_result.stdout.splitlines()[0]
+                address = first_line.split()[0] if first_line else None
 
             elapsed = (time.perf_counter() - started) * 1000
 
-            metrics.dns_success = bool(result)
+            metrics.dns_success = address is not None
             metrics.dns_latency_ms = round(
                 elapsed,
                 3,
             )
 
-            if result:
-                metrics.dns_result = str(result[0][4][0])
+            metrics.dns_result = address
 
-        except OSError as exc:
+        except (OSError, IndexError) as exc:
             elapsed = (time.perf_counter() - started) * 1000
 
             metrics.dns_success = False
@@ -116,7 +156,10 @@ class ConnectivityTester:
             latency_avg,
             latency_max,
             jitter,
-        ) = self._ping(self.internet_target)
+        ) = self._ping(
+            self.internet_target,
+            timeout=self.tests.internet.timeout_seconds,
+        )
 
         metrics.internet_reachable = reachable
         metrics.internet_packet_loss_percent = packet_loss
@@ -143,7 +186,7 @@ class ConnectivityTester:
         try:
             with urllib.request.urlopen(
                 request,
-                timeout=5,
+                timeout=self.tests.https.timeout_seconds or 5.0,
             ) as response:
                 elapsed = (time.perf_counter() - started) * 1000
 
@@ -194,6 +237,7 @@ class ConnectivityTester:
     def _ping(
         self,
         target: str,
+        timeout: float | None = None,
     ) -> tuple[
         bool | None,
         float | None,
@@ -215,7 +259,7 @@ class ConnectivityTester:
                 "2",
                 target,
             ],
-            timeout=6,
+            timeout=timeout or 6.0,
         )
 
         output = result.stdout
@@ -260,3 +304,25 @@ class ConnectivityTester:
             latency_max,
             jitter,
         )
+
+
+_TEST_FIELDS = {
+    "gateway": (
+        "gateway_reachable",
+        "gateway_packet_loss_percent",
+        "gateway_latency_min_ms",
+        "gateway_latency_avg_ms",
+        "gateway_latency_max_ms",
+        "gateway_jitter_ms",
+    ),
+    "dns": ("dns_success", "dns_latency_ms", "dns_query", "dns_result"),
+    "internet": (
+        "internet_reachable",
+        "internet_packet_loss_percent",
+        "internet_latency_min_ms",
+        "internet_latency_avg_ms",
+        "internet_latency_max_ms",
+        "internet_jitter_ms",
+    ),
+    "https": ("https_success", "https_status_code", "https_total_time_ms"),
+}

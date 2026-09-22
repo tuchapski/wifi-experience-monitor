@@ -6,9 +6,14 @@ from wem.models.metrics import (
     WifiDeltaMetrics,
     WifiMetrics,
 )
+from wem.profiles.defaults import default_profile_config
+from wem.profiles.models import TestProfileConfig
 
 
 class DiagnosticEngine:
+    def __init__(self, profile: TestProfileConfig | None = None) -> None:
+        self.profile = (profile or default_profile_config()).model_copy(deep=True)
+
     def analyze(
         self,
         wifi: WifiMetrics,
@@ -18,20 +23,21 @@ class DiagnosticEngine:
         collector_errors: list[str] | None = None,
     ) -> DiagnosticResult:
         findings: list[DiagnosticFinding] = []
-        complete = (
-            all(
-                value is not None
-                for value in (
-                    wifi.associated,
-                    wifi.signal_dbm,
-                    connectivity.gateway_reachable,
-                    connectivity.internet_reachable,
-                    connectivity.dns_success,
-                    connectivity.https_success,
-                )
-            )
-            and not collector_errors
-        )
+        complete = wifi.associated is not None and wifi.signal_dbm is not None
+        result_fields = {
+            "gateway": connectivity.gateway_reachable,
+            "dns": connectivity.dns_success,
+            "internet": connectivity.internet_reachable,
+            "https": connectivity.https_success,
+        }
+        for name, value in result_fields.items():
+            test = getattr(self.profile.tests, name)
+            if test.enabled:
+                outcome = connectivity.tests.get(name)
+                complete = complete and value is not None
+                if outcome is not None:
+                    complete = complete and outcome.status in {"passed", "failed"}
+        complete = complete and not collector_errors
         if calibration is not None:
             complete = complete and calibration.calibrated
             for finding in calibration.findings:
@@ -109,24 +115,25 @@ class DiagnosticEngine:
             )
             return
 
+        thresholds = self.profile.thresholds.wifi
         if wifi.signal_dbm is not None:
-            if wifi.signal_dbm < -82:
+            if wifi.signal_dbm < thresholds.rssi_critical_dbm:
                 findings.append(
                     DiagnosticFinding(
                         severity="critical",
                         domain="wifi",
                         code="WIFI_VERY_LOW_SIGNAL",
-                        message=("Wi-Fi signal is below -82 dBm."),
+                        message=(f"Wi-Fi signal is below {thresholds.rssi_critical_dbm:g} dBm."),
                     )
                 )
 
-            elif wifi.signal_dbm < -75:
+            elif wifi.signal_dbm < thresholds.rssi_warning_dbm:
                 findings.append(
                     DiagnosticFinding(
                         severity="warning",
                         domain="wifi",
                         code="WIFI_LOW_SIGNAL",
-                        message=("Wi-Fi signal is below -75 dBm."),
+                        message=(f"Wi-Fi signal is below {thresholds.rssi_warning_dbm:g} dBm."),
                     )
                 )
 
@@ -147,7 +154,7 @@ class DiagnosticEngine:
         retry_rate = wifi_delta.tx_retries_per_100_packets
 
         if retry_rate is not None:
-            if retry_rate >= 50:
+            if retry_rate >= thresholds.retry_critical_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="critical",
@@ -157,7 +164,7 @@ class DiagnosticEngine:
                     )
                 )
 
-            elif retry_rate >= 20:
+            elif retry_rate >= thresholds.retry_warning_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="warning",
@@ -167,7 +174,10 @@ class DiagnosticEngine:
                     )
                 )
 
-        if wifi_delta.tx_failed_percent is not None and wifi_delta.tx_failed_percent >= 5:
+        if (
+            wifi_delta.tx_failed_percent is not None
+            and wifi_delta.tx_failed_percent >= thresholds.tx_failure_critical_percent
+        ):
             findings.append(
                 DiagnosticFinding(
                     severity="critical",
@@ -205,10 +215,11 @@ class DiagnosticEngine:
             )
             return
 
+        thresholds = self.profile.thresholds.gateway
         loss = connectivity.gateway_packet_loss_percent
 
         if loss is not None:
-            if loss >= 20:
+            if loss >= thresholds.packet_loss_critical_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="critical",
@@ -218,7 +229,7 @@ class DiagnosticEngine:
                     )
                 )
 
-            elif loss >= 5:
+            elif loss >= thresholds.packet_loss_warning_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="warning",
@@ -230,7 +241,7 @@ class DiagnosticEngine:
 
         latency = connectivity.gateway_latency_avg_ms
 
-        if latency is not None and latency >= 50:
+        if latency is not None and latency >= thresholds.latency_warning_ms:
             findings.append(
                 DiagnosticFinding(
                     severity="warning",
@@ -258,7 +269,7 @@ class DiagnosticEngine:
 
         latency = connectivity.dns_latency_ms
 
-        if latency is not None and latency >= 250:
+        if latency is not None and latency >= self.profile.thresholds.dns.latency_warning_ms:
             findings.append(
                 DiagnosticFinding(
                     severity="warning",
@@ -294,10 +305,11 @@ class DiagnosticEngine:
             )
             return
 
+        thresholds = self.profile.thresholds.internet
         loss = connectivity.internet_packet_loss_percent
 
         if loss is not None:
-            if loss >= 20:
+            if loss >= thresholds.packet_loss_critical_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="critical",
@@ -307,7 +319,7 @@ class DiagnosticEngine:
                     )
                 )
 
-            elif loss >= 5:
+            elif loss >= thresholds.packet_loss_warning_percent:
                 findings.append(
                     DiagnosticFinding(
                         severity="warning",
@@ -319,7 +331,7 @@ class DiagnosticEngine:
 
         latency = connectivity.internet_latency_avg_ms
 
-        if latency is not None and latency >= 150:
+        if latency is not None and latency >= thresholds.latency_warning_ms:
             findings.append(
                 DiagnosticFinding(
                     severity="warning",
@@ -347,7 +359,7 @@ class DiagnosticEngine:
 
         latency = connectivity.https_total_time_ms
 
-        if latency is not None and latency >= 1000:
+        if latency is not None and latency >= self.profile.thresholds.https.response_warning_ms:
             findings.append(
                 DiagnosticFinding(
                     severity="warning",

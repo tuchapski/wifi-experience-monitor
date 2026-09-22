@@ -63,6 +63,7 @@ def test_default_profile_matches_current_hardcoded_behavior() -> None:
             }
         },
         {"sampling": {"wifi_interval_seconds": 0}},
+        {"tests": {"dns": {"interval_seconds": 7}}},
         {"unknown": True},
     ],
 )
@@ -148,18 +149,14 @@ def test_profile_api_crud_versioning_and_activation(tmp_path) -> None:
             json={
                 "name": "  Branch Office  ",
                 "description": "Branch profile",
-                "configuration": {
-                    "tests": {"dns": {"query": "branch.example.com"}}
-                },
+                "configuration": {"tests": {"dns": {"query": "branch.example.com"}}},
             },
         )
         assert created.status_code == 201
         profile_id = created.json()["id"]
         assert created.json()["name"] == "Branch Office"
         assert created.json()["active"] is False
-        assert created.json()["configuration"]["tests"]["dns"]["query"] == (
-            "branch.example.com"
-        )
+        assert created.json()["configuration"]["tests"]["dns"]["query"] == ("branch.example.com")
 
         configuration = created.json()["configuration"]
         configuration["tests"]["dns"]["query"] = "updated.example.com"

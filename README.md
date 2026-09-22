@@ -82,9 +82,17 @@ The backend exposes `GET/POST /profiles`, `GET/PUT /profiles/{id}`,
 `GET /profiles/active`, `POST /profiles/{id}/activate` and version-history
 endpoints below `/profiles/{id}/versions`.
 
-This increment establishes persistence, validation, versioning and the API.
-The runtime still executes the existing fixed collection loop; consuming the
-active profile in a per-test scheduler is a separate follow-up change.
+Each monitoring start pins the then-active immutable profile version in a
+persistent session. Wi-Fi sampling follows the profile cadence, while enabled
+synthetic tests run independently at their configured intervals. Cached results
+remain visible with `fresh: false`, `observed_at` and `age_seconds`, but do not
+advance incident confirmation or recovery counters. Profile changes made during
+a running session apply only after monitoring is restarted.
+
+An enabled synthetic-test interval must be equal to or an integer multiple of
+the Wi-Fi sampling interval. This keeps snapshot timing deterministic while
+allowing cadences such as 5, 10, 30 and 60 seconds. `/sensor/status` reports the
+session, profile and exact profile-version identifiers used by the runtime.
 
 ## Environment-change events
 

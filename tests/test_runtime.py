@@ -8,6 +8,7 @@ from wem.models.metrics import (
     SensorHealthMetrics,
     WifiMetrics,
 )
+from wem.models.metrics import TestOutcome as Outcome
 from wem.runtime.sensor import RuntimeConfig, SensorRuntime
 
 
@@ -29,6 +30,10 @@ def mock_health_collector():
 class DummyRuntime(SensorRuntime):
     def on_snapshot(self, snapshot) -> None:
         pass
+
+
+def skipped_test(name: str) -> ConnectivityMetrics:
+    return ConnectivityMetrics(tests={name: Outcome("skipped", "test fixture")})
 
 
 @patch("wem.runtime.sensor.ConnectivityTester")
@@ -56,6 +61,7 @@ def test_runtime_first_collection_has_no_delta(
     )
 
     connectivity = ConnectivityMetrics(
+        tests={"gateway": Outcome("passed", "gateway reached")},
         gateway_reachable=True,
     )
 
@@ -65,13 +71,20 @@ def test_runtime_first_collection_has_no_delta(
     mock_network_collector.return_value.collect.return_value = network
     mock_network_collector.return_value.errors = []
 
-    mock_connectivity_tester.return_value.run.return_value = connectivity
+    mock_connectivity_tester.return_value.run_test.side_effect = lambda name: (
+        connectivity if name == "gateway" else skipped_test(name)
+    )
     mock_connectivity_tester.return_value.errors = []
 
     runtime = DummyRuntime(
         RuntimeConfig(
             interface="wlp0s20f3",
             interval_seconds=10.0,
+            profile_id=1,
+            profile_version_id=2,
+            profile_name="Office",
+            profile_version=3,
+            monitoring_session_id=4,
         )
     )
 
@@ -80,10 +93,13 @@ def test_runtime_first_collection_has_no_delta(
     assert snapshot.wifi_delta is None
     assert snapshot.wifi is wifi
     assert snapshot.network is network
-    assert snapshot.connectivity is connectivity
+    assert snapshot.connectivity.gateway_reachable is True
     assert snapshot.experience_score is not None
     assert snapshot.experience_score.status == "unavailable"
     assert snapshot.experience_score.value is None
+    assert snapshot.monitoring is not None
+    assert snapshot.monitoring.session_id == 4
+    assert snapshot.monitoring.profile.profile_version_id == 2
 
 
 @patch("wem.runtime.sensor.ConnectivityTester")
@@ -135,7 +151,7 @@ def test_runtime_calculates_wifi_delta(
 
     mock_network_collector.return_value.errors = []
 
-    mock_connectivity_tester.return_value.run.return_value = ConnectivityMetrics()
+    mock_connectivity_tester.return_value.run_test.side_effect = skipped_test
 
     mock_connectivity_tester.return_value.errors = []
 

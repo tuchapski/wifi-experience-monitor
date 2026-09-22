@@ -206,3 +206,19 @@ class TestProfileVersionRecord(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     config_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(nullable=False)
+
+
+class MonitoringSessionRecord(Base):
+    __tablename__ = "monitoring_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    interface: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("test_profiles.id"), nullable=False, index=True
+    )
+    profile_version_id: Mapped[int] = mapped_column(
+        ForeignKey("test_profile_versions.id"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(nullable=False, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)

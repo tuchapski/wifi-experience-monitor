@@ -376,7 +376,7 @@ def create_app(
 
         return {
             "interface": (request.interface),
-            "interval_seconds": (request.interval_seconds),
+            "interval_seconds": (sensor_controller.status()["interval_seconds"]),
         }
 
     @app.post("/sensor/start")

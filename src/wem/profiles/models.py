@@ -57,9 +57,7 @@ class TestConfigurations(ProfileModel):
     internet: InternetTestConfig = Field(
         default_factory=lambda: InternetTestConfig(timeout_seconds=6.0)
     )
-    https: HTTPSTestConfig = Field(
-        default_factory=lambda: HTTPSTestConfig(timeout_seconds=5.0)
-    )
+    https: HTTPSTestConfig = Field(default_factory=lambda: HTTPSTestConfig(timeout_seconds=5.0))
 
 
 class WifiThresholds(ProfileModel):
@@ -86,9 +84,7 @@ class LatencyLossThresholds(ProfileModel):
     @model_validator(mode="after")
     def validate_loss_order(self) -> Self:
         if self.packet_loss_critical_percent <= self.packet_loss_warning_percent:
-            raise ValueError(
-                "packet_loss_critical_percent must exceed packet_loss_warning_percent"
-            )
+            raise ValueError("packet_loss_critical_percent must exceed packet_loss_warning_percent")
         return self
 
 
@@ -121,3 +117,18 @@ class TestProfileConfig(ProfileModel):
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
     tests: TestConfigurations = Field(default_factory=TestConfigurations)
     thresholds: ProfileThresholds = Field(default_factory=ProfileThresholds)
+
+    @model_validator(mode="after")
+    def validate_test_cadence(self) -> Self:
+        wifi_interval = self.sampling.wifi_interval_seconds
+        for name in ("gateway", "dns", "internet", "https"):
+            test = getattr(self.tests, name)
+            if not test.enabled:
+                continue
+            ratio = test.interval_seconds / wifi_interval
+            if test.interval_seconds < wifi_interval or abs(ratio - round(ratio)) > 1e-9:
+                raise ValueError(
+                    f"enabled test {name} interval_seconds must be an integer "
+                    "multiple of sampling.wifi_interval_seconds"
+                )
+        return self

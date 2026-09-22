@@ -25,6 +25,12 @@ export interface SensorStatus {
   interval_seconds: number;
 
   last_error: string | null;
+
+  session_id: number | null;
+  profile_id: number;
+  profile_version_id: number;
+  profile_name: string;
+  profile_version: number;
 }
 
 

@@ -82,6 +82,10 @@ function SensorControl({
         statusData,
       );
 
+      setIntervalSeconds(
+        statusData.interval_seconds,
+      );
+
       if (
         statusData.interface !== null
       ) {
@@ -89,9 +93,6 @@ function SensorControl({
           statusData.interface,
         );
 
-        setIntervalSeconds(
-          statusData.interval_seconds,
-        );
       }
 
       onStatusChange?.(
@@ -120,6 +121,10 @@ function SensorControl({
           .then((statusData) => {
             setStatus(
               statusData
+            );
+
+            setIntervalSeconds(
+              statusData.interval_seconds,
             );
 
             onStatusChange?.(
@@ -165,6 +170,10 @@ function SensorControl({
 
       setStatus(
         statusData
+      );
+
+      setIntervalSeconds(
+        statusData.interval_seconds,
       );
 
       onStatusChange?.(
@@ -310,7 +319,7 @@ function SensorControl({
         <label>
 
           <span>
-            Collection Interval
+            Sampling Interval
           </span>
 
           <input
@@ -320,21 +329,11 @@ function SensorControl({
             value={
               intervalSeconds
             }
-            disabled={
-              status?.running
-              || loading
-            }
-            onChange={(event) => {
-              setIntervalSeconds(
-                Number(
-                  event.target.value
-                )
-              );
-            }}
+            disabled
           />
 
           <small>
-            seconds
+            seconds · active profile
           </small>
 
         </label>

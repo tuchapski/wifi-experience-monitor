@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from wem.collectors.command import CommandResult
 from wem.models.metrics import ConnectivityMetrics
+from wem.profiles.models import TestConfigurations as ConnectivityConfigurations
 from wem.tests_engine.connectivity import ConnectivityTester
 
 PING_SUCCESS_OUTPUT = """
@@ -154,3 +155,41 @@ def test_connectivity_tester_dns_failure(
     assert tester.errors == []
     assert metrics.tests["dns"].status == "failed"
     assert "dns failure" in metrics.tests["dns"].reason
+
+
+@patch("wem.tests_engine.connectivity.run_command")
+def test_profile_controls_dns_timeout(mock_run_command) -> None:
+    mock_run_command.return_value = CommandResult(
+        stdout="203.0.113.10 STREAM example.com",
+        stderr="",
+        returncode=0,
+    )
+    tests = ConnectivityConfigurations()
+    tests.dns.timeout_seconds = 1.5
+    tester = ConnectivityTester("wlan0", "192.0.2.1", tests=tests)
+    metrics = tester.run_test("dns")
+
+    mock_run_command.assert_called_once_with(["getent", "ahostsv4", "example.com"], timeout=1.5)
+    assert metrics.dns_success is True
+    assert metrics.dns_result == "203.0.113.10"
+
+
+@patch("wem.tests_engine.connectivity.run_command")
+def test_profile_can_override_automatic_gateway(mock_run_command) -> None:
+    mock_run_command.return_value = CommandResult(
+        stdout=PING_SUCCESS_OUTPUT,
+        stderr="",
+        returncode=0,
+    )
+    tests = ConnectivityConfigurations()
+    tests.gateway.automatic_gateway = False
+    tests.gateway.target = "192.0.2.254"
+    tests.gateway.timeout_seconds = 9
+    tester = ConnectivityTester("wlan0", "192.0.2.1", tests=tests)
+
+    metrics = tester.run_test("gateway")
+
+    command = mock_run_command.call_args.args[0]
+    assert command[-1] == "192.0.2.254"
+    assert mock_run_command.call_args.kwargs["timeout"] == 9
+    assert metrics.gateway_reachable is True

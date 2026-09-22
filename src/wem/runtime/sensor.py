@@ -1,5 +1,6 @@
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from wem.analysis.environment import EnvironmentChangeAnalyzer
 from wem.analysis.experience import ExperienceScoreEngine
@@ -11,18 +12,39 @@ from wem.collectors.network import NetworkCollector
 from wem.collectors.wifi import WifiCollector
 from wem.diagnostics.engine import DiagnosticEngine
 from wem.incidents.engine import IncidentEngine
-from wem.models.metrics import ConnectivityMetrics, SensorSnapshot, TestOutcome, WifiMetrics
+from wem.models.metrics import (
+    MonitoringContext,
+    ProfileReference,
+    SensorSnapshot,
+    WifiMetrics,
+)
+from wem.profiles.defaults import default_profile_config
+from wem.profiles.models import TestProfileConfig
+from wem.runtime.connectivity_scheduler import ConnectivityTestScheduler
 from wem.tests_engine.connectivity import ConnectivityTester
 
 
 @dataclass(slots=True)
 class RuntimeConfig:
     interface: str
-    interval_seconds: float = 10.0
+    interval_seconds: float | None = None
+    profile_config: TestProfileConfig = field(default_factory=default_profile_config)
+    profile_id: int | None = None
+    profile_version_id: int | None = None
+    profile_name: str | None = None
+    profile_version: int | None = None
+    monitoring_session_id: int | None = None
 
-    dns_query: str = "example.com"
-    internet_target: str = "1.1.1.1"
-    https_url: str = "https://example.com"
+    def __post_init__(self) -> None:
+        self.profile_config = self.profile_config.model_copy(deep=True)
+        if self.interval_seconds is not None:
+            self.profile_config.sampling.wifi_interval_seconds = self.interval_seconds
+            for name in ("gateway", "dns", "internet", "https"):
+                getattr(self.profile_config.tests, name).interval_seconds = self.interval_seconds
+
+    @property
+    def sampling_interval_seconds(self) -> float:
+        return self.profile_config.sampling.wifi_interval_seconds
 
 
 class SensorRuntime:
@@ -40,8 +62,9 @@ class SensorRuntime:
         self.environment_analyzer = EnvironmentChangeAnalyzer()
         self.recommendation_engine = RecommendationEngine()
         self.calibration_engine = CalibrationEngine()
-        self.diagnostic_engine = DiagnosticEngine()
+        self.diagnostic_engine = DiagnosticEngine(self.config.profile_config)
         self.incident_engine = IncidentEngine()
+        self.connectivity_scheduler = ConnectivityTestScheduler(self.config.profile_config.tests)
 
     def collect_once(
         self,
@@ -64,9 +87,7 @@ class SensorRuntime:
         connectivity_tester = ConnectivityTester(
             interface=self.config.interface,
             gateway=network_metrics.gateway,
-            dns_query=self.config.dns_query,
-            internet_target=self.config.internet_target,
-            https_url=self.config.https_url,
+            tests=self.config.profile_config.tests,
         )
 
         blocked = (
@@ -77,19 +98,14 @@ class SensorRuntime:
             or health_metrics.rfkill_hard_blocked is True
             or wifi_metrics.associated is False
         )
-        if blocked:
-            connectivity_metrics = ConnectivityMetrics(
-                tests={
-                    name: TestOutcome(
-                        "skipped",
-                        "Interface unavailable, unverified, blocked or disconnected.",
-                        "host" if name in {"dns", "https"} else "selected_interface",
-                    )
-                    for name in ("gateway", "internet", "dns", "https")
-                }
-            )
-        else:
-            connectivity_metrics = connectivity_tester.run()
+        scheduled = self.connectivity_scheduler.collect(
+            connectivity_tester,
+            now=started,
+            observed_at=datetime.now(UTC).isoformat(),
+            blocked=blocked,
+            gateway=network_metrics.gateway,
+        )
+        connectivity_metrics = scheduled.metrics
 
         wifi_delta = None
         environment_changes = []
@@ -123,7 +139,10 @@ class SensorRuntime:
             collector_errors=errors,
         )
 
-        incident_evaluation = self.incident_engine.evaluate(diagnostic=diagnostic)
+        incident_evaluation = self.incident_engine.evaluate(
+            diagnostic=diagnostic,
+            fresh_domains={"wifi", "sensor", *scheduled.fresh_domains},
+        )
 
         recommendations = self.recommendation_engine.build(
             diagnostic=diagnostic,
@@ -152,6 +171,31 @@ class SensorRuntime:
             experience_score=self.experience_engine.calculate(
                 wifi_metrics, wifi_delta, connectivity_metrics, calibration, errors
             ),
+            monitoring=self._monitoring_context(),
+        )
+
+    def _monitoring_context(self) -> MonitoringContext | None:
+        session_id = self.config.monitoring_session_id
+        profile_id = self.config.profile_id
+        profile_version_id = self.config.profile_version_id
+        profile_name = self.config.profile_name
+        profile_version = self.config.profile_version
+        if (
+            session_id is None
+            or profile_id is None
+            or profile_version_id is None
+            or profile_name is None
+            or profile_version is None
+        ):
+            return None
+        return MonitoringContext(
+            session_id=session_id,
+            profile=ProfileReference(
+                profile_id=profile_id,
+                profile_version_id=profile_version_id,
+                name=profile_name,
+                version=profile_version,
+            ),
         )
 
     def run_forever(
@@ -168,7 +212,7 @@ class SensorRuntime:
 
             sleep_time = max(
                 0.0,
-                self.config.interval_seconds - elapsed,
+                self.config.sampling_interval_seconds - elapsed,
             )
 
             time.sleep(sleep_time)
