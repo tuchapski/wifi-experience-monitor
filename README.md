@@ -65,6 +65,27 @@ The backend rechecks that the interface is available before starting. Stop ends
 collection; each new Start creates a new runtime and resets metric deltas.
 Historical samples remain stored but are not displayed as a current session.
 
+## Versioned test profiles
+
+On database initialization, the backend creates and activates `Default v1` when
+no profile exists. Its targets, five-second cadence and diagnostic thresholds
+match the behavior used before profiles were introduced. Re-running the
+initialization is idempotent and does not replace existing profiles.
+
+Profile configuration is validated and stored as immutable JSON versions in
+SQLite. Updating a profile creates a new version; updating the active profile
+also activates that new version. Activating another enabled profile atomically
+deactivates the previous one. An active profile must be replaced before it can
+be disabled.
+
+The backend exposes `GET/POST /profiles`, `GET/PUT /profiles/{id}`,
+`GET /profiles/active`, `POST /profiles/{id}/activate` and version-history
+endpoints below `/profiles/{id}/versions`.
+
+This increment establishes persistence, validation, versioning and the API.
+The runtime still executes the existing fixed collection loop; consuming the
+active profile in a per-test scheduler is a separate follow-up change.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

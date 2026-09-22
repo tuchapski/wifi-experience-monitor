@@ -1,6 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import Float, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -158,3 +168,41 @@ class IncidentRecord(Base):
         nullable=True,
         index=True,
     )
+
+
+class TestProfileRecord(Base):
+    __tablename__ = "test_profiles"
+    __table_args__ = (
+        Index(
+            "uq_test_profiles_single_active",
+            text("1"),
+            unique=True,
+            sqlite_where=text("active_version_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    active_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("test_profile_versions.id"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(nullable=False)
+
+
+class TestProfileVersionRecord(Base):
+    __tablename__ = "test_profile_versions"
+    __table_args__ = (UniqueConstraint("profile_id", "version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("test_profiles.id"),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(nullable=False)
