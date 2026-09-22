@@ -13,7 +13,10 @@ authors = [
     { name = "Andre Tuchapski" }
 ]
 
-dependencies = []
+dependencies = [
+	"sqlalchemy>=2.0",
+    "fastapi[standard]>=0.100",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -22,6 +25,7 @@ dev = [
     "ruff",
     "mypy",
     "pre-commit",
+    "httpx2",
 ]
 
 [project.scripts]

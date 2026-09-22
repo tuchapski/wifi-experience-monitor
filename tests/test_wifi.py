@@ -75,6 +75,9 @@ def fake_run_command(command: list[str], timeout: float = 5.0) -> CommandResult:
             returncode=0,
         )
 
+    if command == ["iw", "dev", "wlp0s20f3", "survey", "dump"]:
+        return CommandResult("", "command failed: Operation not supported (-95)", 1)
+
     if command == ["iw", "dev", "wlp0s20f3", "link"]:
         return CommandResult(
             stdout=IW_LINK_OUTPUT,
@@ -183,7 +186,9 @@ def test_wifi_collector_parses_ax201_output(mock_run_command) -> None:
 
     assert collector.errors == []
 
-    assert mock_run_command.call_count == 4
+    assert metrics.survey.status == "unsupported"
+    assert metrics.survey.noise_dbm is None
+    assert mock_run_command.call_count == 5
 
 
 @patch("wem.collectors.wifi.run_command")
@@ -252,7 +257,7 @@ def test_wifi_collector_handles_disconnected_interface(mock_run_command) -> None
     assert metrics.tx_bitrate_mbps is None
     assert metrics.rx_bitrate_mbps is None
 
-    assert metrics.associated is None
+    assert metrics.associated is False
 
     assert collector.errors == ["wlp0s20f3 is not connected"]
 
