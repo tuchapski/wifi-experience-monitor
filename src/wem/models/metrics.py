@@ -197,6 +197,21 @@ class ConnectionCycleMetrics:
 
 
 @dataclass(slots=True)
+class ConnectionStageSloMetric:
+    stage: str
+    label: str
+    status: str
+    sample_count: int
+    minimum_samples: int
+    p95_ms: float | None
+    warning_threshold_ms: float
+    critical_threshold_ms: float
+    latest_ms: float | None
+    fresh: bool
+    reason: str
+
+
+@dataclass(slots=True)
 class ConnectionCycleSloMetrics:
     status: str
     sample_count: int
@@ -208,6 +223,7 @@ class ConnectionCycleSloMetrics:
     latest_cycle_ms: float | None
     fresh: bool
     reason: str
+    stages: dict[str, ConnectionStageSloMetric] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

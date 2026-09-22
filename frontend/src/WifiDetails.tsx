@@ -44,6 +44,7 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
     authentication: "Authentication",
     authorization: "Authorization",
     dhcp: "IPv4 address",
+    ipv4: "IPv4 address",
     gateway: "Gateway",
     dns: "DNS",
     network_ready: "Network ready",
@@ -168,6 +169,25 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
             <div><span>Critical threshold</span><strong>{number(cycleSlo.critical_threshold_ms, " ms")}</strong></div>
           </div>
           <p className="metric-note">{cycleSlo.reason}</p>
+          {cycleSlo.stages && Object.keys(cycleSlo.stages).length > 0 && <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Milestone</th><th>Status</th><th>P95 from start</th><th>Samples</th><th>Warning</th><th>Critical</th></tr></thead>
+              <tbody>{Object.entries(cycleSlo.stages).map(([key, stage]) => (
+                <tr key={key}>
+                  <td>{stageLabels[key] ?? stage.label}</td>
+                  <td><strong className={`status-${stage.status}`}>{stage.status.replaceAll("_", " ")}</strong></td>
+                  <td>{number(stage.p95_ms, " ms")}</td>
+                  <td>{stage.sample_count} / {cycleSlo.window_size}</td>
+                  <td>{number(stage.warning_threshold_ms, " ms")}</td>
+                  <td>{number(stage.critical_threshold_ms, " ms")}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <p className="metric-note">
+              Milestone P95 is elapsed time from connection start to that observation.
+              It is not the isolated duration of the preceding protocol phase.
+            </p>
+          </div>}
         </>}
       </section>
       <section className="panel" aria-labelledby="wifi-retries-title">

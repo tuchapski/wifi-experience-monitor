@@ -96,11 +96,56 @@ class ResponseThreshold(ProfileModel):
     response_warning_ms: float = Field(gt=0.0)
 
 
+class ConnectionStageP95Threshold(ProfileModel):
+    p95_warning_ms: float = Field(gt=0.0, le=300000.0)
+    p95_critical_ms: float = Field(gt=0.0, le=300000.0)
+
+    @model_validator(mode="after")
+    def validate_stage_slo(self) -> Self:
+        if self.p95_critical_ms <= self.p95_warning_ms:
+            raise ValueError("stage p95_critical_ms must exceed p95_warning_ms")
+        return self
+
+
+class ConnectionCycleStageThresholds(ProfileModel):
+    association: ConnectionStageP95Threshold = Field(
+        default_factory=lambda: ConnectionStageP95Threshold(
+            p95_warning_ms=1500.0,
+            p95_critical_ms=3000.0,
+        )
+    )
+    authentication: ConnectionStageP95Threshold = Field(
+        default_factory=lambda: ConnectionStageP95Threshold(
+            p95_warning_ms=3000.0,
+            p95_critical_ms=6000.0,
+        )
+    )
+    ipv4: ConnectionStageP95Threshold = Field(
+        default_factory=lambda: ConnectionStageP95Threshold(
+            p95_warning_ms=5000.0,
+            p95_critical_ms=10000.0,
+        )
+    )
+    gateway: ConnectionStageP95Threshold = Field(
+        default_factory=lambda: ConnectionStageP95Threshold(
+            p95_warning_ms=6000.0,
+            p95_critical_ms=12000.0,
+        )
+    )
+    dns: ConnectionStageP95Threshold = Field(
+        default_factory=lambda: ConnectionStageP95Threshold(
+            p95_warning_ms=7000.0,
+            p95_critical_ms=14000.0,
+        )
+    )
+
+
 class ConnectionCycleThresholds(ProfileModel):
     window_size: int = Field(default=20, ge=3, le=200)
     minimum_samples: int = Field(default=5, ge=3, le=200)
     p95_warning_ms: float = Field(default=8000.0, gt=0.0, le=300000.0)
     p95_critical_ms: float = Field(default=15000.0, gt=0.0, le=300000.0)
+    stages: ConnectionCycleStageThresholds = Field(default_factory=ConnectionCycleStageThresholds)
 
     @model_validator(mode="after")
     def validate_slo(self) -> Self:

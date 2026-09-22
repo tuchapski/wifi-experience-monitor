@@ -49,6 +49,11 @@ export interface ServiceSloTargetConfiguration {
   packet_loss_p95_critical_percent: number | null;
 }
 
+export interface ConnectionStageP95ThresholdConfiguration {
+  p95_warning_ms: number;
+  p95_critical_ms: number;
+}
+
 export interface TestProfileConfiguration {
   schema_version: 1;
   sampling: {
@@ -98,6 +103,13 @@ export interface TestProfileConfiguration {
       minimum_samples: number;
       p95_warning_ms: number;
       p95_critical_ms: number;
+      stages: {
+        association: ConnectionStageP95ThresholdConfiguration;
+        authentication: ConnectionStageP95ThresholdConfiguration;
+        ipv4: ConnectionStageP95ThresholdConfiguration;
+        gateway: ConnectionStageP95ThresholdConfiguration;
+        dns: ConnectionStageP95ThresholdConfiguration;
+      };
     };
     adaptive_baseline: {
       enabled: boolean;
@@ -306,6 +318,20 @@ export interface ConnectionCycleMetrics {
   networkmanager_event_count?: number;
 }
 
+export interface ConnectionStageSloMetric {
+  stage: string;
+  label: string;
+  status: "insufficient_data" | "healthy" | "warning" | "critical";
+  sample_count: number;
+  minimum_samples: number;
+  p95_ms: number | null;
+  warning_threshold_ms: number;
+  critical_threshold_ms: number;
+  latest_ms: number | null;
+  fresh: boolean;
+  reason: string;
+}
+
 export interface ConnectionCycleSloMetrics {
   status: "insufficient_data" | "healthy" | "warning" | "critical";
   sample_count: number;
@@ -317,6 +343,7 @@ export interface ConnectionCycleSloMetrics {
   latest_cycle_ms: number | null;
   fresh: boolean;
   reason: string;
+  stages?: Record<string, ConnectionStageSloMetric>;
 }
 
 export interface AdaptiveBaselineMetric {

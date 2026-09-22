@@ -86,8 +86,8 @@ class ConsoleSensorRuntime(SensorRuntime):
 
         slo_evaluation = self.connection_cycle_slo_engine.observe(snapshot.connection_cycle)
         snapshot.connection_cycle_slo = slo_evaluation.metrics
-        if snapshot.diagnostic is not None and slo_evaluation.finding is not None:
-            self.diagnostic_engine.extend_result(snapshot.diagnostic, [slo_evaluation.finding])
+        if snapshot.diagnostic is not None and slo_evaluation.findings:
+            self.diagnostic_engine.extend_result(snapshot.diagnostic, slo_evaluation.findings)
 
         if not self._baseline_seeded or snapshot.wifi.ssid != self._baseline_ssid:
             baseline_reference = self.baseline_repository.reference_values(
@@ -116,19 +116,22 @@ class ConsoleSensorRuntime(SensorRuntime):
                 service_slo_evaluation.findings,
             )
 
+        slo_severity = "healthy"
+        if any(item.severity == "critical" for item in slo_evaluation.findings):
+            slo_severity = "critical"
+        elif slo_evaluation.findings:
+            slo_severity = "warning"
         slo_diagnostic = DiagnosticResult(
-            overall_status=(
-                slo_evaluation.finding.severity if slo_evaluation.finding is not None else "healthy"
-            ),
-            probable_domain=("connection_cycle" if slo_evaluation.finding is not None else None),
+            overall_status=slo_severity,
+            probable_domain=("connection_cycle" if slo_evaluation.findings else None),
             complete=True,
-            findings=([slo_evaluation.finding] if slo_evaluation.finding is not None else []),
+            findings=slo_evaluation.findings,
         )
         base_events = snapshot.incidents.events if snapshot.incidents is not None else []
         slo_incidents = self.incident_engine.evaluate(
             slo_diagnostic,
             timestamp=snapshot.timestamp,
-            fresh_domains={"connection_cycle"} if slo_evaluation.metrics.fresh else set(),
+            fresh_codes=slo_evaluation.fresh_codes,
         )
 
         baseline_severity = "healthy"

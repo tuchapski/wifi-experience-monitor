@@ -2,20 +2,29 @@ import pytest
 from pydantic import ValidationError
 
 from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
-from wem.models.metrics import ConnectionCycleMetrics
+from wem.models.metrics import ConnectionCycleMetrics, ConnectionStageMetric
 from wem.profiles.models import (
+    ConnectionCycleStageThresholds,
     ConnectionCycleThresholds,
+    ConnectionStageP95Threshold,
 )
 from wem.profiles.models import (
     TestProfileConfig as ProfileConfiguration,
 )
 
 
-def cycle(session_id: str, duration_ms: float | None, *, session_type: str = "reconnect"):
+def cycle(
+    session_id: str,
+    duration_ms: float | None,
+    *,
+    session_type: str = "reconnect",
+    state: str = "ready",
+    stages: dict[str, float] | None = None,
+):
     return ConnectionCycleMetrics(
         session_id=session_id,
         session_type=session_type,
-        state="ready",
+        state=state,
         ssid="CORP",
         bssid="aa:bb:cc:dd:ee:ff",
         started_at="2026-09-22T12:00:00+00:00",
@@ -23,6 +32,14 @@ def cycle(session_id: str, duration_ms: float | None, *, session_type: str = "re
         completed_at=None,
         total_time_ms=duration_ms,
         sample_resolution_ms=5000.0,
+        stages={
+            key: ConnectionStageMetric(
+                status="observed",
+                elapsed_ms=value,
+                reason="Observed for test.",
+            )
+            for key, value in (stages or {}).items()
+        },
     )
 
 
@@ -32,6 +49,21 @@ def thresholds() -> ConnectionCycleThresholds:
         minimum_samples=3,
         p95_warning_ms=1000.0,
         p95_critical_ms=2000.0,
+    )
+
+
+def stage_thresholds() -> ConnectionCycleThresholds:
+    return ConnectionCycleThresholds(
+        window_size=5,
+        minimum_samples=3,
+        p95_warning_ms=10000.0,
+        p95_critical_ms=20000.0,
+        stages=ConnectionCycleStageThresholds(
+            association=ConnectionStageP95Threshold(
+                p95_warning_ms=1000.0,
+                p95_critical_ms=2000.0,
+            )
+        ),
     )
 
 
@@ -59,22 +91,67 @@ def test_slo_warning_and_critical_use_rolling_p95():
 
     assert warning.metrics.p95_ms == 1450.0
     assert warning.metrics.status == "warning"
-    assert warning.finding is not None
-    assert warning.finding.code == "CONNECTION_CYCLE_P95_SLO"
-    assert warning.finding.domain == "connection_cycle"
+    assert any(item.code == "CONNECTION_CYCLE_P95_SLO" for item in warning.findings)
+    assert warning.fresh_codes == {"CONNECTION_CYCLE_P95_SLO"}
 
     critical = engine.observe(cycle("four", 3000.0))
     assert critical.metrics.status == "critical"
-    assert critical.finding is not None
-    assert critical.finding.severity == "critical"
+    total_finding = next(
+        item for item in critical.findings if item.code == "CONNECTION_CYCLE_P95_SLO"
+    )
+    assert total_finding.severity == "critical"
+    assert total_finding.domain == "connection_cycle"
+
+
+def test_stage_milestone_slo_uses_unique_time_from_connection_start():
+    engine = ConnectionCycleSloEngine(stage_thresholds())
+
+    engine.observe(cycle("one", 500.0, stages={"association": 500.0}))
+    engine.observe(cycle("two", 500.0, stages={"association": 1000.0}))
+    warning = engine.observe(cycle("three", 500.0, stages={"association": 1500.0}))
+
+    association = warning.metrics.stages["association"]
+    assert association.p95_ms == 1450.0
+    assert association.status == "warning"
+    assert warning.metrics.status == "warning"
+    assert "CONNECTION_CYCLE_ASSOCIATION_P95_SLO" in warning.fresh_codes
+    assert any(item.code == "CONNECTION_CYCLE_ASSOCIATION_P95_SLO" for item in warning.findings)
+
+    repeated = engine.observe(cycle("three", 500.0, stages={"association": 1500.0}))
+    assert repeated.metrics.stages["association"].sample_count == 3
+    assert repeated.metrics.stages["association"].fresh is False
+    assert repeated.fresh_codes == set()
+
+
+def test_stage_milestone_can_be_measured_before_network_ready():
+    engine = ConnectionCycleSloEngine(stage_thresholds())
+
+    result = engine.observe(
+        cycle(
+            "connecting",
+            None,
+            state="connecting",
+            stages={"association": 750.0},
+        )
+    )
+
+    assert result.metrics.sample_count == 0
+    assert result.metrics.stages["association"].sample_count == 1
+    assert result.metrics.stages["association"].fresh is True
 
 
 def test_profile_defaults_are_backward_compatible():
     profile = ProfileConfiguration.model_validate({})
-    assert profile.thresholds.connection_cycle.window_size == 20
-    assert profile.thresholds.connection_cycle.minimum_samples == 5
-    assert profile.thresholds.connection_cycle.p95_warning_ms == 8000.0
-    assert profile.thresholds.connection_cycle.p95_critical_ms == 15000.0
+    cycle_config = profile.thresholds.connection_cycle
+    assert cycle_config.window_size == 20
+    assert cycle_config.minimum_samples == 5
+    assert cycle_config.p95_warning_ms == 8000.0
+    assert cycle_config.p95_critical_ms == 15000.0
+    assert cycle_config.stages.association.p95_warning_ms == 1500.0
+    assert cycle_config.stages.authentication.p95_warning_ms == 3000.0
+    assert cycle_config.stages.ipv4.p95_warning_ms == 5000.0
+    assert cycle_config.stages.gateway.p95_warning_ms == 6000.0
+    assert cycle_config.stages.dns.p95_warning_ms == 7000.0
 
 
 @pytest.mark.parametrize(
@@ -82,6 +159,14 @@ def test_profile_defaults_are_backward_compatible():
     [
         {"window_size": 4, "minimum_samples": 5},
         {"p95_warning_ms": 1000, "p95_critical_ms": 1000},
+        {
+            "stages": {
+                "dns": {
+                    "p95_warning_ms": 1000,
+                    "p95_critical_ms": 1000,
+                }
+            }
+        },
     ],
 )
 def test_connection_cycle_threshold_validation(value: dict[str, object]):

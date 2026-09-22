@@ -64,6 +64,13 @@ export function validateProfileConfiguration(
     minimum_samples: 5,
     p95_warning_ms: 8000,
     p95_critical_ms: 15000,
+    stages: {
+      association: { p95_warning_ms: 1500, p95_critical_ms: 3000 },
+      authentication: { p95_warning_ms: 3000, p95_critical_ms: 6000 },
+      ipv4: { p95_warning_ms: 5000, p95_critical_ms: 10000 },
+      gateway: { p95_warning_ms: 6000, p95_critical_ms: 12000 },
+      dns: { p95_warning_ms: 7000, p95_critical_ms: 14000 },
+    },
   };
   if (!Number.isInteger(cycle.window_size) || cycle.window_size < 3 || cycle.window_size > 200) {
     errors.push("Connection-cycle window must be an integer between 3 and 200.");
@@ -82,6 +89,26 @@ export function validateProfileConfiguration(
     || cycle.p95_critical_ms <= cycle.p95_warning_ms
     || cycle.p95_critical_ms > 300000) {
     errors.push("Connection-cycle P95 critical must exceed warning and be at most 300000 ms.");
+  }
+
+  const cycleStages = cycle.stages ?? {
+    association: { p95_warning_ms: 1500, p95_critical_ms: 3000 },
+    authentication: { p95_warning_ms: 3000, p95_critical_ms: 6000 },
+    ipv4: { p95_warning_ms: 5000, p95_critical_ms: 10000 },
+    gateway: { p95_warning_ms: 6000, p95_critical_ms: 12000 },
+    dns: { p95_warning_ms: 7000, p95_critical_ms: 14000 },
+  };
+  for (const [name, target] of Object.entries(cycleStages)) {
+    if (!Number.isFinite(target.p95_warning_ms)
+      || target.p95_warning_ms <= 0
+      || target.p95_warning_ms > 300000) {
+      errors.push(`${name} connection-cycle stage P95 warning must be between 0 and 300000 ms.`);
+    }
+    if (!Number.isFinite(target.p95_critical_ms)
+      || target.p95_critical_ms <= target.p95_warning_ms
+      || target.p95_critical_ms > 300000) {
+      errors.push(`${name} connection-cycle stage P95 critical must exceed warning and be at most 300000 ms.`);
+    }
   }
 
   const baseline = configuration.thresholds.adaptive_baseline ?? {

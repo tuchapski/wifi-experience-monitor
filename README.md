@@ -133,6 +133,15 @@ snapshots of the same cycle therefore cannot satisfy incident confirmation or
 recovery counters. Threshold changes remain pinned to the profile version selected
 when monitoring starts.
 
+The connection-cycle SLO also evaluates Association, Authentication, IPv4 address,
+Gateway and DNS milestone P95 values independently. These values are elapsed time
+from the observed connection start to each milestone, not isolated protocol-stage
+durations. This distinction is important because NetworkManager D-Bus timestamps and
+sample-derived observations can use different timing sources. Each milestone keeps
+its own rolling sample set and stable incident code, so fresh Association evidence
+cannot resolve a DNS-stage incident. The existing end-to-end P95 remains the Network
+Ready SLO.
+
 ## Adaptive same-SSID baseline
 
 The sensor can compare fresh measurements with its own recent history for the same

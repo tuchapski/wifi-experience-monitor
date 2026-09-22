@@ -127,3 +127,22 @@ test("validates service SLO window and target ordering", () => {
   assert.match(errors, /Gateway service-SLO latency/i);
   assert.match(errors, /Gateway service-SLO packet-loss/i);
 });
+
+test("validates connection-cycle stage milestone threshold ordering", () => {
+  const value = configuration();
+  value.thresholds.connection_cycle = {
+    window_size: 20,
+    minimum_samples: 5,
+    p95_warning_ms: 8000,
+    p95_critical_ms: 15000,
+    stages: {
+      association: { p95_warning_ms: 1500, p95_critical_ms: 1000 },
+      authentication: { p95_warning_ms: 3000, p95_critical_ms: 6000 },
+      ipv4: { p95_warning_ms: 5000, p95_critical_ms: 10000 },
+      gateway: { p95_warning_ms: 6000, p95_critical_ms: 12000 },
+      dns: { p95_warning_ms: 7000, p95_critical_ms: 14000 },
+    },
+  };
+  const errors = validate(value).join(" ");
+  assert.match(errors, /association connection-cycle stage P95 critical/i);
+});
