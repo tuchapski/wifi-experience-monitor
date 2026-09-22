@@ -114,5 +114,69 @@ export function validateProfileConfiguration(
     errors.push("Adaptive-baseline critical deviation must exceed warning and be at most 30 sigma.");
   }
 
+  const serviceSlo = configuration.thresholds.service_slo ?? {
+    enabled: true,
+    window_size: 60,
+    minimum_samples: 20,
+    gateway: {
+      availability_warning_percent: 99, availability_critical_percent: 95,
+      latency_p95_warning_ms: 50, latency_p95_critical_ms: 100,
+      packet_loss_p95_warning_percent: 5, packet_loss_p95_critical_percent: 20,
+    },
+    internet: {
+      availability_warning_percent: 99, availability_critical_percent: 95,
+      latency_p95_warning_ms: 150, latency_p95_critical_ms: 300,
+      packet_loss_p95_warning_percent: 5, packet_loss_p95_critical_percent: 20,
+    },
+    dns: {
+      availability_warning_percent: 99, availability_critical_percent: 95,
+      latency_p95_warning_ms: 250, latency_p95_critical_ms: 500,
+      packet_loss_p95_warning_percent: null, packet_loss_p95_critical_percent: null,
+    },
+    https: {
+      availability_warning_percent: 99, availability_critical_percent: 95,
+      latency_p95_warning_ms: 1000, latency_p95_critical_ms: 2000,
+      packet_loss_p95_warning_percent: null, packet_loss_p95_critical_percent: null,
+    },
+  };
+  if (!Number.isInteger(serviceSlo.window_size)
+    || serviceSlo.window_size < 10 || serviceSlo.window_size > 1000) {
+    errors.push("Service-SLO window must be an integer between 10 and 1000 executions.");
+  }
+  if (!Number.isInteger(serviceSlo.minimum_samples)
+    || serviceSlo.minimum_samples < 5
+    || serviceSlo.minimum_samples > serviceSlo.window_size) {
+    errors.push("Service-SLO minimum samples must be between 5 and the window size.");
+  }
+  for (const [name, target] of [
+    ["Gateway", serviceSlo.gateway],
+    ["Internet", serviceSlo.internet],
+    ["DNS", serviceSlo.dns],
+    ["HTTPS", serviceSlo.https],
+  ] as const) {
+    if (!Number.isFinite(target.availability_warning_percent)
+      || !Number.isFinite(target.availability_critical_percent)
+      || target.availability_warning_percent < 0
+      || target.availability_warning_percent > 100
+      || target.availability_critical_percent < 0
+      || target.availability_critical_percent >= target.availability_warning_percent) {
+      errors.push(`${name} service-SLO availability critical must be lower than warning.`);
+    }
+    if (!Number.isFinite(target.latency_p95_warning_ms)
+      || target.latency_p95_warning_ms <= 0
+      || !Number.isFinite(target.latency_p95_critical_ms)
+      || target.latency_p95_critical_ms <= target.latency_p95_warning_ms) {
+      errors.push(`${name} service-SLO latency P95 critical must exceed warning.`);
+    }
+    const lossWarning = target.packet_loss_p95_warning_percent;
+    const lossCritical = target.packet_loss_p95_critical_percent;
+    if ((lossWarning === null) !== (lossCritical === null)
+      || (lossWarning !== null && lossCritical !== null
+        && (lossWarning < 0 || lossWarning > 100
+          || lossCritical <= lossWarning || lossCritical > 100))) {
+      errors.push(`${name} service-SLO packet-loss P95 thresholds are invalid.`);
+    }
+  }
+
   return errors;
 }

@@ -228,6 +228,32 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Lines show averages of available readings per bucket. Hover or use the time slider
         to inspect min/max and available counts. Empty buckets are gaps, not zeros. Samples from different interfaces
         are never combined. DNS/HTTPS use the host route; retry ratios can exceed 100.</p>
+      {data.service_slo_summary && Object.values(data.service_slo_summary).some(
+        service => service.attempt_count > 0,
+      ) && <section aria-labelledby="service-slo-history-title">
+        <h3 id="service-slo-history-title">Synthetic service SLA/SLO observations</h3>
+        <p className="metric-note">
+          Availability uses fresh definitive passed/failed executions in this selected period.
+          Collection errors are excluded from the availability denominator. Historical percentiles
+          are observations for the selected period; rolling incident compliance uses the profile-pinned
+          runtime SLO window.
+        </p>
+        <div className="table-wrapper"><table>
+          <thead><tr><th>Service</th><th>Availability</th><th>Success / Failure / Error</th>
+            <th>Latency P95</th><th>Latency P99</th><th>Packet-loss P95</th></tr></thead>
+          <tbody>{Object.entries(data.service_slo_summary).filter(([, service]) =>
+            service.attempt_count > 0).map(([name, service]) => <tr key={name}>
+            <td>{name.toUpperCase()}</td>
+            <td>{format(service.availability_percent)}%</td>
+            <td>{service.success_count} / {service.failure_count} /
+              {" "}{service.measurement_error_count}</td>
+            <td>{format(service.latency_ms.p95)} ms</td>
+            <td>{format(service.latency_ms.p99)} ms</td>
+            <td>{service.packet_loss_percent.count > 0
+              ? `${format(service.packet_loss_percent.p95)}%` : "Not applicable / unavailable"}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>}
       {data.connection_cycle_summary && data.connection_cycle_summary.total_cycles > 0 && <section
         aria-labelledby="connection-cycle-summary-title">
         <h3 id="connection-cycle-summary-title">Connection cycle statistics</h3>

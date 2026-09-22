@@ -40,6 +40,15 @@ export interface SyntheticTestConfiguration {
   timeout_seconds: number | null;
 }
 
+export interface ServiceSloTargetConfiguration {
+  availability_warning_percent: number;
+  availability_critical_percent: number;
+  latency_p95_warning_ms: number;
+  latency_p95_critical_ms: number;
+  packet_loss_p95_warning_percent: number | null;
+  packet_loss_p95_critical_percent: number | null;
+}
+
 export interface TestProfileConfiguration {
   schema_version: 1;
   sampling: {
@@ -97,6 +106,15 @@ export interface TestProfileConfiguration {
       max_samples: number;
       warning_sigma: number;
       critical_sigma: number;
+    };
+    service_slo: {
+      enabled: boolean;
+      window_size: number;
+      minimum_samples: number;
+      gateway: ServiceSloTargetConfiguration;
+      internet: ServiceSloTargetConfiguration;
+      dns: ServiceSloTargetConfiguration;
+      https: ServiceSloTargetConfiguration;
     };
   };
 }
@@ -329,6 +347,39 @@ export interface AdaptiveBaselineMetrics {
   reason: string;
 }
 
+export interface ServiceSloMetric {
+  service: string;
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  latency_sample_count: number;
+  latency_p95_ms: number | null;
+  packet_loss_sample_count: number;
+  packet_loss_p95_percent: number | null;
+  availability_warning_percent: number;
+  availability_critical_percent: number;
+  latency_p95_warning_ms: number;
+  latency_p95_critical_ms: number;
+  packet_loss_p95_warning_percent: number | null;
+  packet_loss_p95_critical_percent: number | null;
+  fresh: boolean;
+  reason: string;
+}
+
+export interface ServiceSloMetrics {
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  enabled: boolean;
+  window_size: number;
+  minimum_samples: number;
+  services: Record<string, ServiceSloMetric>;
+  fresh: boolean;
+  reason: string;
+}
+
 export interface ConnectivityMetrics {
   tests?: Record<string, TestOutcome>;
 
@@ -542,6 +593,7 @@ export interface SensorSnapshot {
   connection_cycle?: ConnectionCycleMetrics | null;
   connection_cycle_slo?: ConnectionCycleSloMetrics | null;
   adaptive_baseline?: AdaptiveBaselineMetrics | null;
+  service_slo?: ServiceSloMetrics | null;
 
   monitoring?: {
     session_id: number;
@@ -639,6 +691,19 @@ export interface ConnectionCycleSummary {
   stages: Record<string, ConnectionCycleAggregate>;
 }
 
+export interface ServiceSloHistoryMetric {
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  latency_ms: HistoryAggregate;
+  packet_loss_percent: HistoryAggregate;
+}
+
+export type ServiceSloHistorySummary = Record<string, ServiceSloHistoryMetric>;
+
 export interface HistorySummary {
   sample_count: number;
   metrics: Record<string, HistoryAggregate>;
@@ -652,6 +717,10 @@ export interface HistoryComparison {
   connection_cycles?: {
     current: ConnectionCycleSummary;
     previous: ConnectionCycleSummary;
+  };
+  service_slo?: {
+    current: ServiceSloHistorySummary;
+    previous: ServiceSloHistorySummary;
   };
 }
 
@@ -671,6 +740,7 @@ export interface HistoryWindow {
   events: EnvironmentChange[];
   connection_cycles?: ConnectionCycleMetrics[];
   connection_cycle_summary?: ConnectionCycleSummary;
+  service_slo_summary?: ServiceSloHistorySummary;
   summary?: HistorySummary;
   comparison?: HistoryComparison;
 }

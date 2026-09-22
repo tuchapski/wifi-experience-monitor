@@ -77,3 +77,53 @@ test("validates adaptive baseline sample and sigma ordering", () => {
   assert.match(errors, /maximum samples/i);
   assert.match(errors, /critical deviation/i);
 });
+
+test("accepts legacy thresholds without service SLO", () => {
+  assert.deepEqual(validate(configuration()), []);
+});
+
+test("validates service SLO window and target ordering", () => {
+  const value = configuration();
+  value.thresholds.service_slo = {
+    enabled: true,
+    window_size: 10,
+    minimum_samples: 20,
+    gateway: {
+      availability_warning_percent: 95,
+      availability_critical_percent: 99,
+      latency_p95_warning_ms: 100,
+      latency_p95_critical_ms: 50,
+      packet_loss_p95_warning_percent: 20,
+      packet_loss_p95_critical_percent: 5,
+    },
+    internet: {
+      availability_warning_percent: 99,
+      availability_critical_percent: 95,
+      latency_p95_warning_ms: 150,
+      latency_p95_critical_ms: 300,
+      packet_loss_p95_warning_percent: 5,
+      packet_loss_p95_critical_percent: 20,
+    },
+    dns: {
+      availability_warning_percent: 99,
+      availability_critical_percent: 95,
+      latency_p95_warning_ms: 250,
+      latency_p95_critical_ms: 500,
+      packet_loss_p95_warning_percent: null,
+      packet_loss_p95_critical_percent: null,
+    },
+    https: {
+      availability_warning_percent: 99,
+      availability_critical_percent: 95,
+      latency_p95_warning_ms: 1000,
+      latency_p95_critical_ms: 2000,
+      packet_loss_p95_warning_percent: null,
+      packet_loss_p95_critical_percent: null,
+    },
+  };
+  const errors = validate(value).join(" ");
+  assert.match(errors, /minimum samples/i);
+  assert.match(errors, /Gateway service-SLO availability/i);
+  assert.match(errors, /Gateway service-SLO latency/i);
+  assert.match(errors, /Gateway service-SLO packet-loss/i);
+});

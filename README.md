@@ -152,6 +152,25 @@ not replace them. Warning/critical deviation multipliers, lookback and sample li
 versioned with the profile. Baseline incidents use stable per-metric codes and only
 advance confirmation or recovery when that specific metric has fresh evidence.
 
+## Synthetic service SLA/SLO
+
+Gateway, Internet, DNS and HTTPS tests also feed a profile-versioned rolling SLO.
+Only fresh test executions enter the window. Availability uses definitive `passed`
+and `failed` outcomes; sensor-side collection `error` results are tracked separately
+and are not silently converted into service outages. Cached results never advance the
+window or incident confirmation.
+
+Latency P95 uses successful measurements. Gateway and Internet additionally evaluate
+packet-loss P95. The default policy uses a 60-execution window and waits for 20
+definitive samples before evaluating a dimension. Availability, tail-latency and
+packet-loss thresholds remain independent from the existing single-sample diagnostic
+limits.
+
+History and HTML reports summarize fresh executions for the selected period with
+availability, failure/error counts and latency/loss percentiles. Those historical
+figures are observational; rolling incident compliance remains tied to the immutable
+profile version selected when monitoring starts.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

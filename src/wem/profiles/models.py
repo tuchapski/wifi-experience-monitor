@@ -128,6 +128,73 @@ class AdaptiveBaselineThresholds(ProfileModel):
         return self
 
 
+class ServiceSloTarget(ProfileModel):
+    availability_warning_percent: float = Field(default=99.0, ge=0.0, le=100.0)
+    availability_critical_percent: float = Field(default=95.0, ge=0.0, le=100.0)
+    latency_p95_warning_ms: float = Field(gt=0.0, le=300000.0)
+    latency_p95_critical_ms: float = Field(gt=0.0, le=300000.0)
+    packet_loss_p95_warning_percent: float | None = Field(default=None, ge=0.0, le=100.0)
+    packet_loss_p95_critical_percent: float | None = Field(default=None, ge=0.0, le=100.0)
+
+    @model_validator(mode="after")
+    def validate_service_slo_target(self) -> Self:
+        if self.availability_critical_percent >= self.availability_warning_percent:
+            raise ValueError(
+                "availability_critical_percent must be lower than availability_warning_percent"
+            )
+        if self.latency_p95_critical_ms <= self.latency_p95_warning_ms:
+            raise ValueError("latency_p95_critical_ms must exceed latency_p95_warning_ms")
+        warning_loss = self.packet_loss_p95_warning_percent
+        critical_loss = self.packet_loss_p95_critical_percent
+        if (warning_loss is None) != (critical_loss is None):
+            raise ValueError("packet-loss P95 warning and critical thresholds must both be set")
+        if warning_loss is not None and critical_loss is not None and critical_loss <= warning_loss:
+            raise ValueError(
+                "packet_loss_p95_critical_percent must exceed packet_loss_p95_warning_percent"
+            )
+        return self
+
+
+class ServiceSloThresholds(ProfileModel):
+    enabled: bool = True
+    window_size: int = Field(default=60, ge=10, le=1000)
+    minimum_samples: int = Field(default=20, ge=5, le=1000)
+    gateway: ServiceSloTarget = Field(
+        default_factory=lambda: ServiceSloTarget(
+            latency_p95_warning_ms=50.0,
+            latency_p95_critical_ms=100.0,
+            packet_loss_p95_warning_percent=5.0,
+            packet_loss_p95_critical_percent=20.0,
+        )
+    )
+    internet: ServiceSloTarget = Field(
+        default_factory=lambda: ServiceSloTarget(
+            latency_p95_warning_ms=150.0,
+            latency_p95_critical_ms=300.0,
+            packet_loss_p95_warning_percent=5.0,
+            packet_loss_p95_critical_percent=20.0,
+        )
+    )
+    dns: ServiceSloTarget = Field(
+        default_factory=lambda: ServiceSloTarget(
+            latency_p95_warning_ms=250.0,
+            latency_p95_critical_ms=500.0,
+        )
+    )
+    https: ServiceSloTarget = Field(
+        default_factory=lambda: ServiceSloTarget(
+            latency_p95_warning_ms=1000.0,
+            latency_p95_critical_ms=2000.0,
+        )
+    )
+
+    @model_validator(mode="after")
+    def validate_service_slo_window(self) -> Self:
+        if self.minimum_samples > self.window_size:
+            raise ValueError("service SLO minimum_samples must not exceed window_size")
+        return self
+
+
 class ProfileThresholds(ProfileModel):
     wifi: WifiThresholds = Field(default_factory=WifiThresholds)
     gateway: LatencyLossThresholds = Field(
@@ -146,6 +213,7 @@ class ProfileThresholds(ProfileModel):
     adaptive_baseline: AdaptiveBaselineThresholds = Field(
         default_factory=AdaptiveBaselineThresholds
     )
+    service_slo: ServiceSloThresholds = Field(default_factory=ServiceSloThresholds)
 
 
 class TestProfileConfig(ProfileModel):

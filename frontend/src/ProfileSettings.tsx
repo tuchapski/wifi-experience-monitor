@@ -81,6 +81,43 @@ const defaultConfiguration: TestProfileConfiguration = {
       warning_sigma: 3.5,
       critical_sigma: 6,
     },
+    service_slo: {
+      enabled: true,
+      window_size: 60,
+      minimum_samples: 20,
+      gateway: {
+        availability_warning_percent: 99,
+        availability_critical_percent: 95,
+        latency_p95_warning_ms: 50,
+        latency_p95_critical_ms: 100,
+        packet_loss_p95_warning_percent: 5,
+        packet_loss_p95_critical_percent: 20,
+      },
+      internet: {
+        availability_warning_percent: 99,
+        availability_critical_percent: 95,
+        latency_p95_warning_ms: 150,
+        latency_p95_critical_ms: 300,
+        packet_loss_p95_warning_percent: 5,
+        packet_loss_p95_critical_percent: 20,
+      },
+      dns: {
+        availability_warning_percent: 99,
+        availability_critical_percent: 95,
+        latency_p95_warning_ms: 250,
+        latency_p95_critical_ms: 500,
+        packet_loss_p95_warning_percent: null,
+        packet_loss_p95_critical_percent: null,
+      },
+      https: {
+        availability_warning_percent: 99,
+        availability_critical_percent: 95,
+        latency_p95_warning_ms: 1000,
+        latency_p95_critical_ms: 2000,
+        packet_loss_p95_warning_percent: null,
+        packet_loss_p95_critical_percent: null,
+      },
+    },
   },
 };
 
@@ -439,6 +476,34 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
                   <NumberField label="P95 warning (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_warning_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_warning_ms = value ?? 0; })} />
                   <NumberField label="P95 critical (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_critical_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_critical_ms = value ?? 0; })} />
                   <p className="metric-note">Only unique connection cycles with a measured network-ready duration enter the rolling P95.</p>
+                </fieldset>
+                <fieldset>
+                  <legend>Synthetic service SLO</legend>
+                  <label className="profile-toggle">
+                    <input type="checkbox" checked={draft.configuration.thresholds.service_slo.enabled} onChange={(event) => updateConfiguration((configuration) => { configuration.thresholds.service_slo.enabled = event.target.checked; })} />
+                    <span>Evaluate rolling availability and tail performance</span>
+                  </label>
+                  <NumberField label="Rolling window (executions)" min={10} max={1000} step={1} value={draft.configuration.thresholds.service_slo.window_size} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo.window_size = value ?? 0; })} />
+                  <NumberField label="Minimum definitive samples" min={5} max={1000} step={1} value={draft.configuration.thresholds.service_slo.minimum_samples} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo.minimum_samples = value ?? 0; })} />
+                  {(["gateway", "internet", "dns", "https"] as const).map((name) => {
+                    const target = draft.configuration.thresholds.service_slo[name];
+                    const packetLoss = name === "gateway" || name === "internet";
+                    return <details key={name}>
+                      <summary>{name.toUpperCase()} policy</summary>
+                      <NumberField label="Availability warning below (%)" min={0} max={100} value={target.availability_warning_percent} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].availability_warning_percent = value ?? 0; })} />
+                      <NumberField label="Availability critical below (%)" min={0} max={100} value={target.availability_critical_percent} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].availability_critical_percent = value ?? 0; })} />
+                      <NumberField label="Latency P95 warning (ms)" min={0.1} value={target.latency_p95_warning_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].latency_p95_warning_ms = value ?? 0; })} />
+                      <NumberField label="Latency P95 critical (ms)" min={0.1} value={target.latency_p95_critical_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].latency_p95_critical_ms = value ?? 0; })} />
+                      {packetLoss && <>
+                        <NumberField label="Packet-loss P95 warning (%)" min={0} max={100} value={target.packet_loss_p95_warning_percent} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].packet_loss_p95_warning_percent = value; })} />
+                        <NumberField label="Packet-loss P95 critical (%)" min={0} max={100} value={target.packet_loss_p95_critical_percent} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.service_slo[name].packet_loss_p95_critical_percent = value; })} />
+                      </>}
+                    </details>;
+                  })}
+                  <p className="metric-note">
+                    Availability counts only definitive passed/failed executions. Sensor collection
+                    errors are tracked separately and cached test results are never counted twice.
+                  </p>
                 </fieldset>
                 <fieldset>
                   <legend>Adaptive baseline</legend>

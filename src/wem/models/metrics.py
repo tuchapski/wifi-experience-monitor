@@ -241,6 +241,41 @@ class AdaptiveBaselineMetrics:
 
 
 @dataclass(slots=True)
+class ServiceSloMetric:
+    service: str
+    status: str
+    attempt_count: int
+    measurable_count: int
+    success_count: int
+    failure_count: int
+    measurement_error_count: int
+    availability_percent: float | None
+    latency_sample_count: int
+    latency_p95_ms: float | None
+    packet_loss_sample_count: int
+    packet_loss_p95_percent: float | None
+    availability_warning_percent: float
+    availability_critical_percent: float
+    latency_p95_warning_ms: float
+    latency_p95_critical_ms: float
+    packet_loss_p95_warning_percent: float | None
+    packet_loss_p95_critical_percent: float | None
+    fresh: bool
+    reason: str
+
+
+@dataclass(slots=True)
+class ServiceSloMetrics:
+    status: str
+    enabled: bool
+    window_size: int
+    minimum_samples: int
+    services: dict[str, ServiceSloMetric] = field(default_factory=dict)
+    fresh: bool = False
+    reason: str = ""
+
+
+@dataclass(slots=True)
 class SensorHealthMetrics:
     interface: str
 
@@ -433,6 +468,7 @@ class SensorSnapshot:
     connection_cycle: ConnectionCycleMetrics | None = None
     connection_cycle_slo: ConnectionCycleSloMetrics | None = None
     adaptive_baseline: AdaptiveBaselineMetrics | None = None
+    service_slo: ServiceSloMetrics | None = None
     monitoring: MonitoringContext | None = None
 
     @classmethod

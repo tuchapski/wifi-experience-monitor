@@ -4,6 +4,7 @@ from datetime import datetime
 from wem.analysis.adaptive_baseline import AdaptiveBaselineEngine
 from wem.analysis.connection_cycle import ConnectionCycleTracker
 from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
+from wem.analysis.service_slo import ServiceSloEngine
 from wem.collectors.networkmanager_events import NetworkManagerEventMonitor
 from wem.models.metrics import DiagnosticResult, IncidentEvaluation, SensorSnapshot
 from wem.runtime.sensor import (
@@ -42,6 +43,10 @@ class ConsoleSensorRuntime(SensorRuntime):
         )
         self.adaptive_baseline_engine = AdaptiveBaselineEngine(
             config.profile_config.thresholds.adaptive_baseline
+        )
+        self.service_slo_engine = ServiceSloEngine(
+            config.profile_config.thresholds.service_slo,
+            config.profile_config.tests,
         )
         self._baseline_seeded = False
         self._baseline_ssid: str | None = None
@@ -103,6 +108,14 @@ class ConsoleSensorRuntime(SensorRuntime):
         if snapshot.diagnostic is not None and baseline_evaluation.findings:
             self.diagnostic_engine.extend_result(snapshot.diagnostic, baseline_evaluation.findings)
 
+        service_slo_evaluation = self.service_slo_engine.evaluate(snapshot)
+        snapshot.service_slo = service_slo_evaluation.metrics
+        if snapshot.diagnostic is not None and service_slo_evaluation.findings:
+            self.diagnostic_engine.extend_result(
+                snapshot.diagnostic,
+                service_slo_evaluation.findings,
+            )
+
         slo_diagnostic = DiagnosticResult(
             overall_status=(
                 slo_evaluation.finding.severity if slo_evaluation.finding is not None else "healthy"
@@ -136,9 +149,31 @@ class ConsoleSensorRuntime(SensorRuntime):
             fresh_domains={"baseline"} if baseline_disabled else None,
             fresh_codes=None if baseline_disabled else baseline_evaluation.fresh_codes,
         )
+
+        service_slo_severity = "healthy"
+        if any(item.severity == "critical" for item in service_slo_evaluation.findings):
+            service_slo_severity = "critical"
+        elif service_slo_evaluation.findings:
+            service_slo_severity = "warning"
+        service_slo_diagnostic = DiagnosticResult(
+            overall_status=service_slo_severity,
+            probable_domain=("service_slo" if service_slo_evaluation.findings else None),
+            complete=True,
+            findings=service_slo_evaluation.findings,
+        )
+        service_slo_incidents = self.incident_engine.evaluate(
+            service_slo_diagnostic,
+            timestamp=snapshot.timestamp,
+            fresh_codes=service_slo_evaluation.fresh_codes,
+        )
         snapshot.incidents = IncidentEvaluation(
-            active_incidents=baseline_incidents.active_incidents,
-            events=[*base_events, *slo_incidents.events, *baseline_incidents.events],
+            active_incidents=service_slo_incidents.active_incidents,
+            events=[
+                *base_events,
+                *slo_incidents.events,
+                *baseline_incidents.events,
+                *service_slo_incidents.events,
+            ],
         )
 
         self.snapshot_repository.save(snapshot)
