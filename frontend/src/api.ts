@@ -1,4 +1,5 @@
 import type {
+  ExperienceEpisodeHistory,
   HistoryRecord,
   HistoryWindow,
   IncidentRecord,
@@ -232,6 +233,14 @@ export function getIncidentHistory(
 ): Promise<IncidentRecord[]> {
   return request<IncidentRecord[]>(
     `/incidents/history?limit=${limit}`,
+  );
+}
+
+export function getExperienceEpisodes(
+  limit = 50,
+): Promise<ExperienceEpisodeHistory> {
+  return request<ExperienceEpisodeHistory>(
+    `/episodes/history?limit=${limit}`,
   );
 }
 

@@ -6,17 +6,20 @@ import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
 import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
 import CorrelationPanel from "./CorrelationPanel";
+import ExperienceEpisodesPanel from "./ExperienceEpisodesPanel";
 import ServiceSloPanel from "./ServiceSloPanel";
 import ProfileSettings from "./ProfileSettings";
 
 import {
   clearIncidentHistory,
   getActiveIncidents,
+  getExperienceEpisodes,
   getIncidentHistory,
   getLatestSnapshot,
 } from "./api";
 
 import type {
+  ExperienceEpisodeHistory,
   IncidentRecord,
   SensorSnapshot,
   SensorStatus,
@@ -282,6 +285,8 @@ function App() {
     setIncidentHistory,
   ] = useState<IncidentRecord[]>([]);
 
+  const [episodeHistory, setEpisodeHistory] = useState<ExperienceEpisodeHistory | null>(null);
+
   const [clearingHistory, setClearingHistory] = useState(false);
 
   const [error, setError] =
@@ -294,10 +299,12 @@ function App() {
         latestData,
         activeIncidentData,
         incidentHistoryData,
+        episodeHistoryData,
       ] = await Promise.all([
         getLatestSnapshot(),
         getActiveIncidents(),
         getIncidentHistory(50),
+        getExperienceEpisodes(50),
       ]);
 
       setSnapshot(latestData);
@@ -310,6 +317,8 @@ function App() {
       setIncidentHistory(
         incidentHistoryData,
       );
+
+      setEpisodeHistory(episodeHistoryData);
 
       setError(null);
     } catch (err) {
@@ -787,6 +796,7 @@ function App() {
 
       <section id="panel-incidents" role="tabpanel" aria-labelledby="tab-incidents"
         tabIndex={0} hidden={activeTab !== "incidents"}>
+        <ExperienceEpisodesPanel history={episodeHistory} />
         <IncidentPanel
           activeIncidents={activeIncidents}
           incidentHistory={incidentHistory}

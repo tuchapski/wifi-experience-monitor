@@ -30,6 +30,7 @@ from wem.profiles.service import (
 from wem.reports.html import render_html_report
 from wem.runtime.controller import SensorController
 from wem.storage.database import Database
+from wem.storage.episodes import EpisodeRepository
 from wem.storage.history import HistoryRepository
 from wem.storage.incidents import IncidentRepository
 from wem.storage.models import (
@@ -194,6 +195,8 @@ def create_app(
     snapshot_repository = SnapshotRepository(database)
 
     incident_repository = IncidentRepository(database)
+
+    episode_repository = EpisodeRepository(database)
 
     profile_service = ProfileService(database)
 
@@ -492,6 +495,12 @@ def create_app(
         records = incident_repository.history(limit=limit)
 
         return [_incident_to_dict(record) for record in records]
+
+    @app.get("/episodes/history")
+    def experience_episode_history(
+        limit: int = Query(default=50, ge=1, le=200),
+    ) -> dict[str, object]:
+        return episode_repository.history(limit=limit)
 
     @app.delete("/incidents/history")
     def clear_incident_history() -> dict[str, int]:

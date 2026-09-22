@@ -717,6 +717,30 @@ export interface IncidentRecord {
 }
 
 
+export interface ExperienceEpisode {
+  episode_id: string;
+  status: "active" | "ended";
+  severity: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  incident_count: number;
+  incident_ids: number[];
+  codes: string[];
+  domains: string[];
+  correlation_status: "correlated" | "mixed" | "unavailable";
+  primary_domain: string | null;
+  correlation_sample_count: number;
+  correlation_domain_counts: Record<string, number>;
+  correlation_reason: string;
+}
+
+export interface ExperienceEpisodeHistory {
+  merge_gap_seconds: number;
+  episodes: ExperienceEpisode[];
+}
+
+
 export interface HistoryAggregate {
   avg: number | null;
   min: number | null;

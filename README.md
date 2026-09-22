@@ -199,6 +199,20 @@ gaps are retained as limitations, and the assessment never claims a proven root 
 The correlation result is stored in snapshot JSON and does not create duplicate
 incidents; objective findings and SLO violations remain the incident sources.
 
+## Experience episodes
+
+The incident view also derives higher-level experience episodes without adding a
+second persistence model. Incident intervals that overlap, or whose gap is at most
+120 seconds, are grouped into one operational episode. The original incidents remain
+the immutable evidence and are still shown individually.
+
+Stored warning/critical snapshots inside each episode are inspected for correlation
+results. A primary episode domain is assigned only when all correlated snapshots in
+that episode agree on the same domain. If multiple correlated domains occur, the
+episode is marked `mixed`; if no correlated snapshot exists, correlation remains
+`unavailable`. Clearing ended incident history therefore also removes the derived
+ended episodes, while active intervals remain visible.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor
