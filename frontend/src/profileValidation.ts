@@ -59,5 +59,30 @@ export function validateProfileConfiguration(
     }
   }
 
+  const cycle = configuration.thresholds.connection_cycle ?? {
+    window_size: 20,
+    minimum_samples: 5,
+    p95_warning_ms: 8000,
+    p95_critical_ms: 15000,
+  };
+  if (!Number.isInteger(cycle.window_size) || cycle.window_size < 3 || cycle.window_size > 200) {
+    errors.push("Connection-cycle window must be an integer between 3 and 200.");
+  }
+  if (!Number.isInteger(cycle.minimum_samples)
+    || cycle.minimum_samples < 3
+    || cycle.minimum_samples > cycle.window_size) {
+    errors.push("Connection-cycle minimum samples must be between 3 and the window size.");
+  }
+  if (!Number.isFinite(cycle.p95_warning_ms)
+    || cycle.p95_warning_ms <= 0
+    || cycle.p95_warning_ms > 300000) {
+    errors.push("Connection-cycle P95 warning must be between 0 and 300000 ms.");
+  }
+  if (!Number.isFinite(cycle.p95_critical_ms)
+    || cycle.p95_critical_ms <= cycle.p95_warning_ms
+    || cycle.p95_critical_ms > 300000) {
+    errors.push("Connection-cycle P95 critical must exceed warning and be at most 300000 ms.");
+  }
+
   return errors;
 }
