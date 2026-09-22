@@ -49,6 +49,38 @@ class HTTPSTestConfig(SyntheticTestConfig):
         return value
 
 
+class ApplicationTargetConfig(SyntheticTestConfig):
+    name: str = Field(min_length=1, max_length=80)
+    kind: Literal["http", "tcp", "dns"]
+    target: str = Field(min_length=1, max_length=2048)
+    port: int | None = Field(default=None, ge=1, le=65535)
+
+    @field_validator("name", "target")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("value must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_target(self) -> Self:
+        if self.kind == "http":
+            parsed = urlsplit(self.target)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("HTTP application target must be an absolute HTTP or HTTPS URL")
+            if self.port is not None:
+                raise ValueError("HTTP application target port must be omitted; use the URL port")
+        elif self.kind == "tcp":
+            if "://" in self.target:
+                raise ValueError("TCP application target must be a host name or IP address")
+            if self.port is None:
+                raise ValueError("TCP application target requires a port")
+        elif self.port is not None:
+            raise ValueError("DNS application target does not use a port")
+        return self
+
+
 class TestConfigurations(ProfileModel):
     gateway: GatewayTestConfig = Field(
         default_factory=lambda: GatewayTestConfig(timeout_seconds=6.0)
@@ -265,6 +297,7 @@ class TestProfileConfig(ProfileModel):
     schema_version: Literal[1] = 1
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
     tests: TestConfigurations = Field(default_factory=TestConfigurations)
+    application_targets: list[ApplicationTargetConfig] = Field(default_factory=list, max_length=20)
     thresholds: ProfileThresholds = Field(default_factory=ProfileThresholds)
 
     @model_validator(mode="after")
@@ -279,5 +312,19 @@ class TestProfileConfig(ProfileModel):
                 raise ValueError(
                     f"enabled test {name} interval_seconds must be an integer "
                     "multiple of sampling.wifi_interval_seconds"
+                )
+        names: set[str] = set()
+        for target in self.application_targets:
+            normalized_name = target.name.casefold()
+            if normalized_name in names:
+                raise ValueError("application target names must be unique")
+            names.add(normalized_name)
+            if not target.enabled:
+                continue
+            ratio = target.interval_seconds / wifi_interval
+            if target.interval_seconds < wifi_interval or abs(ratio - round(ratio)) > 1e-9:
+                raise ValueError(
+                    f"enabled application target {target.name} interval_seconds must be an "
+                    "integer multiple of sampling.wifi_interval_seconds"
                 )
         return self

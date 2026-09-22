@@ -6,6 +6,7 @@ import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
 import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
 import CorrelationPanel from "./CorrelationPanel";
+import ApplicationTargetsPanel from "./ApplicationTargetsPanel";
 import ExperienceEpisodesPanel from "./ExperienceEpisodesPanel";
 import ServiceSloPanel from "./ServiceSloPanel";
 import ProfileSettings from "./ProfileSettings";
@@ -395,6 +396,7 @@ function App() {
       <ExperienceScorePanel score={snapshot.experience_score} />
       <CorrelationPanel correlation={snapshot.correlation} />
       <ServiceSloPanel slo={snapshot.service_slo} />
+      <ApplicationTargetsPanel targets={snapshot.connectivity.application_targets} />
       <AdaptiveBaselinePanel baseline={snapshot.adaptive_baseline} />
       {snapshot.diagnostic?.complete === false && (
         <div className="empty-state">

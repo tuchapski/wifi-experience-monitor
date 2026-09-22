@@ -41,6 +41,54 @@ export function validateProfileConfiguration(
     errors.push("HTTPS test URL must be an absolute URL.");
   }
 
+  const applicationTargets = configuration.application_targets ?? [];
+  if (applicationTargets.length > 20) {
+    errors.push("At most 20 application targets can be configured.");
+  }
+  const targetNames = new Set<string>();
+  for (const target of applicationTargets) {
+    const name = target.name.trim();
+    const normalizedName = name.toLowerCase();
+    if (!name) errors.push("Application target name is required.");
+    if (targetNames.has(normalizedName)) {
+      errors.push(`Application target name '${name}' must be unique.`);
+    }
+    targetNames.add(normalizedName);
+    if (!target.target.trim()) errors.push(`${name || "Application target"} target is required.`);
+    if (target.enabled && (!Number.isFinite(target.interval_seconds)
+      || target.interval_seconds < wifiInterval
+      || Math.abs(target.interval_seconds / wifiInterval
+        - Math.round(target.interval_seconds / wifiInterval)) > 1e-9)) {
+      errors.push(`${name || "Application target"} interval must be an integer multiple of the Wi-Fi interval.`);
+    }
+    if (target.timeout_seconds !== null
+      && (!Number.isFinite(target.timeout_seconds)
+        || target.timeout_seconds <= 0
+        || target.timeout_seconds > 300)) {
+      errors.push(`${name || "Application target"} timeout must be greater than 0 and at most 300 seconds.`);
+    }
+    if (target.kind === "http") {
+      try {
+        const url = new URL(target.target);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          errors.push(`${name || "Application target"} URL must use HTTP or HTTPS.`);
+        }
+      } catch {
+        errors.push(`${name || "Application target"} must use an absolute HTTP/HTTPS URL.`);
+      }
+      if (target.port !== null) errors.push(`${name || "Application target"} HTTP port must be part of the URL.`);
+    } else if (target.kind === "tcp") {
+      if (target.port === null || !Number.isInteger(target.port) || target.port < 1 || target.port > 65535) {
+        errors.push(`${name || "Application target"} TCP port must be between 1 and 65535.`);
+      }
+      if (target.target.includes("://")) {
+        errors.push(`${name || "Application target"} TCP target must be a host name or IP address.`);
+      }
+    } else if (target.kind === "dns" && target.port !== null) {
+      errors.push(`${name || "Application target"} DNS target does not use a port.`);
+    }
+  }
+
   const wifi = configuration.thresholds.wifi;
   if (wifi.rssi_critical_dbm >= wifi.rssi_warning_dbm) {
     errors.push("Critical RSSI must be lower than warning RSSI.");

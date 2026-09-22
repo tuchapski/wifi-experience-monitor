@@ -1,8 +1,8 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
-from wem.models.metrics import ConnectivityMetrics, TestOutcome
-from wem.profiles.models import TestConfigurations
+from wem.models.metrics import ApplicationTargetMetric, ConnectivityMetrics, TestOutcome
+from wem.profiles.models import ApplicationTargetConfig, TestConfigurations
 from wem.tests_engine.connectivity import ConnectivityTester
 
 TEST_NAMES = ("gateway", "dns", "internet", "https")
@@ -41,11 +41,21 @@ class ScheduledConnectivity:
 
 
 class ConnectivityTestScheduler:
-    def __init__(self, tests: TestConfigurations) -> None:
+    def __init__(
+        self,
+        tests: TestConfigurations,
+        application_targets: list[ApplicationTargetConfig] | None = None,
+    ) -> None:
         self.tests = tests.model_copy(deep=True)
+        self.application_targets = [
+            item.model_copy(deep=True) for item in application_targets or []
+        ]
         self._last_run: dict[str, float] = {}
         self._observed_monotonic: dict[str, float] = {}
         self._cache: dict[str, ConnectivityMetrics] = {}
+        self._target_last_run: dict[str, float] = {}
+        self._target_observed_monotonic: dict[str, float] = {}
+        self._target_cache: dict[str, ApplicationTargetMetric] = {}
         self._last_blocked: bool | None = None
         self._last_gateway: str | None = None
 
@@ -98,6 +108,45 @@ class ConnectivityTestScheduler:
                 )
             self._merge(combined, name, cached)
 
+        for config in self.application_targets:
+            key = config.name
+            if not config.enabled:
+                combined.application_targets[key] = ApplicationTargetMetric(
+                    name=config.name,
+                    kind=config.kind,
+                    target=config.target,
+                    port=config.port,
+                    status="disabled",
+                    reason="Application target disabled by profile.",
+                    fresh=False,
+                    age_seconds=None,
+                )
+                continue
+            due = (
+                key not in self._target_last_run
+                or now - self._target_last_run[key] >= config.interval_seconds
+                or state_changed
+            )
+            if due:
+                metric = (
+                    self._blocked_target(config)
+                    if blocked
+                    else tester.run_application_target(config)
+                )
+                metric.observed_at = observed_at
+                metric.fresh = True
+                metric.age_seconds = 0.0
+                self._target_cache[key] = deepcopy(metric)
+                self._target_last_run[key] = now
+                self._target_observed_monotonic[key] = now
+            cached_target = deepcopy(self._target_cache[key])
+            if not due:
+                cached_target.fresh = False
+                cached_target.age_seconds = round(
+                    max(0.0, now - self._target_observed_monotonic[key]), 3
+                )
+            combined.application_targets[key] = cached_target
+
         self._last_blocked = blocked
         self._last_gateway = gateway
         return ScheduledConnectivity(combined, fresh_domains)
@@ -113,6 +162,18 @@ class ConnectivityTestScheduler:
                     scope,
                 )
             }
+        )
+
+    @staticmethod
+    def _blocked_target(config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        return ApplicationTargetMetric(
+            name=config.name,
+            kind=config.kind,
+            target=config.target,
+            port=config.port,
+            status="skipped",
+            reason="Interface unavailable, unverified, blocked or disconnected.",
+            scope="host",
         )
 
     @staticmethod

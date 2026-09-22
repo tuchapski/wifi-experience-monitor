@@ -2,7 +2,12 @@ from unittest.mock import MagicMock, patch
 
 from wem.collectors.command import CommandResult
 from wem.models.metrics import ConnectivityMetrics
-from wem.profiles.models import TestConfigurations as ConnectivityConfigurations
+from wem.profiles.models import (
+    ApplicationTargetConfig,
+)
+from wem.profiles.models import (
+    TestConfigurations as ConnectivityConfigurations,
+)
 from wem.tests_engine.connectivity import ConnectivityTester
 
 PING_SUCCESS_OUTPUT = """
@@ -193,3 +198,71 @@ def test_profile_can_override_automatic_gateway(mock_run_command) -> None:
     assert command[-1] == "192.0.2.254"
     assert mock_run_command.call_args.kwargs["timeout"] == 9
     assert metrics.gateway_reachable is True
+
+
+@patch("wem.tests_engine.connectivity.urllib.request.urlopen")
+def test_http_application_target_records_status_and_latency(mock_urlopen) -> None:
+    response = MagicMock()
+    response.status = 204
+    mock_urlopen.return_value.__enter__.return_value = response
+    tester = ConnectivityTester("wlan0", "192.0.2.1")
+    target = ApplicationTargetConfig(
+        name="Portal",
+        kind="http",
+        target="https://portal.example.com/health",
+        interval_seconds=10,
+        timeout_seconds=3,
+    )
+
+    metric = tester.run_application_target(target)
+
+    assert metric.status == "passed"
+    assert metric.status_code == 204
+    assert metric.latency_ms is not None
+    assert metric.scope == "host"
+
+
+@patch("wem.tests_engine.connectivity.socket.create_connection")
+def test_tcp_application_target(mock_create_connection) -> None:
+    connection = MagicMock()
+    mock_create_connection.return_value.__enter__.return_value = connection
+    tester = ConnectivityTester("wlan0", "192.0.2.1")
+    target = ApplicationTargetConfig(
+        name="Database",
+        kind="tcp",
+        target="db.example.com",
+        port=5432,
+        interval_seconds=10,
+        timeout_seconds=2,
+    )
+
+    metric = tester.run_application_target(target)
+
+    assert metric.status == "passed"
+    assert metric.port == 5432
+    assert metric.latency_ms is not None
+    mock_create_connection.assert_called_once_with(("db.example.com", 5432), timeout=2.0)
+
+
+@patch("wem.tests_engine.connectivity.run_command")
+def test_dns_application_target(mock_run_command) -> None:
+    mock_run_command.return_value = CommandResult(
+        stdout="203.0.113.50 STREAM api.example.com\n",
+        stderr="",
+        returncode=0,
+    )
+    tester = ConnectivityTester("wlan0", "192.0.2.1")
+    target = ApplicationTargetConfig(
+        name="API DNS",
+        kind="dns",
+        target="api.example.com",
+        interval_seconds=10,
+        timeout_seconds=2,
+    )
+
+    metric = tester.run_application_target(target)
+
+    assert metric.status == "passed"
+    assert metric.latency_ms is not None
+    assert "203.0.113.50" in metric.reason
+    mock_run_command.assert_called_once_with(["getent", "ahostsv4", "api.example.com"], timeout=2.0)

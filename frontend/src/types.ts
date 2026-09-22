@@ -40,6 +40,13 @@ export interface SyntheticTestConfiguration {
   timeout_seconds: number | null;
 }
 
+export interface ApplicationTargetConfiguration extends SyntheticTestConfiguration {
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+}
+
 export interface ServiceSloTargetConfiguration {
   availability_warning_percent: number;
   availability_critical_percent: number;
@@ -74,6 +81,7 @@ export interface TestProfileConfiguration {
       url: string;
     };
   };
+  application_targets: ApplicationTargetConfiguration[];
   thresholds: {
     wifi: {
       rssi_warning_dbm: number;
@@ -431,8 +439,24 @@ export interface CorrelationAssessment {
   reason: string;
 }
 
+export interface ApplicationTargetMetric {
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+  status: "passed" | "failed" | "error" | "skipped" | "disabled";
+  reason: string;
+  scope: "host";
+  latency_ms: number | null;
+  status_code: number | null;
+  observed_at: string | null;
+  fresh: boolean;
+  age_seconds: number | null;
+}
+
 export interface ConnectivityMetrics {
   tests?: Record<string, TestOutcome>;
+  application_targets?: Record<string, ApplicationTargetMetric>;
 
   gateway_reachable: boolean | null;
 

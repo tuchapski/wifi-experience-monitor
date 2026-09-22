@@ -5,8 +5,11 @@ import urllib.error
 import urllib.request
 
 from wem.collectors.command import run_command
-from wem.models.metrics import ConnectivityMetrics, TestOutcome
-from wem.profiles.models import TestConfigurations
+from wem.models.metrics import ApplicationTargetMetric, ConnectivityMetrics, TestOutcome
+from wem.profiles.models import (
+    ApplicationTargetConfig,
+    TestConfigurations,
+)
 
 
 class ConnectivityTester:
@@ -223,6 +226,138 @@ class ConnectivityTester:
             else failure_reason,
             "host",
         )
+
+    def run_application_target(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        try:
+            if config.kind == "http":
+                return self._test_application_http(config)
+            if config.kind == "tcp":
+                return self._test_application_tcp(config)
+            return self._test_application_dns(config)
+        except Exception as exc:
+            self.errors.append(f"application target collection failed for {config.name}: {exc}")
+            return self._target_metric(
+                config,
+                status="error",
+                reason=f"Application target collection error: {exc}",
+                latency_ms=None,
+            )
+
+    @staticmethod
+    def _target_metric(
+        config: ApplicationTargetConfig,
+        *,
+        status: str,
+        reason: str,
+        latency_ms: float | None,
+        status_code: int | None = None,
+    ) -> ApplicationTargetMetric:
+        return ApplicationTargetMetric(
+            name=config.name,
+            kind=config.kind,
+            target=config.target,
+            port=config.port,
+            status=status,
+            reason=reason,
+            latency_ms=latency_ms,
+            status_code=status_code,
+        )
+
+    def _test_application_http(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        request = urllib.request.Request(
+            config.target,
+            method="GET",
+            headers={"User-Agent": "wifi-experience-monitor/0.1"},
+        )
+        started = time.perf_counter()
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=config.timeout_seconds or 5.0,
+            ) as response:
+                elapsed = round((time.perf_counter() - started) * 1000, 3)
+                status_code = int(response.status)
+                passed = 200 <= status_code < 400
+                return self._target_metric(
+                    config,
+                    status="passed" if passed else "failed",
+                    reason=f"HTTP response: {status_code}.",
+                    latency_ms=elapsed,
+                    status_code=status_code,
+                )
+        except urllib.error.HTTPError as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"HTTP response: {exc.code}.",
+                latency_ms=elapsed,
+                status_code=exc.code,
+            )
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"HTTP target failed: {exc}",
+                latency_ms=elapsed,
+            )
+
+    def _test_application_tcp(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        assert config.port is not None
+        started = time.perf_counter()
+        try:
+            with socket.create_connection(
+                (config.target, config.port),
+                timeout=config.timeout_seconds or 5.0,
+            ):
+                pass
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="passed",
+                reason=f"TCP connection to {config.target}:{config.port} succeeded.",
+                latency_ms=elapsed,
+            )
+        except (OSError, TimeoutError) as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"TCP connection failed: {exc}",
+                latency_ms=elapsed,
+            )
+
+    def _test_application_dns(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        started = time.perf_counter()
+        try:
+            timeout = config.timeout_seconds
+            if timeout is None:
+                result = socket.getaddrinfo(config.target, None, family=socket.AF_INET)
+                address = str(result[0][4][0]) if result else None
+            else:
+                command_result = run_command(["getent", "ahostsv4", config.target], timeout=timeout)
+                if not command_result.success:
+                    raise OSError(command_result.stderr or "No IPv4 address was returned.")
+                first_line = command_result.stdout.splitlines()[0]
+                address = first_line.split()[0] if first_line else None
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            if address is None:
+                raise OSError("No IPv4 address was returned.")
+            return self._target_metric(
+                config,
+                status="passed",
+                reason=f"System resolver returned {address}.",
+                latency_ms=elapsed,
+            )
+        except (OSError, IndexError) as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"DNS target failed: {exc}",
+                latency_ms=elapsed,
+            )
 
     def _ping_outcome(self, reachable: bool | None, target: str) -> TestOutcome:
         if reachable is None:

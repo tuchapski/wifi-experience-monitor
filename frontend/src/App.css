@@ -819,7 +819,8 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-.profile-section input {
+.profile-section input,
+.profile-section select {
   min-height: 40px;
   box-sizing: border-box;
   padding: 8px 10px;
@@ -830,7 +831,8 @@ tbody tr:hover {
   font: inherit;
 }
 
-.profile-section input:disabled {
+.profile-section input:disabled,
+.profile-section select:disabled {
   background: #f2f4f7;
 }
 

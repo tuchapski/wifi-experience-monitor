@@ -31,6 +31,7 @@ def test_default_profile_matches_current_hardcoded_behavior() -> None:
     assert config.tests.internet.timeout_seconds == 6.0
     assert config.tests.https.url == "https://example.com"
     assert config.tests.https.timeout_seconds == 5.0
+    assert config.application_targets == []
     assert config.thresholds.wifi.rssi_warning_dbm == -75.0
     assert config.thresholds.wifi.rssi_critical_dbm == -82.0
     assert config.thresholds.wifi.retry_warning_percent == 20.0
@@ -64,12 +65,54 @@ def test_default_profile_matches_current_hardcoded_behavior() -> None:
         },
         {"sampling": {"wifi_interval_seconds": 0}},
         {"tests": {"dns": {"interval_seconds": 7}}},
+        {"application_targets": [{"name": "Database", "kind": "tcp", "target": "db.example.com"}]},
         {"unknown": True},
     ],
 )
 def test_profile_validation_rejects_invalid_configuration(change: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         ProfileConfiguration.model_validate(change)
+
+
+def test_application_targets_are_versioned_and_validate_names_and_cadence() -> None:
+    config = ProfileConfiguration.model_validate(
+        {
+            "application_targets": [
+                {
+                    "name": "Portal",
+                    "kind": "http",
+                    "target": "https://portal.example.com/health",
+                    "interval_seconds": 10,
+                    "timeout_seconds": 3,
+                }
+            ]
+        }
+    )
+    assert config.application_targets[0].name == "Portal"
+
+    with pytest.raises(ValidationError):
+        ProfileConfiguration.model_validate(
+            {
+                "application_targets": [
+                    {"name": "Portal", "kind": "dns", "target": "a.example.com"},
+                    {"name": "portal", "kind": "dns", "target": "b.example.com"},
+                ]
+            }
+        )
+
+    with pytest.raises(ValidationError):
+        ProfileConfiguration.model_validate(
+            {
+                "application_targets": [
+                    {
+                        "name": "Portal",
+                        "kind": "dns",
+                        "target": "a.example.com",
+                        "interval_seconds": 7,
+                    }
+                ]
+            }
+        )
 
 
 def test_database_bootstraps_default_profile_once(tmp_path) -> None:

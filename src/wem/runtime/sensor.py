@@ -64,7 +64,10 @@ class SensorRuntime:
         self.calibration_engine = CalibrationEngine()
         self.diagnostic_engine = DiagnosticEngine(self.config.profile_config)
         self.incident_engine = IncidentEngine()
-        self.connectivity_scheduler = ConnectivityTestScheduler(self.config.profile_config.tests)
+        self.connectivity_scheduler = ConnectivityTestScheduler(
+            self.config.profile_config.tests,
+            self.config.profile_config.application_targets,
+        )
 
     def collect_once(
         self,

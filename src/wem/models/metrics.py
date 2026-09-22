@@ -131,8 +131,25 @@ class TestOutcome:
 
 
 @dataclass(slots=True)
+class ApplicationTargetMetric:
+    name: str
+    kind: str
+    target: str
+    port: int | None
+    status: str
+    reason: str
+    scope: str = "host"
+    latency_ms: float | None = None
+    status_code: int | None = None
+    observed_at: str | None = None
+    fresh: bool = True
+    age_seconds: float | None = 0.0
+
+
+@dataclass(slots=True)
 class ConnectivityMetrics:
     tests: dict[str, TestOutcome] = field(default_factory=dict)
+    application_targets: dict[str, ApplicationTargetMetric] = field(default_factory=dict)
 
     gateway_reachable: bool | None = None
 

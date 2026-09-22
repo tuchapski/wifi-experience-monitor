@@ -26,6 +26,7 @@ function configuration() {
       https: { enabled: true, interval_seconds: 60, timeout_seconds: 5,
         url: "https://example.com" },
     },
+    application_targets: [],
     thresholds: {
       wifi: { rssi_warning_dbm: -75, rssi_critical_dbm: -82,
         retry_warning_percent: 20, retry_critical_percent: 50,
@@ -145,4 +146,33 @@ test("validates connection-cycle stage milestone threshold ordering", () => {
   };
   const errors = validate(value).join(" ");
   assert.match(errors, /association connection-cycle stage P95 critical/i);
+});
+
+test("validates application target names, cadence and target shape", () => {
+  const value = configuration();
+  value.application_targets = [
+    { name: "Portal", kind: "http", target: "not-a-url", port: null,
+      enabled: true, interval_seconds: 7, timeout_seconds: 5 },
+    { name: "portal", kind: "tcp", target: "tcp://db.example.com", port: null,
+      enabled: true, interval_seconds: 10, timeout_seconds: 5 },
+  ];
+  const errors = validate(value).join(" ");
+  assert.match(errors, /must be unique/i);
+  assert.match(errors, /Portal interval.*integer multiple/i);
+  assert.match(errors, /absolute HTTP\/HTTPS URL/i);
+  assert.match(errors, /TCP port/i);
+  assert.match(errors, /TCP target.*host name or IP/i);
+});
+
+test("accepts valid HTTP, TCP and DNS application targets", () => {
+  const value = configuration();
+  value.application_targets = [
+    { name: "Portal", kind: "http", target: "https://portal.example.com/health", port: null,
+      enabled: true, interval_seconds: 10, timeout_seconds: 5 },
+    { name: "Database", kind: "tcp", target: "db.example.com", port: 5432,
+      enabled: true, interval_seconds: 30, timeout_seconds: 3 },
+    { name: "Identity DNS", kind: "dns", target: "login.example.com", port: null,
+      enabled: true, interval_seconds: 60, timeout_seconds: 2 },
+  ];
+  assert.deepEqual(validate(value), []);
 });
