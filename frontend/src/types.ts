@@ -566,6 +566,22 @@ export interface HistoryAggregate {
   p99: number | null;
 }
 
+export interface ConnectionCycleAggregate extends HistoryAggregate {
+  sources?: Record<string, number>;
+}
+
+export interface ConnectionCycleSummary {
+  total_cycles: number;
+  ready_cycles: number;
+  measurable_cycles: number;
+  unmeasured_cycles: number;
+  by_type: Record<string, number>;
+  by_state: Record<string, number>;
+  by_timing_source: Record<string, number>;
+  total_time_ms: ConnectionCycleAggregate;
+  stages: Record<string, ConnectionCycleAggregate>;
+}
+
 export interface HistorySummary {
   sample_count: number;
   metrics: Record<string, HistoryAggregate>;
@@ -576,6 +592,10 @@ export interface HistoryComparison {
   previous: HistorySummary;
   previous_start: string;
   previous_end: string;
+  connection_cycles?: {
+    current: ConnectionCycleSummary;
+    previous: ConnectionCycleSummary;
+  };
 }
 
 export interface HistoryPoint {
@@ -593,6 +613,7 @@ export interface HistoryWindow {
   points: HistoryPoint[];
   events: EnvironmentChange[];
   connection_cycles?: ConnectionCycleMetrics[];
+  connection_cycle_summary?: ConnectionCycleSummary;
   summary?: HistorySummary;
   comparison?: HistoryComparison;
 }

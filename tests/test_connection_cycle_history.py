@@ -53,6 +53,12 @@ def test_history_deduplicates_cycle_and_keeps_latest_state(tmp_path):
     assert len(result["connection_cycles"]) == 1
     assert result["connection_cycles"][0]["state"] == "ready"
     assert result["connection_cycles"][0]["total_time_ms"] == 5000.0
+    summary = result["connection_cycle_summary"]
+    assert summary["total_cycles"] == 1
+    assert summary["measurable_cycles"] == 1
+    assert summary["total_time_ms"]["p50"] == 5000.0
+    assert summary["total_time_ms"]["p95"] == 5000.0
+    assert summary["stages"]["network_ready"]["p50"] == 5000.0
 
 
 def test_report_renders_connection_cycles_and_escapes_ssid():
@@ -64,9 +70,25 @@ def test_report_renders_connection_cycles_and_escapes_ssid():
             "points": [],
             "events": [],
             "connection_cycles": [cycle("ready", (START + timedelta(seconds=5)).isoformat())],
+            "connection_cycle_summary": {
+                "total_cycles": 1,
+                "measurable_cycles": 1,
+                "by_type": {"reconnect": 1},
+                "total_time_ms": {"p50": 5000.0, "p95": 5000.0},
+                "stages": {
+                    "network_ready": {
+                        "count": 1,
+                        "p50": 5000.0,
+                        "p95": 5000.0,
+                        "p99": 5000.0,
+                    }
+                },
+            },
         },
         [],
     )
     assert "Connection cycles" in html
     assert "CORP&lt;WiFi&gt;" in html
     assert "5000.00 ms" in html
+    assert "Connection cycle statistics" in html
+    assert "Stage timing percentiles" in html

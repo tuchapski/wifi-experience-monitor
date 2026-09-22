@@ -228,10 +228,42 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Lines show averages of available readings per bucket. Hover or use the time slider
         to inspect min/max and available counts. Empty buckets are gaps, not zeros. Samples from different interfaces
         are never combined. DNS/HTTPS use the host route; retry ratios can exceed 100.</p>
+      {data.connection_cycle_summary && data.connection_cycle_summary.total_cycles > 0 && <section
+        aria-labelledby="connection-cycle-summary-title">
+        <h3 id="connection-cycle-summary-title">Connection cycle statistics</h3>
+        <p className="metric-note">Percentiles use only cycles with an observed duration. Missing timing remains
+          unavailable and is never converted to zero. D-Bus and sampling sources remain distinguishable.</p>
+        <div className="history-comparison-grid">
+          <article className="history-comparison-card"><span>Cycles</span>
+            <strong>{data.connection_cycle_summary.total_cycles}</strong>
+            <small>{data.connection_cycle_summary.ready_cycles} reached network ready</small></article>
+          <article className="history-comparison-card"><span>Measured durations</span>
+            <strong>{data.connection_cycle_summary.measurable_cycles}</strong>
+            <small>{data.connection_cycle_summary.unmeasured_cycles} with unknown duration</small></article>
+          <article className="history-comparison-card"><span>Ready time · P50</span>
+            <strong>{format(data.connection_cycle_summary.total_time_ms.p50)} ms</strong>
+            <small>Median of measured connection cycles</small></article>
+          <article className="history-comparison-card"><span>Ready time · P95</span>
+            <strong>{format(data.connection_cycle_summary.total_time_ms.p95)} ms</strong>
+            <small>Tail connection experience</small></article>
+          <article className="history-comparison-card"><span>Ready time · P99</span>
+            <strong>{format(data.connection_cycle_summary.total_time_ms.p99)} ms</strong>
+            <small>Extreme measured tail</small></article>
+        </div>
+        <div className="table-wrapper"><table>
+          <thead><tr><th>Stage</th><th>Samples</th><th>P50</th><th>P95</th><th>P99</th><th>Sources</th></tr></thead>
+          <tbody>{Object.entries(data.connection_cycle_summary.stages).map(([key, stats]) => <tr key={key}>
+            <td>{key.replaceAll("_", " ")}</td><td>{stats.count}</td>
+            <td>{format(stats.p50)} ms</td><td>{format(stats.p95)} ms</td><td>{format(stats.p99)} ms</td>
+            <td>{Object.entries(stats.sources ?? {}).map(([source, count]) =>
+              `${source.replaceAll("_", " ")}: ${count}`).join(" · ") || "Unavailable"}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>}
       {(data.connection_cycles?.length ?? 0) > 0 && <section aria-labelledby="connection-cycle-history-title">
         <h3 id="connection-cycle-history-title">Connection cycles</h3>
-        <p className="metric-note">Durations marked by the sensor are estimates bounded by the sampling interval.
-          Sessions already active when monitoring starts keep unknown timing.</p>
+        <p className="metric-note">Sampling-derived durations are upper-bound estimates. Event-derived stages
+          retain their NetworkManager D-Bus source. Sessions already active when monitoring starts keep unknown timing.</p>
         <div className="table-wrapper"><table>
           <thead><tr><th>Type</th><th>State</th><th>SSID / BSSID</th><th>Started</th><th>Ready estimate</th><th>Resolution</th></tr></thead>
           <tbody>{data.connection_cycles?.map(cycle => <tr key={cycle.session_id}>
@@ -247,6 +279,20 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
         <h3 id="history-comparison-title">Compared with the previous equivalent period</h3>
         <p className="metric-note">Previous period: {date(data.comparison.previous_start)} – {date(data.comparison.previous_end)}.
           Values use all available readings; unavailable metrics remain unavailable.</p>
+        {data.comparison.connection_cycles && <div className="history-comparison-grid">
+          {(() => {
+            const current = data.comparison?.connection_cycles?.current.total_time_ms.p95;
+            const previous = data.comparison?.connection_cycles?.previous.total_time_ms.p95;
+            const delta = current != null && previous != null ? current - previous : null;
+            const trend = delta == null || Math.abs(delta) < 0.005 ? "flat" : delta < 0 ? "improved" : "worse";
+            return <article className={`history-comparison-card trend-${trend}`}>
+              <span>Connection ready time · P95</span><strong>{format(current)} ms</strong>
+              <small>{delta == null ? "No comparable measured cycles" :
+                `${delta >= 0 ? "+" : ""}${format(delta)} ms vs previous`}</small>
+              <em>{trend === "improved" ? "Improved" : trend === "worse" ? "Worse" : "Stable / unavailable"}</em>
+            </article>;
+          })()}
+        </div>}
         <div className="history-comparison-grid">
           {comparisonMetrics.map(item => {
             const current = data.comparison?.current.metrics[item.key]?.avg;

@@ -7,6 +7,7 @@ from typing import cast as typing_cast
 
 from sqlalchemy import Integer, cast, func, select
 
+from wem.analysis.connection_cycle_stats import summarize_connection_cycles
 from wem.storage.database import Database
 from wem.storage.models import SnapshotRecord
 
@@ -142,6 +143,7 @@ class HistoryRepository:
             cycles_by_session.values(),
             key=lambda cycle: str(cycle.get("last_observed_at", "")),
         )
+        connection_cycle_summary = summarize_connection_cycles(connection_cycles)
         points: list[dict[str, object]] = []
         for index in range(math.ceil(duration / seconds)):
             row = rows.get(index)
@@ -178,6 +180,7 @@ class HistoryRepository:
             "points": points,
             "events": events,
             "connection_cycles": connection_cycles,
+            "connection_cycle_summary": connection_cycle_summary,
             "summary": summary,
         }
         if include_comparison:
@@ -193,6 +196,10 @@ class HistoryRepository:
                 "previous": previous["summary"],
                 "previous_start": previous["start"],
                 "previous_end": previous["end"],
+                "connection_cycles": {
+                    "current": connection_cycle_summary,
+                    "previous": previous["connection_cycle_summary"],
+                },
             }
         return result
 

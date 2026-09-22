@@ -73,6 +73,7 @@ def render_html_report(window: dict[str, Any], incidents: list[dict[str, Any]]) 
     points = window.get("points", [])
     events = window.get("events", [])
     connection_cycles = window.get("connection_cycles", [])
+    connection_summary = window.get("connection_cycle_summary", {})
     interface = escape(str(window.get("interface", "Unknown")))
     start = escape(str(window.get("start", "Unknown")))
     end = escape(str(window.get("end", "Unknown")))
@@ -122,6 +123,32 @@ def render_html_report(window: dict[str, Any], incidents: list[dict[str, Any]]) 
         )
         or '<tr><td colspan="6">No connection cycles observed in this period.</td></tr>'
     )
+    total_time = connection_summary.get("total_time_ms", {})
+    stage_summaries = connection_summary.get("stages", {})
+    type_rows = (
+        "".join(
+            f"<tr><td>{escape(str(name))}</td><td>{escape(str(count))}</td></tr>"
+            for name, count in connection_summary.get("by_type", {}).items()
+        )
+        or '<tr><td colspan="2">No connection-cycle types observed.</td></tr>'
+    )
+    stage_rows = (
+        "".join(
+            f"<tr><td>{escape(str(name))}</td>"
+            f"<td>{escape(_value(values.get('count')))}</td>"
+            f"<td>{escape(_value(values.get('p50')))} ms</td>"
+            f"<td>{escape(_value(values.get('p95')))} ms</td>"
+            f"<td>{escape(_value(values.get('p99')))} ms</td></tr>"
+            for name, values in stage_summaries.items()
+        )
+        or '<tr><td colspan="5">No measured connection stages.</td></tr>'
+    )
+    cycle_summary_cards = (
+        f'<div class="card">Connection cycles<strong>{escape(_value(connection_summary.get("total_cycles")))}</strong></div>'
+        f'<div class="card">Measured cycle durations<strong>{escape(_value(connection_summary.get("measurable_cycles")))}</strong></div>'
+        f'<div class="card">Ready time · P50<strong>{escape(_value(total_time.get("p50")))} ms</strong></div>'
+        f'<div class="card">Ready time · P95<strong>{escape(_value(total_time.get("p95")))} ms</strong></div>'
+    )
     samples = sum(point.get("sample_count", 0) for point in points)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -136,9 +163,10 @@ th{{color:#667085}}@media(max-width:800px){{main{{padding:16px}}.summary,.charts
 </style></head><body><main>
 <header><h1>Wi-Fi Experience Monitor report</h1><p class="muted">Interface: <strong>{interface}</strong><br>Period: {start} – {end}</p></header>
 <section><h2>Summary</h2><div class="summary"><div class="card">Stored samples<strong>{samples}</strong></div><div class="card">History buckets<strong>{len(points)}</strong></div><div class="card">Environment changes<strong>{len(events)}</strong></div><div class="card">Incidents<strong>{len(incidents)}</strong></div></div></section>
+<section><h2>Connection cycle statistics</h2><div class="summary">{cycle_summary_cards}</div><h3>Cycles by type</h3><table><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>{type_rows}</tbody></table><h3>Stage timing percentiles</h3><table><thead><tr><th>Stage</th><th>Samples</th><th>P50</th><th>P95</th><th>P99</th></tr></thead><tbody>{stage_rows}</tbody></table><p class="muted">Percentiles exclude unknown durations rather than treating them as zero.</p></section>
 <section><h2>Measurements</h2><div class="charts">{charts}</div></section>
 <section><h2>Environment changes</h2><table><thead><tr><th>Time</th><th>Field</th><th>Evidence</th></tr></thead><tbody>{event_rows}</tbody></table></section>
 <section><h2>Connection cycles</h2><table><thead><tr><th>Type</th><th>State</th><th>SSID</th><th>BSSID</th><th>Started</th><th>Network ready estimate</th></tr></thead><tbody>{connection_rows}</tbody></table></section>
 <section><h2>Incidents</h2><table><thead><tr><th>Severity</th><th>Domain</th><th>Code</th><th>Started</th><th>Ended</th><th>Duration (s)</th></tr></thead><tbody>{incident_rows}</tbody></table></section>
-<section><h2>Interpretation and limitations</h2><ul><li>PHY rates are radio rates, not application throughput.</li><li>DNS and HTTPS use the host route and are not proof that those tests used the selected Wi-Fi interface.</li><li>Empty buckets and unavailable values remain missing data.</li><li>An AP or channel change is evidence of an environment change, not by itself proof of a fault.</li><li>Connection-cycle durations derived from periodic samples are upper-bound estimates; a pre-existing session has unknown stage durations.</li></ul></section>
+<section><h2>Interpretation and limitations</h2><ul><li>PHY rates are radio rates, not application throughput.</li><li>DNS and HTTPS use the host route and are not proof that those tests used the selected Wi-Fi interface.</li><li>Empty buckets and unavailable values remain missing data.</li><li>An AP or channel change is evidence of an environment change, not by itself proof of a fault.</li><li>Connection-cycle percentiles use only observed durations. Sampling-derived values remain upper-bound estimates, while NetworkManager D-Bus stages retain their event source.</li></ul></section>
 </main></body></html>"""
