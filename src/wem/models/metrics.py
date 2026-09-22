@@ -197,6 +197,20 @@ class ConnectionCycleMetrics:
 
 
 @dataclass(slots=True)
+class ConnectionCycleSloMetrics:
+    status: str
+    sample_count: int
+    minimum_samples: int
+    window_size: int
+    p95_ms: float | None
+    warning_threshold_ms: float
+    critical_threshold_ms: float
+    latest_cycle_ms: float | None
+    fresh: bool
+    reason: str
+
+
+@dataclass(slots=True)
 class SensorHealthMetrics:
     interface: str
 
@@ -387,6 +401,7 @@ class SensorSnapshot:
 
     experience_score: ExperienceScore | None = None
     connection_cycle: ConnectionCycleMetrics | None = None
+    connection_cycle_slo: ConnectionCycleSloMetrics | None = None
     monitoring: MonitoringContext | None = None
 
     @classmethod

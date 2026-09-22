@@ -2,8 +2,9 @@ import json
 from datetime import datetime
 
 from wem.analysis.connection_cycle import ConnectionCycleTracker
+from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
 from wem.collectors.networkmanager_events import NetworkManagerEventMonitor
-from wem.models.metrics import SensorSnapshot
+from wem.models.metrics import DiagnosticResult, IncidentEvaluation, SensorSnapshot
 from wem.runtime.sensor import (
     RuntimeConfig,
     SensorRuntime,
@@ -33,6 +34,9 @@ class ConsoleSensorRuntime(SensorRuntime):
 
         self.incident_repository = IncidentRepository(self.database)
         self.connection_cycle_tracker = ConnectionCycleTracker()
+        self.connection_cycle_slo_engine = ConnectionCycleSloEngine(
+            config.profile_config.thresholds.connection_cycle
+        )
         self.networkmanager_event_monitor = NetworkManagerEventMonitor(config.interface)
         self.networkmanager_event_monitor.start()
 
@@ -66,11 +70,35 @@ class ConsoleSensorRuntime(SensorRuntime):
             event_monitor_status=self.networkmanager_event_monitor.status,
             event_monitor_reason=self.networkmanager_event_monitor.reason,
         )
+
+        slo_evaluation = self.connection_cycle_slo_engine.observe(snapshot.connection_cycle)
+        snapshot.connection_cycle_slo = slo_evaluation.metrics
+        if snapshot.diagnostic is not None and slo_evaluation.finding is not None:
+            self.diagnostic_engine.extend_result(snapshot.diagnostic, [slo_evaluation.finding])
+
+        slo_diagnostic = DiagnosticResult(
+            overall_status=(
+                slo_evaluation.finding.severity if slo_evaluation.finding is not None else "healthy"
+            ),
+            probable_domain=("connection_cycle" if slo_evaluation.finding is not None else None),
+            complete=True,
+            findings=([slo_evaluation.finding] if slo_evaluation.finding is not None else []),
+        )
+        base_events = snapshot.incidents.events if snapshot.incidents is not None else []
+        slo_incidents = self.incident_engine.evaluate(
+            slo_diagnostic,
+            timestamp=snapshot.timestamp,
+            fresh_domains={"connection_cycle"} if slo_evaluation.metrics.fresh else set(),
+        )
+        snapshot.incidents = IncidentEvaluation(
+            active_incidents=slo_incidents.active_incidents,
+            events=[*base_events, *slo_incidents.events],
+        )
+
         self.snapshot_repository.save(snapshot)
 
-        if snapshot.incidents is not None:
-            for event in snapshot.incidents.events:
-                self.incident_repository.process_event(event)
+        for event in snapshot.incidents.events:
+            self.incident_repository.process_event(event)
 
         print(
             json.dumps(

@@ -67,6 +67,12 @@ const defaultConfiguration: TestProfileConfiguration = {
       packet_loss_critical_percent: 20,
     },
     https: { response_warning_ms: 1000 },
+    connection_cycle: {
+      window_size: 20,
+      minimum_samples: 5,
+      p95_warning_ms: 8000,
+      p95_critical_ms: 15000,
+    },
   },
 };
 
@@ -417,6 +423,14 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
                 <fieldset>
                   <legend>HTTPS</legend>
                   <NumberField label="Response warning (ms)" min={0.1} value={draft.configuration.thresholds.https.response_warning_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.https.response_warning_ms = value ?? 0; })} />
+                </fieldset>
+                <fieldset>
+                  <legend>Connection cycle SLO</legend>
+                  <NumberField label="Rolling window (cycles)" min={3} max={200} step={1} value={draft.configuration.thresholds.connection_cycle.window_size} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.window_size = value ?? 0; })} />
+                  <NumberField label="Minimum samples" min={3} max={200} step={1} value={draft.configuration.thresholds.connection_cycle.minimum_samples} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.minimum_samples = value ?? 0; })} />
+                  <NumberField label="P95 warning (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_warning_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_warning_ms = value ?? 0; })} />
+                  <NumberField label="P95 critical (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_critical_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_critical_ms = value ?? 0; })} />
+                  <p className="metric-note">Only unique connection cycles with a measured network-ready duration enter the rolling P95.</p>
                 </fieldset>
               </div>
             </section>

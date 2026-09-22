@@ -120,6 +120,19 @@ The IPv4 stage intentionally does not claim that DHCP was used. NetworkManager's
 IP configuration phase also covers static addressing; the UI therefore labels
 that stage **IPv4 address**.
 
+## Connection-cycle SLO
+
+Each test profile also defines a rolling connection-cycle SLO. Only unique cycles
+with a measured network-ready duration enter the window; pre-existing sessions,
+in-progress cycles and unknown durations never become zero-valued samples. The
+default policy evaluates P95 after at least five measured cycles in a 20-cycle
+window, warning at 8000 ms and becoming critical at 15000 ms.
+
+The incident domain advances only when a new measurable cycle arrives. Repeated
+snapshots of the same cycle therefore cannot satisfy incident confirmation or
+recovery counters. Threshold changes remain pinned to the profile version selected
+when monitoring starts.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

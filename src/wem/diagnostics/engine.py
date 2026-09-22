@@ -14,6 +14,21 @@ class DiagnosticEngine:
     def __init__(self, profile: TestProfileConfig | None = None) -> None:
         self.profile = (profile or default_profile_config()).model_copy(deep=True)
 
+    def extend_result(
+        self,
+        result: DiagnosticResult,
+        findings: list[DiagnosticFinding],
+    ) -> DiagnosticResult:
+        if not findings:
+            return result
+        result.findings.extend(findings)
+        overall_status = self._overall_status(result.findings)
+        if not result.complete and overall_status in {"healthy", "info"}:
+            overall_status = "unknown"
+        result.overall_status = overall_status
+        result.probable_domain = self._probable_domain(result.findings)
+        return result
+
     def analyze(
         self,
         wifi: WifiMetrics,

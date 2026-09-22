@@ -96,6 +96,21 @@ class ResponseThreshold(ProfileModel):
     response_warning_ms: float = Field(gt=0.0)
 
 
+class ConnectionCycleThresholds(ProfileModel):
+    window_size: int = Field(default=20, ge=3, le=200)
+    minimum_samples: int = Field(default=5, ge=3, le=200)
+    p95_warning_ms: float = Field(default=8000.0, gt=0.0, le=300000.0)
+    p95_critical_ms: float = Field(default=15000.0, gt=0.0, le=300000.0)
+
+    @model_validator(mode="after")
+    def validate_slo(self) -> Self:
+        if self.minimum_samples > self.window_size:
+            raise ValueError("minimum_samples must not exceed window_size")
+        if self.p95_critical_ms <= self.p95_warning_ms:
+            raise ValueError("p95_critical_ms must exceed p95_warning_ms")
+        return self
+
+
 class ProfileThresholds(ProfileModel):
     wifi: WifiThresholds = Field(default_factory=WifiThresholds)
     gateway: LatencyLossThresholds = Field(
@@ -110,6 +125,7 @@ class ProfileThresholds(ProfileModel):
     https: ResponseThreshold = Field(
         default_factory=lambda: ResponseThreshold(response_warning_ms=1000.0)
     )
+    connection_cycle: ConnectionCycleThresholds = Field(default_factory=ConnectionCycleThresholds)
 
 
 class TestProfileConfig(ProfileModel):

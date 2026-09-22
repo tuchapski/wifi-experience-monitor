@@ -84,6 +84,12 @@ export interface TestProfileConfiguration {
     https: {
       response_warning_ms: number;
     };
+    connection_cycle: {
+      window_size: number;
+      minimum_samples: number;
+      p95_warning_ms: number;
+      p95_critical_ms: number;
+    };
   };
 }
 
@@ -272,6 +278,19 @@ export interface ConnectionCycleMetrics {
   networkmanager_state?: number | null;
   networkmanager_state_name?: string | null;
   networkmanager_event_count?: number;
+}
+
+export interface ConnectionCycleSloMetrics {
+  status: "insufficient_data" | "healthy" | "warning" | "critical";
+  sample_count: number;
+  minimum_samples: number;
+  window_size: number;
+  p95_ms: number | null;
+  warning_threshold_ms: number;
+  critical_threshold_ms: number;
+  latest_cycle_ms: number | null;
+  fresh: boolean;
+  reason: string;
 }
 
 export interface ConnectivityMetrics {
@@ -485,6 +504,7 @@ export interface SensorSnapshot {
 
   recommendations?: Recommendation[];
   connection_cycle?: ConnectionCycleMetrics | null;
+  connection_cycle_slo?: ConnectionCycleSloMetrics | null;
 
   monitoring?: {
     session_id: number;

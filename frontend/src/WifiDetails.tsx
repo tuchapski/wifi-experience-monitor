@@ -38,6 +38,7 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
     ["Short GI (HT/VHT)", state(wifi.tx_short_gi), state(wifi.rx_short_gi)],
   ];
   const cycle = snapshot.connection_cycle;
+  const cycleSlo = snapshot.connection_cycle_slo;
   const stageLabels: Record<string, string> = {
     association: "Association",
     authentication: "Authentication",
@@ -155,6 +156,18 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
             </table>
           </div>
           <ul className="metric-note">{cycle.limitations.map(item => <li key={item}>{item}</li>)}</ul>
+        </>}
+        {cycleSlo && <>
+          <h3>Rolling connection-cycle SLO</h3>
+          <div className="wifi-metric-grid">
+            <div><span>SLO status</span><strong>{cycleSlo.status.replaceAll("_", " ")}</strong></div>
+            <div><span>Network-ready P95</span><strong>{number(cycleSlo.p95_ms, " ms")}</strong></div>
+            <div><span>Measured cycles</span><strong>{cycleSlo.sample_count} / {cycleSlo.window_size}</strong></div>
+            <div><span>Minimum samples</span><strong>{cycleSlo.minimum_samples}</strong></div>
+            <div><span>Warning threshold</span><strong>{number(cycleSlo.warning_threshold_ms, " ms")}</strong></div>
+            <div><span>Critical threshold</span><strong>{number(cycleSlo.critical_threshold_ms, " ms")}</strong></div>
+          </div>
+          <p className="metric-note">{cycleSlo.reason}</p>
         </>}
       </section>
       <section className="panel" aria-labelledby="wifi-retries-title">
