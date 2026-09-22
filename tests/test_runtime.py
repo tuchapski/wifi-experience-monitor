@@ -81,6 +81,9 @@ def test_runtime_first_collection_has_no_delta(
     assert snapshot.wifi is wifi
     assert snapshot.network is network
     assert snapshot.connectivity is connectivity
+    assert snapshot.experience_score is not None
+    assert snapshot.experience_score.status == "unavailable"
+    assert snapshot.experience_score.value is None
 
 
 @patch("wem.runtime.sensor.ConnectivityTester")
@@ -157,3 +160,5 @@ def test_runtime_calculates_wifi_delta(
     assert second.wifi_delta.rx_drop_misc_delta == 2
 
     assert second.wifi_delta.tx_retries_per_100_packets == 20.0
+    assert first.experience_score is not None
+    assert second.experience_score is not None

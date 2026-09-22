@@ -4,6 +4,19 @@ from typing import Any
 
 
 @dataclass(slots=True)
+class WifiSurveyMetrics:
+    status: str = "unavailable"
+    reason: str = "Survey measurements have not been collected."
+    frequency_mhz: int | None = None
+    noise_dbm: int | None = None
+    snr_db: int | None = None
+    active_ms: int | None = None
+    busy_ms: int | None = None
+    rx_ms: int | None = None
+    tx_ms: int | None = None
+
+
+@dataclass(slots=True)
 class WifiMetrics:
     interface: str
 
@@ -64,6 +77,8 @@ class WifiMetrics:
 
     power_save: bool | None = None
 
+    survey: WifiSurveyMetrics = field(default_factory=WifiSurveyMetrics)
+
 
 @dataclass(slots=True)
 class NetworkMetrics:
@@ -97,6 +112,12 @@ class WifiDeltaMetrics:
 
     association_changed: bool = False
     counter_reset_detected: bool = False
+
+    survey_unavailable_reason: str | None = None
+    survey_active_ms_delta: int | None = None
+    channel_utilization_percent: float | None = None
+    channel_rx_percent: float | None = None
+    channel_tx_percent: float | None = None
 
 
 @dataclass(slots=True)
@@ -255,6 +276,45 @@ class IncidentEvaluation:
 
 
 @dataclass(slots=True)
+class ScoreMetric:
+    key: str
+    label: str
+    weight: float
+    unit: str
+    value: float | None
+    score: float | None
+    state: str
+    reason: str
+    rule: str
+
+
+@dataclass(slots=True)
+class ScoreComponent:
+    key: str
+    label: str
+    weight: float
+    coverage_percent: float
+    score: float | None
+    scope: str
+    metrics: list[ScoreMetric]
+    available_weight: float = 0.0
+    effective_weight: float = 0.0
+    contribution: float | None = None
+    deduction: float | None = None
+
+
+@dataclass(slots=True)
+class ExperienceScore:
+    policy_version: str
+    value: float | None
+    status: str
+    coverage_percent: float
+    minimum_coverage_percent: float
+    components: list[ScoreComponent]
+    reasons: list[str]
+
+
+@dataclass(slots=True)
 class SensorSnapshot:
     timestamp: str
 
@@ -276,6 +336,8 @@ class SensorSnapshot:
 
     collector_errors: list[str] = field(default_factory=list)
 
+    experience_score: ExperienceScore | None = None
+
     @classmethod
     def create(
         cls,
@@ -290,6 +352,7 @@ class SensorSnapshot:
         environment_changes: list[EnvironmentChange] | None = None,
         recommendations: list[Recommendation] | None = None,
         errors: list[str] | None = None,
+        experience_score: ExperienceScore | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
@@ -304,6 +367,7 @@ class SensorSnapshot:
             environment_changes=environment_changes or [],
             recommendations=recommendations or [],
             collector_errors=errors or [],
+            experience_score=experience_score,
         )
 
     def to_dict(

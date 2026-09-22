@@ -24,6 +24,11 @@ function intervalReason(delta: WifiDeltaMetrics | null, direction: "tx" | "rx"):
 export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) {
   const wifi = snapshot.wifi;
   const delta = snapshot.wifi_delta;
+  const survey = wifi.survey;
+  const surveyLabels: Record<string, string> = {
+    available: "Available", partial: "Partial support", unavailable: "Unavailable",
+    unsupported: "Not supported by this driver", error: "Collection error",
+  };
   const rates = [
     ["Reported PHY rate", number(wifi.tx_bitrate_mbps, " Mbps"), number(wifi.rx_bitrate_mbps, " Mbps")],
     ["PHY mode", wifi.tx_phy_mode ?? "Unavailable", wifi.rx_phy_mode ?? "Unavailable"],
@@ -34,6 +39,43 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
   ];
   return (
     <>
+      <section className="panel" aria-labelledby="wifi-survey-title">
+        <h2 id="wifi-survey-title">RF noise and channel occupancy</h2>
+        <p><strong>{survey ? surveyLabels[survey.status] ?? survey.status : "Unavailable"}</strong>
+          {" — "}{survey?.reason ?? "This sample has no survey measurements."}</p>
+        <div className="wifi-metric-grid">
+          <div><span>Noise floor · driver</span><strong>{number(survey?.noise_dbm, " dBm")}</strong></div>
+          <div><span>Estimated SNR</span><strong>{number(survey?.snr_db, " dB")}</strong></div>
+          <div><span>Primary channel busy · interval</span><strong>{number(delta?.channel_utilization_percent, "%")}</strong></div>
+          <div><span>Radio receive time · interval</span><strong>{number(delta?.channel_rx_percent, "%")}</strong></div>
+          <div><span>Radio transmit time · interval</span><strong>{number(delta?.channel_tx_percent, "%")}</strong></div>
+          <div><span>Active-time delta · denominator</span><strong>{number(delta?.survey_active_ms_delta, " ms")}</strong></div>
+        </div>
+        <p className="metric-note">
+          {delta?.survey_unavailable_reason ?? delta?.unavailable_reason
+            ?? (delta?.survey_active_ms_delta != null
+              ? "Percentages use counter changes between comparable samples, not lifetime totals."
+              : "Waiting for two comparable survey samples.")}
+        </p>
+        <p className="metric-note">
+          SNR is an estimate: current RSSI minus the noise reported for the in-use frequency.
+          Driver measurements may have different averaging windows. Channel busy time includes
+          activity or energy detected on the primary channel; it does not identify an interferer
+          or describe the entire bonded channel. RX/TX time may be radio-wide depending on the
+          driver and percentages must not be added together. Missing support is not evidence of
+          a Wi-Fi failure. No scan, monitor mode or network changes are performed.
+        </p>
+        <details>
+          <summary>Show cumulative survey counters</summary>
+          <dl>
+            <dt>Survey frequency</dt><dd>{number(survey?.frequency_mhz, " MHz")}</dd>
+            <dt>Active time</dt><dd>{number(survey?.active_ms, " ms")}</dd>
+            <dt>Busy time</dt><dd>{number(survey?.busy_ms, " ms")}</dd>
+            <dt>Receive time</dt><dd>{number(survey?.rx_ms, " ms")}</dd>
+            <dt>Transmit time</dt><dd>{number(survey?.tx_ms, " ms")}</dd>
+          </dl>
+        </details>
+      </section>
       <section className="panel wifi-radio" aria-labelledby="wifi-radio-title">
         <h2 id="wifi-radio-title">Wi-Fi radio and link</h2>
         <p className="metric-note">TX is traffic sent by this notebook; RX is traffic received.

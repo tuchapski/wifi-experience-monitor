@@ -2,6 +2,7 @@ import time
 from dataclasses import dataclass
 
 from wem.analysis.environment import EnvironmentChangeAnalyzer
+from wem.analysis.experience import ExperienceScoreEngine
 from wem.analysis.recommendations import RecommendationEngine
 from wem.analysis.wifi_delta import WifiDeltaAnalyzer
 from wem.calibration.engine import CalibrationEngine
@@ -35,6 +36,7 @@ class SensorRuntime:
         self.previous_timestamp: float | None = None
 
         self.delta_analyzer = WifiDeltaAnalyzer()
+        self.experience_engine = ExperienceScoreEngine()
         self.environment_analyzer = EnvironmentChangeAnalyzer()
         self.recommendation_engine = RecommendationEngine()
         self.calibration_engine = CalibrationEngine()
@@ -147,6 +149,9 @@ class SensorRuntime:
             environment_changes=environment_changes,
             recommendations=recommendations,
             errors=errors,
+            experience_score=self.experience_engine.calculate(
+                wifi_metrics, wifi_delta, connectivity_metrics, calibration, errors
+            ),
         )
 
     def run_forever(

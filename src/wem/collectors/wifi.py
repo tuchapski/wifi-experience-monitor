@@ -10,14 +10,72 @@ class WifiCollector:
         self.errors: list[str] = []
 
     def collect(self) -> WifiMetrics:
+        self.errors.clear()
         metrics = WifiMetrics(interface=self.interface)
 
         self._collect_info(metrics)
         self._collect_link(metrics)
         self._collect_power_save(metrics)
         self._collect_station(metrics)
+        self._collect_survey(metrics)
 
         return metrics
+
+    def _collect_survey(self, metrics: WifiMetrics) -> None:
+        survey = metrics.survey
+        if metrics.associated is not True or metrics.frequency_mhz is None:
+            survey.reason = "Association and operating frequency are required."
+            return
+
+        result = run_command(["iw", "dev", self.interface, "survey", "dump"])
+        if not result.success:
+            unsupported = "not supported" in result.stderr.lower() or "(-95)" in result.stderr
+            survey.status = "unsupported" if unsupported else "error"
+            survey.reason = result.stderr.strip() or "Unable to read optional survey data."
+            # Optional telemetry must not become evidence of a connectivity failure.
+            return
+
+        blocks = re.split(r"(?=^\s*Survey data from )", result.stdout, flags=re.MULTILINE)
+        in_use = [
+            block
+            for block in blocks
+            if re.search(r"^\s*frequency:.*\[in use\]", block, re.MULTILINE)
+        ]
+        if len(in_use) != 1:
+            survey.reason = "No unique in-use channel in the driver's survey output."
+            return
+        output = in_use[0]
+        frequency = re.search(r"^\s*frequency:\s+(\d+)\s+MHz", output, re.MULTILINE)
+        if frequency is None or int(frequency.group(1)) != metrics.frequency_mhz:
+            survey.reason = "Survey channel does not match the observed Wi-Fi frequency."
+            return
+        survey.frequency_mhz = int(frequency.group(1))
+
+        noise = re.search(r"^\s*noise:\s+(-?\d+)\s+dBm\s*$", output, re.MULTILINE)
+        if noise and -127 <= int(noise.group(1)) < 0:
+            survey.noise_dbm = int(noise.group(1))
+            if metrics.signal_dbm is not None:
+                survey.snr_db = metrics.signal_dbm - survey.noise_dbm
+
+        for label, attribute in (
+            ("active", "active_ms"),
+            ("busy", "busy_ms"),
+            ("receive", "rx_ms"),
+            ("transmit", "tx_ms"),
+        ):
+            match = re.search(rf"^\s*channel {label} time:\s+(\d+)\s+ms\s*$", output, re.MULTILINE)
+            if match:
+                setattr(survey, attribute, int(match.group(1)))
+
+        values = (survey.noise_dbm, survey.active_ms, survey.busy_ms, survey.rx_ms, survey.tx_ms)
+        if all(value is not None for value in values):
+            survey.status = "available"
+            survey.reason = "In-use channel survey reported by the driver."
+        elif any(value is not None for value in values):
+            survey.status = "partial"
+            survey.reason = "Partial driver support; unreported measurements remain unavailable."
+        else:
+            survey.reason = "Driver returned a channel but no usable noise or time counters."
 
     def _collect_info(self, metrics: WifiMetrics) -> None:
         result = run_command(["iw", "dev", self.interface, "info"])

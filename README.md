@@ -185,3 +185,105 @@ warning or informational. The tooltip includes the incident code, duration and
 evidence message. The **Clear history** action deletes only ended intervals and
 preserves currently open incidents. This prevents a cleanup action from losing
 the interval that is still being measured.
+
+## Optional RF survey telemetry
+
+The RF tab displays driver noise, estimated SNR, primary-channel busy time and
+radio RX/TX time from `iw dev <selected-interface> survey dump`. This is a
+read-only query: it does not scan, disconnect, change channels or enable monitor
+mode. Association and frequency must be known; exactly one in-use survey entry
+must match the observed frequency. Optional errors and unsupported drivers are
+shown in the RF panel, not treated as connectivity failures.
+
+Survey support is driver-dependent, including on Intel AX201/iwlwifi. Missing
+noise or counters remain null. SNR is only estimated when RSSI and a usable
+negative noise reading exist. Zero/nonnegative noise readings are conservatively
+discarded. RSSI and noise can have different averaging windows.
+
+Occupancy is `100 * delta(busy_ms) / delta(active_ms)`, never a lifetime ratio.
+RX and TX percentages use the same denominator. Comparable samples require the
+same interface, association, known frequency and known width. First samples,
+resets, unavailable counters, zero active-time deltas and deltas larger than
+active time do not produce fabricated percentages. Partial counters are allowed.
+Busy refers to the primary channel, not the full bonded bandwidth. RX/TX and
+active time may be radio-wide depending on the driver; percentages are not
+additive. These observations cannot identify non-Wi-Fi interferers.
+
+Raw survey values and calculated deltas are stored in snapshot JSON and exposed
+by the snapshot API without a database migration. Existing historical charts and
+HTML reports remain unchanged in this increment. No new automatic incidents or
+RF thresholds are introduced until hardware measurements have been validated.
+
+## Explainable experience score (experience-v1)
+
+The Dashboard shows a 0–100 score separately from diagnostic status and incidents.
+This is a project heuristic for the current sample, not a vendor score, SLA,
+statistical confidence estimate or proof of root cause. Policy rules live in
+`src/wem/analysis/experience.py`; change the version when changing weights or
+thresholds. No new probes, automatic remediations or incident rules are added.
+
+| Component | Global weight | Internal metric weights |
+| --- | ---: | --- |
+| Wi-Fi | 30% | RSSI 40%, retries 40%, TX failures 20% |
+| Gateway ICMP | 20% | Latency 40%, packet loss 60% |
+| Internet target ICMP | 20% | Latency 40%, packet loss 60% |
+| DNS | 15% | Resolution time after successful test 100% |
+| HTTPS | 15% | Response time after successful test 100% |
+
+Each numeric metric uses linear interpolation between the following
+`reading → score` anchors (outside anchors, the nearest endpoint score applies
+only to valid measurements):
+
+| Metric | Anchors |
+| --- | --- |
+| RSSI (dBm) | -90 → 0; -82 → 40; -75 → 70; -67 → 100 |
+| Retries / 100 TX | 0 → 100; 10 → 100; 20 → 70; 50 → 20; 100 → 0 |
+| Failures / 100 TX | 0 → 100; 1 → 85; 5 → 20; 10 → 0 |
+| Gateway latency (ms) | 0 → 100; 10 → 100; 50 → 70; 150 → 20; 500 → 0 |
+| External latency (ms) | 0 → 100; 50 → 100; 150 → 70; 300 → 20; 1000 → 0 |
+| ICMP packet loss (%) | 0 → 100; 1 → 90; 5 → 60; 20 → 10; 100 → 0 |
+| DNS time (ms) | 0 → 100; 50 → 100; 250 → 70; 1000 → 20; 3000 → 0 |
+| HTTPS time (ms) | 0 → 100; 300 → 100; 1000 → 70; 3000 → 20; 5000 → 0 |
+
+A confirmed test failure overrides that component with score zero, without
+inventing a latency/loss measurement. Confirmed Wi-Fi disassociation similarly
+scores Wi-Fi zero; skipped downstream probes remain unavailable, not failed.
+ICMP failures only describe the configured ICMP target; the Dashboard retains
+this warning and highlights failures even if the weighted average remains high.
+Explicit test outcome and success flag must agree. Errors, skipped tests, absent
+outcomes and invalid/non-finite values are excluded, never converted to zero.
+
+RSSI requires confirmed association. Retry/failure ratios require a valid
+interval with positive TX packets and no reset/roam/incomparability flag. No
+traffic does not imply perfect packet delivery. RF survey support is not scored.
+
+Component coverage is the sum of its available internal metric weights.
+Global coverage is `sum(base_weight * component_coverage / 100)`.
+The available weight of each component is that same product; effective weights
+are renormalized over the total available weight. Component scores are weighted
+averages of available metrics; the global score is the weighted average of
+available component scores. Small rounding differences in displayed sums are
+expected. Missing components are shown as unavailable with no penalty.
+
+The global score requires **at least 70% weighted coverage**, usable Wi-Fi
+evidence and at least two connectivity components. Otherwise it is null while
+individual evidence remains visible. Partial coverage, incomplete calibration
+or collection errors mark the result **provisional**, even at 100/100. Full
+coverage measures completeness, not correctness of the network; a complete
+assessment can include failed tests. Partial and complete scores should not
+be compared without checking their evidence mix.
+
+Example: RSSI -75 dBm scores 70; with good retry/failure ratios, Wi-Fi scores 88
+and contributes 26.4 of its possible 30 points. If everything else scores 100,
+the global score is 96.4. On a first sample without counter deltas, only Wi-Fi
+RSSI contributes: total coverage is 82% if all connectivity tests are valid.
+Such a score is explicitly provisional.
+
+The version, score, weights, evidence, penalties and coverage are persisted in
+snapshot JSON and returned by `/snapshot/latest`, without a schema migration.
+Older snapshots retain no score and are not recalculated. Historical score
+charts and score sections in HTML reports are outside this increment.
+
+Validation: run the regular Python checks, then `cd frontend && npm test`,
+`npm run build` and `npm run lint`. Frontend tests verify server-rendered panel
+states; they do not replace an interactive browser/hardware check.

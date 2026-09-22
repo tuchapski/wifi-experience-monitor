@@ -84,6 +84,8 @@ class WifiDeltaAnalyzer:
             result.unavailable_reason = "Counters reset; waiting for comparable samples."
             return result
 
+        self._calculate_survey(previous, current, result)
+
         result.tx_packets_delta = tx_packets
         result.tx_retries_delta = tx_retries
         result.tx_failed_delta = tx_failed
@@ -110,6 +112,61 @@ class WifiDeltaAnalyzer:
             )
 
         return result
+
+    @staticmethod
+    def _calculate_survey(
+        previous: WifiMetrics, current: WifiMetrics, result: WifiDeltaMetrics
+    ) -> None:
+        before, after = previous.survey, current.survey
+        if (
+            before.status not in {"available", "partial"}
+            or after.status not in {"available", "partial"}
+            or before.frequency_mhz is None
+            or before.frequency_mhz != after.frequency_mhz
+            or before.frequency_mhz != previous.frequency_mhz
+            or after.frequency_mhz != current.frequency_mhz
+            or previous.channel_width_mhz is None
+            or previous.channel_width_mhz != current.channel_width_mhz
+        ):
+            result.survey_unavailable_reason = (
+                "Two surveys of the same operating channel and width are required."
+            )
+            return
+        if before.active_ms is None or after.active_ms is None:
+            result.survey_unavailable_reason = "Channel active-time counters unavailable."
+            return
+        counters = ("active_ms", "busy_ms", "rx_ms", "tx_ms")
+        for name in counters:
+            start, end = getattr(before, name), getattr(after, name)
+            if start is not None and end is not None and end < start:
+                result.survey_unavailable_reason = (
+                    "Survey counters reset; waiting for comparable samples."
+                )
+                return
+        active = after.active_ms - before.active_ms
+        if active <= 0:
+            result.survey_unavailable_reason = "No positive channel active-time delta."
+            return
+        result.survey_active_ms_delta = active
+        missing = []
+        for name, destination in (
+            ("busy_ms", "channel_utilization_percent"),
+            ("rx_ms", "channel_rx_percent"),
+            ("tx_ms", "channel_tx_percent"),
+        ):
+            start, end = getattr(before, name), getattr(after, name)
+            if start is None or end is None:
+                missing.append(name)
+                continue
+            difference = end - start
+            if difference > active:
+                missing.append(name)
+                continue
+            setattr(result, destination, round(100 * difference / active, 3))
+        if missing:
+            result.survey_unavailable_reason = (
+                "Unavailable or inconsistent interval counters: " + ", ".join(missing) + "."
+            )
 
     @staticmethod
     def _delta(

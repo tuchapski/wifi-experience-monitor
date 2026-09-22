@@ -28,7 +28,20 @@ export interface SensorStatus {
 }
 
 
+export interface WifiSurveyMetrics {
+  status: "available" | "partial" | "unavailable" | "unsupported" | "error";
+  reason: string;
+  frequency_mhz: number | null;
+  noise_dbm: number | null;
+  snr_db: number | null;
+  active_ms: number | null;
+  busy_ms: number | null;
+  rx_ms: number | null;
+  tx_ms: number | null;
+}
+
 export interface WifiMetrics {
+  survey?: WifiSurveyMetrics;
   interface: string;
 
   ssid: string | null;
@@ -91,6 +104,11 @@ export interface WifiMetrics {
 
 
 export interface WifiDeltaMetrics {
+  survey_unavailable_reason?: string | null;
+  survey_active_ms_delta?: number | null;
+  channel_utilization_percent?: number | null;
+  channel_rx_percent?: number | null;
+  channel_tx_percent?: number | null;
   unavailable_reason?: string | null;
   interval_seconds: number | null;
 
@@ -281,7 +299,44 @@ export interface IncidentEvaluation {
 }
 
 
+export interface ScoreMetric {
+  key: string;
+  label: string;
+  weight: number;
+  unit: string;
+  value: number | null;
+  score: number | null;
+  state: "measured" | "failed" | "unavailable";
+  reason: string;
+  rule: string;
+}
+
+export interface ScoreComponent {
+  key: string;
+  label: string;
+  weight: number;
+  coverage_percent: number;
+  score: number | null;
+  scope: string;
+  metrics: ScoreMetric[];
+  available_weight: number;
+  effective_weight: number;
+  contribution: number | null;
+  deduction: number | null;
+}
+
+export interface ExperienceScore {
+  policy_version: string;
+  value: number | null;
+  status: "complete" | "partial" | "unavailable";
+  coverage_percent: number;
+  minimum_coverage_percent: number;
+  components: ScoreComponent[];
+  reasons: string[];
+}
+
 export interface SensorSnapshot {
+  experience_score?: ExperienceScore | null;
   timestamp: string;
 
   health: SensorHealthMetrics;

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import SensorControl from "./SensorControl";
 import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
+import ExperienceScorePanel from "./ExperienceScorePanel";
 
 import {
   clearIncidentHistory,
@@ -151,9 +152,117 @@ function TestDetails({ outcome }: { outcome?: TestOutcome }) {
   </small>;
 }
 
+type AppTab = "dashboard" | "rf" | "incidents" | "reports";
+
+const tabs: { id: AppTab; label: string }[] = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "rf", label: "RF" },
+  { id: "incidents", label: "Incidents" },
+  { id: "reports", label: "Reports" },
+];
+
+function TabNavigation({
+  activeTab,
+  onChange,
+}: {
+  activeTab: AppTab;
+  onChange: (tab: AppTab) => void;
+}) {
+  return (
+    <div className="app-tabs" role="tablist" aria-label="Application sections">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          id={`tab-${tab.id}`}
+          role="tab"
+          type="button"
+          className={activeTab === tab.id ? "app-tab app-tab-active" : "app-tab"}
+          aria-selected={activeTab === tab.id}
+          aria-controls={`panel-${tab.id}`}
+          tabIndex={activeTab === tab.id ? 0 : -1}
+          onClick={() => onChange(tab.id)}
+          onKeyDown={(event) => {
+            const index = tabs.findIndex((item) => item.id === tab.id);
+            const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+              : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
+              : event.key === "Home" ? 0
+              : event.key === "End" ? tabs.length - 1 : null;
+            if (next === null) return;
+            event.preventDefault();
+            onChange(tabs[next].id);
+            document.getElementById(`tab-${tabs[next].id}`)?.focus();
+          }}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function IncidentPanel({
+  activeIncidents,
+  incidentHistory,
+  clearingHistory,
+  onClearHistory,
+}: {
+  activeIncidents: IncidentRecord[];
+  incidentHistory: IncidentRecord[];
+  clearingHistory: boolean;
+  onClearHistory: () => void;
+}) {
+  return (
+    <>
+      {activeIncidents.length > 0 && (
+        <section className="active-incidents">
+          <h2>Active Incidents</h2>
+          <div className="incident-grid">
+            {activeIncidents.map((incident) => (
+              <article key={incident.id} className={`incident-card incident-${incident.severity}`}>
+                <strong>{incident.code}</strong>
+                <p>{incident.message}</p>
+                <small>{incident.domain} · {incident.severity}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="incident-history">
+        <div className="incident-history-heading">
+          <h2>Incident History</h2>
+          <button type="button" onClick={onClearHistory} disabled={clearingHistory || incidentHistory.length === 0}>
+            {clearingHistory ? "Clearing…" : "Clear history"}
+          </button>
+        </div>
+        {incidentHistory.length === 0 ? (
+          <div className="empty-state">No incidents recorded.</div>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Severity</th><th>Domain</th><th>Code</th><th>Started</th><th>Ended</th><th>Duration</th></tr></thead>
+              <tbody>{incidentHistory.map((incident) => (
+                <tr key={incident.id}>
+                  <td>{incident.severity}</td>
+                  <td>{incident.domain}</td>
+                  <td>{incident.code}</td>
+                  <td>{formatDate(incident.started_at)}</td>
+                  <td>{incident.is_open ? "Ongoing" : formatDate(incident.ended_at)}</td>
+                  <td>{formatDuration(incident.duration_seconds)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <IncidentTimeline incidents={incidentHistory} />
+    </>
+  );
+}
+
 function App() {
+  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [sensorStatus, setSensorStatus] = useState<SensorStatus | null>(null);
-  const [snapshot, setSnapshot] =
+  const [storedSnapshot, setSnapshot] =
     useState<SensorSnapshot | null>(null);
 
 
@@ -240,91 +349,35 @@ function App() {
   }, []);
 
 
-  const currentSnapshot = sensorStatus?.running && sensorStatus.started_at && snapshot
-    && snapshot.wifi.interface === sensorStatus.interface
-    && Date.parse(snapshot.timestamp) >= Date.parse(sensorStatus.started_at);
+  const snapshot = sensorStatus?.running && sensorStatus.started_at && storedSnapshot
+    && storedSnapshot.wifi.interface === sensorStatus.interface
+    && Date.parse(storedSnapshot.timestamp) >= Date.parse(sensorStatus.started_at)
+      ? storedSnapshot : null;
 
-  if (!currentSnapshot || snapshot === null) {
-    return (
-      <main className="page">
-
-        <header className="header">
-
-          <div>
-            <h1>
-              Wi-Fi Experience Monitor
-            </h1>
-
-            <p>
-              Configure the monitoring sensor.
-            </p>
-          </div>
-
-        </header>
-
-
-        <SensorControl onStatusChange={setSensorStatus} />
-
-
-        {error !== null && (
-          <div className="error">
-            {error}
-          </div>
-        )}
-
-
-        <div className="empty-state">
-          {sensorStatus?.running
-            ? "Waiting for the first sample of this monitoring session."
-            : "Monitoring stopped. Select a valid Wi-Fi interface and click Start Monitoring."}
-
-        </div>
-        <HistoryPanel currentInterface={sensorStatus?.interface} />
-
-      </main>
-    );
-  }
-
+  const waitingMessage = sensorStatus?.running
+    ? "Waiting for the first sample of this monitoring session."
+    : "Monitoring stopped. Select a valid Wi-Fi interface and click Start Monitoring.";
 
   return (
     <main className="page">
-
       <header className="header">
-
         <div>
-
-          <h1>
-            Wi-Fi Experience Monitor
-          </h1>
-
-          <p>
-            {snapshot.wifi.ssid ?? "Unknown SSID"}
-            {" · "}
-            {snapshot.wifi.interface}
-          </p>
-
+          <h1>Wi-Fi Experience Monitor</h1>
+          <p>{snapshot
+            ? `${snapshot.wifi.ssid ?? "Unknown SSID"} · ${snapshot.wifi.interface}`
+            : "Configure the monitoring sensor."}</p>
         </div>
-
-
-        <div className="timestamp">
-          {new Date(
-            snapshot.timestamp,
-          ).toLocaleString()}
-        </div>
-
+        {snapshot && <div className="timestamp">{formatDate(snapshot.timestamp)}</div>}
       </header>
 
-
       <SensorControl onStatusChange={setSensorStatus} />
+      {error !== null && <div className="error" role="alert">{error}</div>}
+      <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
 
-
-      {error !== null && (
-        <div className="error">
-          {error}
-        </div>
-      )}
-
-
+      <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard"
+        tabIndex={0} hidden={activeTab !== "dashboard"}>
+        {snapshot ? (<>
+      <ExperienceScorePanel score={snapshot.experience_score} />
       {snapshot.diagnostic?.complete === false && (
         <div className="empty-state">
           Assessment incomplete: missing measurements or unresolved sensor checks.
@@ -337,7 +390,7 @@ function App() {
         <div>
 
           <span>
-            Overall Experience
+            Diagnostic status
           </span>
 
           <strong
@@ -614,131 +667,6 @@ function App() {
       </section>
 
 
-      <WifiDetails snapshot={snapshot} />
-
-      {activeIncidents.length > 0 && (
-        <section className="active-incidents">
-
-          <h2>
-            Active Incidents
-          </h2>
-
-          <div className="incident-grid">
-
-            {activeIncidents.map(
-              (incident) => (
-
-                <article
-                  key={incident.id}
-                  className={
-                    `incident-card incident-${incident.severity}`
-                  }
-                >
-
-                  <strong>
-                    {incident.code}
-                  </strong>
-
-                  <p>
-                    {incident.message}
-                  </p>
-
-                  <small>
-                    {incident.domain}
-                    {" · "}
-                    {incident.severity}
-                  </small>
-
-                </article>
-
-              ),
-            )}
-
-          </div>
-
-        </section>
-      )}
-
-
-      <section className="incident-history">
-
-        <div className="incident-history-heading">
-          <h2>Incident History</h2>
-          <button type="button" onClick={() => void clearHistory()} disabled={clearingHistory || incidentHistory.length === 0}>
-            {clearingHistory ? "Clearing…" : "Clear history"}
-          </button>
-        </div>
-
-        {incidentHistory.length === 0 ? (
-
-          <div className="empty-state">
-            No incidents recorded.
-          </div>
-
-        ) : (
-
-          <div className="table-wrapper">
-
-            <table>
-
-              <thead>
-                <tr>
-                  <th>Severity</th>
-                  <th>Domain</th>
-                  <th>Code</th>
-                  <th>Started</th>
-                  <th>Ended</th>
-                  <th>Duration</th>
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {incidentHistory.map(
-                  (incident) => (
-
-                    <tr key={incident.id}>
-
-                      <td>
-                        {incident.severity}
-                      </td>
-
-                      <td>
-                        {incident.domain}
-                      </td>
-
-                      <td>
-                        {incident.code}
-                      </td>
-
-                      <td>
-                        {formatDate(
-                          incident.started_at,
-                        )}
-                      </td>
-
-                      <td>{incident.is_open ? "Ongoing" : formatDate(incident.ended_at)}</td>
-
-                      <td>{formatDuration(incident.duration_seconds)}</td>
-
-                    </tr>
-
-                  ),
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </section>
-
-      <IncidentTimeline incidents={incidentHistory} />
-
-
       {snapshot.diagnostic && snapshot.diagnostic.findings.length > 0 && (
         <section className="panel">
           <h2>Diagnostic evidence</h2>
@@ -838,11 +766,32 @@ function App() {
       )}
 
 
-      <HistoryPanel currentInterface={sensorStatus?.interface} />
 
+        </>) : <div className="empty-state">{waitingMessage}</div>}
+      </section>
+
+      <section id="panel-rf" role="tabpanel" aria-labelledby="tab-rf"
+        tabIndex={0} hidden={activeTab !== "rf"}>
+        {snapshot ? <WifiDetails snapshot={snapshot} />
+          : <div className="empty-state">{waitingMessage}</div>}
+      </section>
+
+      <section id="panel-incidents" role="tabpanel" aria-labelledby="tab-incidents"
+        tabIndex={0} hidden={activeTab !== "incidents"}>
+        <IncidentPanel
+          activeIncidents={activeIncidents}
+          incidentHistory={incidentHistory}
+          clearingHistory={clearingHistory}
+          onClearHistory={() => void clearHistory()}
+        />
+      </section>
+
+      <section id="panel-reports" role="tabpanel" aria-labelledby="tab-reports"
+        tabIndex={0} hidden={activeTab !== "reports"}>
+        <HistoryPanel currentInterface={sensorStatus?.interface} />
+      </section>
     </main>
   );
 }
-
 
 export default App;
