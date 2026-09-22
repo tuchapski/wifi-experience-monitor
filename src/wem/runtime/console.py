@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from wem.analysis.connection_cycle import ConnectionCycleTracker
+from wem.collectors.networkmanager_events import NetworkManagerEventMonitor
 from wem.models.metrics import SensorSnapshot
 from wem.runtime.sensor import (
     RuntimeConfig,
@@ -32,6 +33,8 @@ class ConsoleSensorRuntime(SensorRuntime):
 
         self.incident_repository = IncidentRepository(self.database)
         self.connection_cycle_tracker = ConnectionCycleTracker()
+        self.networkmanager_event_monitor = NetworkManagerEventMonitor(config.interface)
+        self.networkmanager_event_monitor.start()
 
         self._restore_active_incidents()
 
@@ -59,6 +62,9 @@ class ConsoleSensorRuntime(SensorRuntime):
             network=snapshot.network,
             connectivity=snapshot.connectivity,
             observed_at=datetime.fromisoformat(snapshot.timestamp),
+            networkmanager_events=self.networkmanager_event_monitor.drain(),
+            event_monitor_status=self.networkmanager_event_monitor.status,
+            event_monitor_reason=self.networkmanager_event_monitor.reason,
         )
         self.snapshot_repository.save(snapshot)
 
@@ -74,3 +80,6 @@ class ConsoleSensorRuntime(SensorRuntime):
             ),
             flush=True,
         )
+
+    def close(self) -> None:
+        self.networkmanager_event_monitor.close()

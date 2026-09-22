@@ -250,6 +250,7 @@ export interface ConnectionStageMetric {
   elapsed_ms: number | null;
   estimated: boolean;
   reason: string;
+  source?: "sampling" | "networkmanager_dbus";
 }
 
 export interface ConnectionCycleMetrics {
@@ -265,6 +266,12 @@ export interface ConnectionCycleMetrics {
   sample_resolution_ms: number | null;
   stages: Record<string, ConnectionStageMetric>;
   limitations: string[];
+  timing_source?: "sampling" | "networkmanager_dbus+sampling";
+  event_monitor_status?: "not_started" | "active" | "unavailable" | "error" | "stopped";
+  event_monitor_reason?: string | null;
+  networkmanager_state?: number | null;
+  networkmanager_state_name?: string | null;
+  networkmanager_event_count?: number;
 }
 
 export interface ConnectivityMetrics {

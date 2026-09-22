@@ -100,6 +100,26 @@ enabled profile and inspecting every stored version. When monitoring is already
 running, the page makes clear that changes apply only after the sensor is
 stopped and started again.
 
+## NetworkManager event timing
+
+Connection-cycle timing uses NetworkManager device `StateChanged` signals from
+the system D-Bus when `gdbus` is available. The sensor observes those signals
+read-only; it does not change NetworkManager configuration. Activation start,
+the boundary where layer-2 activation has completed, and the boundary where IP
+configuration has completed can therefore use event timestamps instead of the
+next periodic sample.
+
+These timestamps describe NetworkManager phase transitions, not the exact time
+of an 802.11 management frame. Authentication/authorization reported by `iw`,
+gateway reachability, DNS and final network readiness remain sample-based when
+no stage-specific event exists. The dashboard exposes the timing source for each
+stage and the D-Bus monitor status. If D-Bus monitoring is unavailable or exits,
+the existing sampling tracker continues to operate and records the reason.
+
+The IPv4 stage intentionally does not claim that DHCP was used. NetworkManager's
+IP configuration phase also covers static addressing; the UI therefore labels
+that stage **IPv4 address**.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

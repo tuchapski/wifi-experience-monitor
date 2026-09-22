@@ -128,19 +128,27 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
             <div><span>Current state</span><strong>{cycle.state}</strong></div>
             <div><span>Network ready estimate</span><strong>{number(cycle.total_time_ms, " ms")}</strong></div>
             <div><span>Sampling resolution</span><strong>{number(cycle.sample_resolution_ms, " ms")}</strong></div>
+            <div><span>Timing source</span><strong>{cycle.timing_source?.replaceAll("_", " ") ?? "sampling"}</strong></div>
+            <div><span>D-Bus monitor</span><strong>{cycle.event_monitor_status ?? "unavailable"}</strong></div>
+            <div><span>NetworkManager state</span><strong>{cycle.networkmanager_state_name ?? "Unavailable"}</strong></div>
+            <div><span>D-Bus events observed</span><strong>{number(cycle.networkmanager_event_count)}</strong></div>
           </div>
           <p className="metric-note">
             Started: {cycle.started_at ? new Date(cycle.started_at).toLocaleString() : "not observed"}
             {" · "}Last observed: {new Date(cycle.last_observed_at).toLocaleString()}
           </p>
+          {cycle.event_monitor_reason
+            ? <p className="metric-note">D-Bus monitor: {cycle.event_monitor_reason}</p>
+            : null}
           <div className="table-wrapper">
             <table>
-              <thead><tr><th>Stage</th><th>Status</th><th>Elapsed</th><th>Evidence</th></tr></thead>
+              <thead><tr><th>Stage</th><th>Status</th><th>Elapsed</th><th>Source</th><th>Evidence</th></tr></thead>
               <tbody>{Object.entries(cycle.stages).map(([key, stage]) => (
                 <tr key={key}>
                   <td>{stageLabels[key] ?? key}</td>
                   <td>{stage.status}</td>
                   <td>{stage.elapsed_ms == null ? "Unknown" : `${number(stage.elapsed_ms, " ms")}${stage.estimated ? " · estimated" : ""}`}</td>
+                  <td>{stage.source?.replaceAll("_", " ") ?? "sampling"}</td>
                   <td>{stage.reason}</td>
                 </tr>
               ))}</tbody>

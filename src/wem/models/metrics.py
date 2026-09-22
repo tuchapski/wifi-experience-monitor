@@ -171,6 +171,7 @@ class ConnectionStageMetric:
     elapsed_ms: float | None = None
     estimated: bool = False
     reason: str = ""
+    source: str = "sampling"
 
 
 @dataclass(slots=True)
@@ -187,6 +188,12 @@ class ConnectionCycleMetrics:
     sample_resolution_ms: float | None
     stages: dict[str, ConnectionStageMetric] = field(default_factory=dict)
     limitations: list[str] = field(default_factory=list)
+    timing_source: str = "sampling"
+    event_monitor_status: str = "unavailable"
+    event_monitor_reason: str | None = None
+    networkmanager_state: int | None = None
+    networkmanager_state_name: str | None = None
+    networkmanager_event_count: int = 0
 
 
 @dataclass(slots=True)

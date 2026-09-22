@@ -132,6 +132,7 @@ class SensorController:
         runtime_config: RuntimeConfig,
     ) -> None:
         failed = False
+        runtime: ConsoleSensorRuntime | None = None
         try:
             runtime = ConsoleSensorRuntime(
                 runtime_config,
@@ -160,6 +161,9 @@ class SensorController:
                 self._last_error = str(exc)
 
         finally:
+            if runtime is not None:
+                runtime.close()
+
             session_error: str | None = None
             if runtime_config.monitoring_session_id is not None:
                 try:
