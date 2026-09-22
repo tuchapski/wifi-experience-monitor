@@ -4,6 +4,7 @@ import SensorControl from "./SensorControl";
 import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
+import ProfileSettings from "./ProfileSettings";
 
 import {
   clearIncidentHistory,
@@ -142,23 +143,25 @@ function IncidentTimeline({ incidents }: { incidents: IncidentRecord[] }) {
 function TestDetails({ outcome }: { outcome?: TestOutcome }) {
   const labels: Record<string, string> = {
     passed: "Passed", failed: "Failed", error: "Collection error",
-    skipped: "Not run", unavailable: "Unavailable", observed: "Observed",
+    skipped: "Not run", disabled: "Disabled", unavailable: "Unavailable", observed: "Observed",
   };
   return <small>
     <strong>{outcome ? labels[outcome.status] ?? outcome.status : "Unavailable"}</strong>
     {outcome && <><br />{outcome.reason}<br />
       {outcome.scope === "host" ? "Host route (not bound to selected Wi-Fi)" : "Selected interface"}
+      {outcome.fresh === false && <><br />Cached result · {outcome.age_seconds ?? "?"} s old</>}
     </>}
   </small>;
 }
 
-type AppTab = "dashboard" | "rf" | "incidents" | "reports";
+type AppTab = "dashboard" | "rf" | "incidents" | "reports" | "settings";
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "rf", label: "RF" },
   { id: "incidents", label: "Incidents" },
   { id: "reports", label: "Reports" },
+  { id: "settings", label: "Settings" },
 ];
 
 function TabNavigation({
@@ -789,6 +792,11 @@ function App() {
       <section id="panel-reports" role="tabpanel" aria-labelledby="tab-reports"
         tabIndex={0} hidden={activeTab !== "reports"}>
         <HistoryPanel currentInterface={sensorStatus?.interface} />
+      </section>
+
+      <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings"
+        tabIndex={0} hidden={activeTab !== "settings"}>
+        <ProfileSettings sensorRunning={sensorStatus?.running ?? false} />
       </section>
     </main>
   );

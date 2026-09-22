@@ -94,6 +94,12 @@ the Wi-Fi sampling interval. This keeps snapshot timing deterministic while
 allowing cadences such as 5, 10, 30 and 60 seconds. `/sensor/status` reports the
 session, profile and exact profile-version identifiers used by the runtime.
 
+The dashboard **Settings** tab manages these profiles without editing JSON by
+hand. It supports creating profiles, saving immutable revisions, activating an
+enabled profile and inspecting every stored version. When monitoring is already
+running, the page makes clear that changes apply only after the sensor is
+stopped and started again.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

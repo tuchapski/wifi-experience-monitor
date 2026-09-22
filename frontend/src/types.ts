@@ -34,6 +34,93 @@ export interface SensorStatus {
 }
 
 
+export interface SyntheticTestConfiguration {
+  enabled: boolean;
+  interval_seconds: number;
+  timeout_seconds: number | null;
+}
+
+export interface TestProfileConfiguration {
+  schema_version: 1;
+  sampling: {
+    wifi_interval_seconds: number;
+  };
+  tests: {
+    gateway: SyntheticTestConfiguration & {
+      automatic_gateway: boolean;
+      target: string | null;
+    };
+    dns: SyntheticTestConfiguration & {
+      query: string;
+    };
+    internet: SyntheticTestConfiguration & {
+      target: string;
+    };
+    https: SyntheticTestConfiguration & {
+      url: string;
+    };
+  };
+  thresholds: {
+    wifi: {
+      rssi_warning_dbm: number;
+      rssi_critical_dbm: number;
+      retry_warning_percent: number;
+      retry_critical_percent: number;
+      tx_failure_critical_percent: number;
+    };
+    gateway: {
+      latency_warning_ms: number;
+      packet_loss_warning_percent: number;
+      packet_loss_critical_percent: number;
+    };
+    dns: {
+      latency_warning_ms: number;
+    };
+    internet: {
+      latency_warning_ms: number;
+      packet_loss_warning_percent: number;
+      packet_loss_critical_percent: number;
+    };
+    https: {
+      response_warning_ms: number;
+    };
+  };
+}
+
+export interface TestProfileSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  active: boolean;
+  version: number;
+  version_id: number;
+  created_at: string;
+  updated_at: string;
+  version_created_at: string;
+}
+
+export interface TestProfile extends TestProfileSummary {
+  configuration: TestProfileConfiguration;
+}
+
+export interface TestProfileVersion {
+  id: number;
+  profile_id: number;
+  version: number;
+  active: boolean;
+  created_at: string;
+  configuration: TestProfileConfiguration;
+}
+
+export interface TestProfileWrite {
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  configuration: TestProfileConfiguration;
+}
+
+
 export interface WifiSurveyMetrics {
   status: "available" | "partial" | "unavailable" | "unsupported" | "error";
   reason: string;
@@ -149,9 +236,12 @@ export interface NetworkMetrics {
 
 
 export interface TestOutcome {
-  status: "passed" | "failed" | "error" | "skipped" | "unavailable" | "observed";
+  status: "passed" | "failed" | "error" | "skipped" | "disabled" | "unavailable" | "observed";
   reason: string;
   scope: string;
+  observed_at?: string | null;
+  fresh?: boolean;
+  age_seconds?: number | null;
 }
 
 export interface ConnectivityMetrics {
@@ -364,6 +454,16 @@ export interface SensorSnapshot {
   collector_errors: string[];
 
   recommendations?: Recommendation[];
+
+  monitoring?: {
+    session_id: number;
+    profile: {
+      profile_id: number;
+      profile_version_id: number;
+      name: string;
+      version: number;
+    };
+  } | null;
 }
 
 

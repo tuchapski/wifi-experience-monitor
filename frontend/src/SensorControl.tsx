@@ -368,6 +368,13 @@ function SensorControl({
             </strong>
           </span>
 
+          {status && (
+            <span>
+              Profile:{" "}
+              <strong>{status.profile_name} v{status.profile_version}</strong>
+            </span>
+          )}
+
         </div>
       )}
 
