@@ -1,5 +1,7 @@
 import json
+from datetime import datetime
 
+from wem.analysis.connection_cycle import ConnectionCycleTracker
 from wem.models.metrics import SensorSnapshot
 from wem.runtime.sensor import (
     RuntimeConfig,
@@ -29,6 +31,7 @@ class ConsoleSensorRuntime(SensorRuntime):
         self.snapshot_repository = SnapshotRepository(self.database)
 
         self.incident_repository = IncidentRepository(self.database)
+        self.connection_cycle_tracker = ConnectionCycleTracker()
 
         self._restore_active_incidents()
 
@@ -51,6 +54,12 @@ class ConsoleSensorRuntime(SensorRuntime):
         self,
         snapshot: SensorSnapshot,
     ) -> None:
+        snapshot.connection_cycle = self.connection_cycle_tracker.observe(
+            wifi=snapshot.wifi,
+            network=snapshot.network,
+            connectivity=snapshot.connectivity,
+            observed_at=datetime.fromisoformat(snapshot.timestamp),
+        )
         self.snapshot_repository.save(snapshot)
 
         if snapshot.incidents is not None:

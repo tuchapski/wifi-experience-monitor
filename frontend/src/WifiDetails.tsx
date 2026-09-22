@@ -37,6 +37,16 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
     ["Reported rate width", number(wifi.tx_channel_width_mhz, " MHz"), number(wifi.rx_channel_width_mhz, " MHz")],
     ["Short GI (HT/VHT)", state(wifi.tx_short_gi), state(wifi.rx_short_gi)],
   ];
+  const cycle = snapshot.connection_cycle;
+  const stageLabels: Record<string, string> = {
+    association: "Association",
+    authentication: "Authentication",
+    authorization: "Authorization",
+    dhcp: "IPv4 address",
+    gateway: "Gateway",
+    dns: "DNS",
+    network_ready: "Network ready",
+  };
   return (
     <>
       <section className="panel" aria-labelledby="wifi-survey-title">
@@ -109,6 +119,35 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
           <dt>Protected management frames</dt><dd>{state(wifi.mfp_enabled)}</dd>
           <dt>Power saving</dt><dd>{state(wifi.power_save)}</dd>
         </dl>
+      </section>
+      <section className="panel" aria-labelledby="connection-cycle-title">
+        <h2 id="connection-cycle-title">Connection cycle</h2>
+        {!cycle ? <p className="metric-note">No connection session has been observed yet.</p> : <>
+          <div className="wifi-metric-grid">
+            <div><span>Session type</span><strong>{cycle.session_type.replaceAll("_", " ")}</strong></div>
+            <div><span>Current state</span><strong>{cycle.state}</strong></div>
+            <div><span>Network ready estimate</span><strong>{number(cycle.total_time_ms, " ms")}</strong></div>
+            <div><span>Sampling resolution</span><strong>{number(cycle.sample_resolution_ms, " ms")}</strong></div>
+          </div>
+          <p className="metric-note">
+            Started: {cycle.started_at ? new Date(cycle.started_at).toLocaleString() : "not observed"}
+            {" · "}Last observed: {new Date(cycle.last_observed_at).toLocaleString()}
+          </p>
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Stage</th><th>Status</th><th>Elapsed</th><th>Evidence</th></tr></thead>
+              <tbody>{Object.entries(cycle.stages).map(([key, stage]) => (
+                <tr key={key}>
+                  <td>{stageLabels[key] ?? key}</td>
+                  <td>{stage.status}</td>
+                  <td>{stage.elapsed_ms == null ? "Unknown" : `${number(stage.elapsed_ms, " ms")}${stage.estimated ? " · estimated" : ""}`}</td>
+                  <td>{stage.reason}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <ul className="metric-note">{cycle.limitations.map(item => <li key={item}>{item}</li>)}</ul>
+        </>}
       </section>
       <section className="panel" aria-labelledby="wifi-retries-title">
         <h2 id="wifi-retries-title">Wi-Fi retransmissions and counters</h2>

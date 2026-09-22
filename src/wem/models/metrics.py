@@ -165,6 +165,31 @@ class ConnectivityMetrics:
 
 
 @dataclass(slots=True)
+class ConnectionStageMetric:
+    status: str
+    observed_at: str | None = None
+    elapsed_ms: float | None = None
+    estimated: bool = False
+    reason: str = ""
+
+
+@dataclass(slots=True)
+class ConnectionCycleMetrics:
+    session_id: str
+    session_type: str
+    state: str
+    ssid: str | None
+    bssid: str | None
+    started_at: str | None
+    last_observed_at: str
+    completed_at: str | None
+    total_time_ms: float | None
+    sample_resolution_ms: float | None
+    stages: dict[str, ConnectionStageMetric] = field(default_factory=dict)
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class SensorHealthMetrics:
     interface: str
 
@@ -354,6 +379,7 @@ class SensorSnapshot:
     collector_errors: list[str] = field(default_factory=list)
 
     experience_score: ExperienceScore | None = None
+    connection_cycle: ConnectionCycleMetrics | None = None
     monitoring: MonitoringContext | None = None
 
     @classmethod

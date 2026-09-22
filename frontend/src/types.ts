@@ -244,6 +244,29 @@ export interface TestOutcome {
   age_seconds?: number | null;
 }
 
+export interface ConnectionStageMetric {
+  status: "observed" | "pending" | "unavailable";
+  observed_at: string | null;
+  elapsed_ms: number | null;
+  estimated: boolean;
+  reason: string;
+}
+
+export interface ConnectionCycleMetrics {
+  session_id: string;
+  session_type: "observed_existing" | "initial_connect" | "reconnect" | "roam" | "network_change" | "reassociation";
+  state: "connecting" | "ready" | "disconnected";
+  ssid: string | null;
+  bssid: string | null;
+  started_at: string | null;
+  last_observed_at: string;
+  completed_at: string | null;
+  total_time_ms: number | null;
+  sample_resolution_ms: number | null;
+  stages: Record<string, ConnectionStageMetric>;
+  limitations: string[];
+}
+
 export interface ConnectivityMetrics {
   tests?: Record<string, TestOutcome>;
 
@@ -454,6 +477,7 @@ export interface SensorSnapshot {
   collector_errors: string[];
 
   recommendations?: Recommendation[];
+  connection_cycle?: ConnectionCycleMetrics | null;
 
   monitoring?: {
     session_id: number;
@@ -561,6 +585,7 @@ export interface HistoryWindow {
   total_samples: number;
   points: HistoryPoint[];
   events: EnvironmentChange[];
+  connection_cycles?: ConnectionCycleMetrics[];
   summary?: HistorySummary;
   comparison?: HistoryComparison;
 }

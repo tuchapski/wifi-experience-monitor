@@ -228,6 +228,21 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Lines show averages of available readings per bucket. Hover or use the time slider
         to inspect min/max and available counts. Empty buckets are gaps, not zeros. Samples from different interfaces
         are never combined. DNS/HTTPS use the host route; retry ratios can exceed 100.</p>
+      {(data.connection_cycles?.length ?? 0) > 0 && <section aria-labelledby="connection-cycle-history-title">
+        <h3 id="connection-cycle-history-title">Connection cycles</h3>
+        <p className="metric-note">Durations marked by the sensor are estimates bounded by the sampling interval.
+          Sessions already active when monitoring starts keep unknown timing.</p>
+        <div className="table-wrapper"><table>
+          <thead><tr><th>Type</th><th>State</th><th>SSID / BSSID</th><th>Started</th><th>Ready estimate</th><th>Resolution</th></tr></thead>
+          <tbody>{data.connection_cycles?.map(cycle => <tr key={cycle.session_id}>
+            <td>{cycle.session_type.replaceAll("_", " ")}</td><td>{cycle.state}</td>
+            <td>{cycle.ssid ?? "Unavailable"}<br /><small>{cycle.bssid ?? "Unavailable"}</small></td>
+            <td>{cycle.started_at ? date(cycle.started_at) : "Not observed"}</td>
+            <td>{cycle.total_time_ms == null ? "Unknown" : `${format(cycle.total_time_ms)} ms`}</td>
+            <td>{cycle.sample_resolution_ms == null ? "Unknown" : `${format(cycle.sample_resolution_ms)} ms`}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>}
       {data.comparison && <section className="history-comparison" aria-labelledby="history-comparison-title">
         <h3 id="history-comparison-title">Compared with the previous equivalent period</h3>
         <p className="metric-note">Previous period: {date(data.comparison.previous_start)} – {date(data.comparison.previous_end)}.

@@ -72,6 +72,7 @@ def _chart(title: str, unit: str, points: list[dict[str, Any]], metric: str) -> 
 def render_html_report(window: dict[str, Any], incidents: list[dict[str, Any]]) -> str:
     points = window.get("points", [])
     events = window.get("events", [])
+    connection_cycles = window.get("connection_cycles", [])
     interface = escape(str(window.get("interface", "Unknown")))
     start = escape(str(window.get("start", "Unknown")))
     end = escape(str(window.get("end", "Unknown")))
@@ -109,6 +110,18 @@ def render_html_report(window: dict[str, Any], incidents: list[dict[str, Any]]) 
         )
         or '<tr><td colspan="6">No incidents recorded.</td></tr>'
     )
+    connection_rows = (
+        "".join(
+            f"<tr><td>{escape(str(item.get('session_type', '')))}</td>"
+            f"<td>{escape(str(item.get('state', '')))}</td>"
+            f"<td>{escape(str(item.get('ssid') or 'Unavailable'))}</td>"
+            f"<td>{escape(str(item.get('bssid') or 'Unavailable'))}</td>"
+            f"<td>{escape(str(item.get('started_at') or 'Not observed'))}</td>"
+            f"<td>{escape(_value(item.get('total_time_ms')))} ms</td></tr>"
+            for item in connection_cycles
+        )
+        or '<tr><td colspan="6">No connection cycles observed in this period.</td></tr>'
+    )
     samples = sum(point.get("sample_count", 0) for point in points)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -125,6 +138,7 @@ th{{color:#667085}}@media(max-width:800px){{main{{padding:16px}}.summary,.charts
 <section><h2>Summary</h2><div class="summary"><div class="card">Stored samples<strong>{samples}</strong></div><div class="card">History buckets<strong>{len(points)}</strong></div><div class="card">Environment changes<strong>{len(events)}</strong></div><div class="card">Incidents<strong>{len(incidents)}</strong></div></div></section>
 <section><h2>Measurements</h2><div class="charts">{charts}</div></section>
 <section><h2>Environment changes</h2><table><thead><tr><th>Time</th><th>Field</th><th>Evidence</th></tr></thead><tbody>{event_rows}</tbody></table></section>
+<section><h2>Connection cycles</h2><table><thead><tr><th>Type</th><th>State</th><th>SSID</th><th>BSSID</th><th>Started</th><th>Network ready estimate</th></tr></thead><tbody>{connection_rows}</tbody></table></section>
 <section><h2>Incidents</h2><table><thead><tr><th>Severity</th><th>Domain</th><th>Code</th><th>Started</th><th>Ended</th><th>Duration (s)</th></tr></thead><tbody>{incident_rows}</tbody></table></section>
-<section><h2>Interpretation and limitations</h2><ul><li>PHY rates are radio rates, not application throughput.</li><li>DNS and HTTPS use the host route and are not proof that those tests used the selected Wi-Fi interface.</li><li>Empty buckets and unavailable values remain missing data.</li><li>An AP or channel change is evidence of an environment change, not by itself proof of a fault.</li></ul></section>
+<section><h2>Interpretation and limitations</h2><ul><li>PHY rates are radio rates, not application throughput.</li><li>DNS and HTTPS use the host route and are not proof that those tests used the selected Wi-Fi interface.</li><li>Empty buckets and unavailable values remain missing data.</li><li>An AP or channel change is evidence of an environment change, not by itself proof of a fault.</li><li>Connection-cycle durations derived from periodic samples are upper-bound estimates; a pre-existing session has unknown stage durations.</li></ul></section>
 </main></body></html>"""
