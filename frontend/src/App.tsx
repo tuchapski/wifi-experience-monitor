@@ -5,6 +5,7 @@ import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
 import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
+import CorrelationPanel from "./CorrelationPanel";
 import ServiceSloPanel from "./ServiceSloPanel";
 import ProfileSettings from "./ProfileSettings";
 
@@ -383,6 +384,7 @@ function App() {
         tabIndex={0} hidden={activeTab !== "dashboard"}>
         {snapshot ? (<>
       <ExperienceScorePanel score={snapshot.experience_score} />
+      <CorrelationPanel correlation={snapshot.correlation} />
       <ServiceSloPanel slo={snapshot.service_slo} />
       <AdaptiveBaselinePanel baseline={snapshot.adaptive_baseline} />
       {snapshot.diagnostic?.complete === false && (

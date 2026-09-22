@@ -407,6 +407,30 @@ export interface ServiceSloMetrics {
   reason: string;
 }
 
+export interface CorrelationEvidence {
+  code: string;
+  source: "current_diagnostic" | "rolling_service_slo" | "adaptive_baseline" | "connection_cycle_slo" | "isolation";
+  severity: "critical" | "warning" | "info";
+  message: string;
+}
+
+export interface CorrelationHypothesis {
+  domain: string;
+  label: string;
+  support: "strong" | "moderate" | "weak";
+  evidence: CorrelationEvidence[];
+  limitations: string[];
+}
+
+export interface CorrelationAssessment {
+  policy_version: string;
+  status: "no_degradation" | "correlated" | "ambiguous" | "insufficient_data";
+  primary_domain: string | null;
+  hypotheses: CorrelationHypothesis[];
+  limitations: string[];
+  reason: string;
+}
+
 export interface ConnectivityMetrics {
   tests?: Record<string, TestOutcome>;
 
@@ -621,6 +645,7 @@ export interface SensorSnapshot {
   connection_cycle_slo?: ConnectionCycleSloMetrics | null;
   adaptive_baseline?: AdaptiveBaselineMetrics | null;
   service_slo?: ServiceSloMetrics | null;
+  correlation?: CorrelationAssessment | null;
 
   monitoring?: {
     session_id: number;

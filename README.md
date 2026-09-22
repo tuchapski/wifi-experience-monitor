@@ -180,6 +180,25 @@ availability, failure/error counts and latency/loss percentiles. Those historica
 figures are observational; rolling incident compliance remains tied to the immutable
 profile version selected when monitoring starts.
 
+## Evidence correlation
+
+The correlation engine combines existing diagnostic findings instead of inventing a
+new measurement source. Current findings, rolling service SLOs, adaptive-baseline
+deviations and connection-cycle stage SLOs are treated as independent evidence
+classes and mapped to Wi-Fi, local-network, DNS, Internet or application domains.
+Healthy upstream observations may add isolation evidence, for example a reachable
+gateway supporting an Internet-path hypothesis or successful DNS/Internet checks
+supporting isolation toward the HTTPS application target.
+
+Support is qualitative and deterministic: `strong` requires converging evidence
+classes or a critical current failure with isolation evidence; `moderate` requires a
+critical signal, repeated evidence, or a current signal with isolation; otherwise the
+hypothesis remains `weak`. If multiple domains share the highest support level the
+result is explicitly `ambiguous` and no primary domain is selected. Sensor collection
+gaps are retained as limitations, and the assessment never claims a proven root cause.
+The correlation result is stored in snapshot JSON and does not create duplicate
+incidents; objective findings and SLO violations remain the incident sources.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

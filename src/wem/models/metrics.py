@@ -292,6 +292,33 @@ class ServiceSloMetrics:
 
 
 @dataclass(slots=True)
+class CorrelationEvidence:
+    code: str
+    source: str
+    severity: str
+    message: str
+
+
+@dataclass(slots=True)
+class CorrelationHypothesis:
+    domain: str
+    label: str
+    support: str
+    evidence: list[CorrelationEvidence] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class CorrelationAssessment:
+    policy_version: str
+    status: str
+    primary_domain: str | None
+    hypotheses: list[CorrelationHypothesis] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+    reason: str = ""
+
+
+@dataclass(slots=True)
 class SensorHealthMetrics:
     interface: str
 
@@ -485,6 +512,7 @@ class SensorSnapshot:
     connection_cycle_slo: ConnectionCycleSloMetrics | None = None
     adaptive_baseline: AdaptiveBaselineMetrics | None = None
     service_slo: ServiceSloMetrics | None = None
+    correlation: CorrelationAssessment | None = None
     monitoring: MonitoringContext | None = None
 
     @classmethod

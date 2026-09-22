@@ -4,6 +4,7 @@ from datetime import datetime
 from wem.analysis.adaptive_baseline import AdaptiveBaselineEngine
 from wem.analysis.connection_cycle import ConnectionCycleTracker
 from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
+from wem.analysis.correlation import CorrelationEngine
 from wem.analysis.service_slo import ServiceSloEngine
 from wem.collectors.networkmanager_events import NetworkManagerEventMonitor
 from wem.models.metrics import DiagnosticResult, IncidentEvaluation, SensorSnapshot
@@ -48,6 +49,7 @@ class ConsoleSensorRuntime(SensorRuntime):
             config.profile_config.thresholds.service_slo,
             config.profile_config.tests,
         )
+        self.correlation_engine = CorrelationEngine()
         self._baseline_seeded = False
         self._baseline_ssid: str | None = None
         self.networkmanager_event_monitor = NetworkManagerEventMonitor(config.interface)
@@ -115,6 +117,8 @@ class ConsoleSensorRuntime(SensorRuntime):
                 snapshot.diagnostic,
                 service_slo_evaluation.findings,
             )
+
+        snapshot.correlation = self.correlation_engine.evaluate(snapshot)
 
         slo_severity = "healthy"
         if any(item.severity == "critical" for item in slo_evaluation.findings):
