@@ -180,6 +180,20 @@ availability, failure/error counts and latency/loss percentiles. Those historica
 figures are observational; rolling incident compliance remains tied to the immutable
 profile version selected when monitoring starts.
 
+## Executive HTML report
+
+The HTML report v2 adds an executive layer above the existing technical evidence. It
+summarizes overlapping incident intervals, derived experience episodes and their
+correlated domains, then compares the selected period with the immediately preceding
+window of equal duration. Core RF/network percentiles, connection-ready P95 and
+synthetic-service availability are shown with current, previous and delta values.
+
+Comparison deltas are descriptive only; they are not automatically labeled as better
+or worse. Diagnostic interpretation continues to come from explicit thresholds, SLOs,
+incidents and deterministic correlation. Incident and episode records are currently
+sensor-database scoped rather than keyed by interface, which is disclosed in the
+report when a database may contain history from more than one interface.
+
 ## Evidence correlation
 
 The correlation engine combines existing diagnostic findings instead of inventing a

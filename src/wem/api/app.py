@@ -449,20 +449,47 @@ def create_app(
         interface: str = Query(min_length=1, max_length=64),
     ) -> HTMLResponse:
         try:
-            window = HistoryRepository(database).window(interface, start, end, max_points=600)
+            window = HistoryRepository(database).window(
+                interface,
+                start,
+                end,
+                max_points=600,
+                include_comparison=True,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-        start_utc = start.astimezone(UTC).replace(tzinfo=None)
-        end_utc = end.astimezone(UTC).replace(tzinfo=None)
+        start_aware = start.astimezone(UTC)
+        end_aware = end.astimezone(UTC)
+        start_utc = start_aware.replace(tzinfo=None)
+        end_utc = end_aware.replace(tzinfo=None)
         incidents = [
             _incident_to_dict(record)
             for record in incident_repository.history(limit=1000)
             if record.opened_at < end_utc
             and (record.resolved_at is None or record.resolved_at >= start_utc)
         ]
+        episodes = []
+        episode_items = episode_repository.history(limit=200).get("episodes")
+        if isinstance(episode_items, list):
+            for item in episode_items:
+                if not isinstance(item, dict):
+                    continue
+                started_at = item.get("started_at")
+                if not isinstance(started_at, str):
+                    continue
+                episode_start = datetime.fromisoformat(started_at)
+                ended_at = item.get("ended_at")
+                episode_end = (
+                    datetime.fromisoformat(ended_at) if isinstance(ended_at, str) else None
+                )
+                if episode_start < end_aware and (
+                    episode_end is None or episode_end >= start_aware
+                ):
+                    episodes.append(item)
+
         return HTMLResponse(
-            content=render_html_report(window, incidents),
+            content=render_html_report(window, incidents, episodes),
             headers={"Content-Disposition": 'inline; filename="wifi-experience-report.html"'},
         )
 
