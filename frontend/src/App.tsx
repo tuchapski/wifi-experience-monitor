@@ -4,6 +4,7 @@ import SensorControl from "./SensorControl";
 import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
+import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
 import ProfileSettings from "./ProfileSettings";
 
 import {
@@ -381,6 +382,7 @@ function App() {
         tabIndex={0} hidden={activeTab !== "dashboard"}>
         {snapshot ? (<>
       <ExperienceScorePanel score={snapshot.experience_score} />
+      <AdaptiveBaselinePanel baseline={snapshot.adaptive_baseline} />
       {snapshot.diagnostic?.complete === false && (
         <div className="empty-state">
           Assessment incomplete: missing measurements or unresolved sensor checks.

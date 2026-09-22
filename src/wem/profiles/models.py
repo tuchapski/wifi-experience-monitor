@@ -111,6 +111,23 @@ class ConnectionCycleThresholds(ProfileModel):
         return self
 
 
+class AdaptiveBaselineThresholds(ProfileModel):
+    enabled: bool = True
+    lookback_hours: int = Field(default=24, ge=1, le=168)
+    minimum_samples: int = Field(default=30, ge=10, le=5000)
+    max_samples: int = Field(default=1000, ge=30, le=10000)
+    warning_sigma: float = Field(default=3.5, gt=0.0, le=20.0)
+    critical_sigma: float = Field(default=6.0, gt=0.0, le=30.0)
+
+    @model_validator(mode="after")
+    def validate_baseline(self) -> Self:
+        if self.max_samples < self.minimum_samples:
+            raise ValueError("max_samples must be greater than or equal to minimum_samples")
+        if self.critical_sigma <= self.warning_sigma:
+            raise ValueError("critical_sigma must exceed warning_sigma")
+        return self
+
+
 class ProfileThresholds(ProfileModel):
     wifi: WifiThresholds = Field(default_factory=WifiThresholds)
     gateway: LatencyLossThresholds = Field(
@@ -126,6 +143,9 @@ class ProfileThresholds(ProfileModel):
         default_factory=lambda: ResponseThreshold(response_warning_ms=1000.0)
     )
     connection_cycle: ConnectionCycleThresholds = Field(default_factory=ConnectionCycleThresholds)
+    adaptive_baseline: AdaptiveBaselineThresholds = Field(
+        default_factory=AdaptiveBaselineThresholds
+    )
 
 
 class TestProfileConfig(ProfileModel):

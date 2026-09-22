@@ -80,6 +80,7 @@ class IncidentEngine:
         diagnostic: DiagnosticResult,
         timestamp: str | None = None,
         fresh_domains: set[str] | None = None,
+        fresh_codes: set[str] | None = None,
     ) -> IncidentEvaluation:
         now = timestamp or datetime.now(UTC).isoformat()
 
@@ -100,6 +101,7 @@ class IncidentEngine:
             timestamp=now,
             events=events,
             fresh_domains=fresh_domains,
+            fresh_codes=fresh_codes,
         )
 
         if diagnostic.complete:
@@ -108,6 +110,7 @@ class IncidentEngine:
                 timestamp=now,
                 events=events,
                 fresh_domains=fresh_domains,
+                fresh_codes=fresh_codes,
             )
         else:
             for code, tracker in self._trackers.items():
@@ -145,12 +148,15 @@ class IncidentEngine:
         timestamp: str,
         events: list[IncidentEvent],
         fresh_domains: set[str] | None,
+        fresh_codes: set[str] | None,
     ) -> None:
         for (
             code,
             finding,
         ) in findings.items():
             if fresh_domains is not None and finding.domain not in fresh_domains:
+                continue
+            if fresh_codes is not None and code not in fresh_codes:
                 continue
             tracker = self._trackers.get(code)
 
@@ -206,6 +212,7 @@ class IncidentEngine:
         timestamp: str,
         events: list[IncidentEvent],
         fresh_domains: set[str] | None,
+        fresh_codes: set[str] | None,
     ) -> None:
         for (
             code,
@@ -215,6 +222,9 @@ class IncidentEngine:
                 continue
 
             if fresh_domains is not None and tracker.domain not in fresh_domains:
+                continue
+
+            if fresh_codes is not None and code not in fresh_codes:
                 continue
 
             if not tracker.active:

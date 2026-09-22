@@ -84,5 +84,35 @@ export function validateProfileConfiguration(
     errors.push("Connection-cycle P95 critical must exceed warning and be at most 300000 ms.");
   }
 
+  const baseline = configuration.thresholds.adaptive_baseline ?? {
+    enabled: true,
+    lookback_hours: 24,
+    minimum_samples: 30,
+    max_samples: 1000,
+    warning_sigma: 3.5,
+    critical_sigma: 6,
+  };
+  if (!Number.isInteger(baseline.lookback_hours)
+    || baseline.lookback_hours < 1 || baseline.lookback_hours > 168) {
+    errors.push("Adaptive-baseline lookback must be an integer between 1 and 168 hours.");
+  }
+  if (!Number.isInteger(baseline.minimum_samples)
+    || baseline.minimum_samples < 10 || baseline.minimum_samples > 5000) {
+    errors.push("Adaptive-baseline minimum samples must be an integer between 10 and 5000.");
+  }
+  if (!Number.isInteger(baseline.max_samples)
+    || baseline.max_samples < 30 || baseline.max_samples > 10000
+    || baseline.max_samples < baseline.minimum_samples) {
+    errors.push("Adaptive-baseline maximum samples must be at least the minimum and at most 10000.");
+  }
+  if (!Number.isFinite(baseline.warning_sigma)
+    || baseline.warning_sigma <= 0 || baseline.warning_sigma > 20) {
+    errors.push("Adaptive-baseline warning deviation must be greater than 0 and at most 20 sigma.");
+  }
+  if (!Number.isFinite(baseline.critical_sigma)
+    || baseline.critical_sigma <= baseline.warning_sigma || baseline.critical_sigma > 30) {
+    errors.push("Adaptive-baseline critical deviation must exceed warning and be at most 30 sigma.");
+  }
+
   return errors;
 }

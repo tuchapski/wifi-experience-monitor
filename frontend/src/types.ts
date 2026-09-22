@@ -90,6 +90,14 @@ export interface TestProfileConfiguration {
       p95_warning_ms: number;
       p95_critical_ms: number;
     };
+    adaptive_baseline: {
+      enabled: boolean;
+      lookback_hours: number;
+      minimum_samples: number;
+      max_samples: number;
+      warning_sigma: number;
+      critical_sigma: number;
+    };
   };
 }
 
@@ -289,6 +297,34 @@ export interface ConnectionCycleSloMetrics {
   warning_threshold_ms: number;
   critical_threshold_ms: number;
   latest_cycle_ms: number | null;
+  fresh: boolean;
+  reason: string;
+}
+
+export interface AdaptiveBaselineMetric {
+  key: string;
+  label: string;
+  unit: string;
+  status: "unavailable" | "insufficient_data" | "healthy" | "warning" | "critical";
+  current: number | null;
+  baseline_median: number | null;
+  baseline_mad: number | null;
+  robust_sigma: number | null;
+  deviation_sigma: number | null;
+  sample_count: number;
+  minimum_samples: number;
+  reason: string;
+}
+
+export interface AdaptiveBaselineMetrics {
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  ssid: string | null;
+  lookback_hours: number;
+  minimum_samples: number;
+  max_samples: number;
+  warning_sigma: number;
+  critical_sigma: number;
+  metrics: AdaptiveBaselineMetric[];
   fresh: boolean;
   reason: string;
 }
@@ -505,6 +541,7 @@ export interface SensorSnapshot {
   recommendations?: Recommendation[];
   connection_cycle?: ConnectionCycleMetrics | null;
   connection_cycle_slo?: ConnectionCycleSloMetrics | null;
+  adaptive_baseline?: AdaptiveBaselineMetrics | null;
 
   monitoring?: {
     session_id: number;

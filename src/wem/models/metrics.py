@@ -211,6 +211,36 @@ class ConnectionCycleSloMetrics:
 
 
 @dataclass(slots=True)
+class AdaptiveBaselineMetric:
+    key: str
+    label: str
+    unit: str
+    status: str
+    current: float | None
+    baseline_median: float | None
+    baseline_mad: float | None
+    robust_sigma: float | None
+    deviation_sigma: float | None
+    sample_count: int
+    minimum_samples: int
+    reason: str
+
+
+@dataclass(slots=True)
+class AdaptiveBaselineMetrics:
+    status: str
+    ssid: str | None
+    lookback_hours: int
+    minimum_samples: int
+    max_samples: int
+    warning_sigma: float
+    critical_sigma: float
+    metrics: list[AdaptiveBaselineMetric] = field(default_factory=list)
+    fresh: bool = False
+    reason: str = ""
+
+
+@dataclass(slots=True)
 class SensorHealthMetrics:
     interface: str
 
@@ -402,6 +432,7 @@ class SensorSnapshot:
     experience_score: ExperienceScore | None = None
     connection_cycle: ConnectionCycleMetrics | None = None
     connection_cycle_slo: ConnectionCycleSloMetrics | None = None
+    adaptive_baseline: AdaptiveBaselineMetrics | None = None
     monitoring: MonitoringContext | None = None
 
     @classmethod

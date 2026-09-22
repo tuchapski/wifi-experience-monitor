@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+from wem.analysis.adaptive_baseline import AdaptiveBaselineEngine
 from wem.analysis.connection_cycle import ConnectionCycleTracker
 from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
 from wem.collectors.networkmanager_events import NetworkManagerEventMonitor
@@ -9,6 +10,7 @@ from wem.runtime.sensor import (
     RuntimeConfig,
     SensorRuntime,
 )
+from wem.storage.baseline import BaselineRepository
 from wem.storage.database import Database
 from wem.storage.incidents import (
     IncidentRepository,
@@ -33,10 +35,16 @@ class ConsoleSensorRuntime(SensorRuntime):
         self.snapshot_repository = SnapshotRepository(self.database)
 
         self.incident_repository = IncidentRepository(self.database)
+        self.baseline_repository = BaselineRepository(self.database)
         self.connection_cycle_tracker = ConnectionCycleTracker()
         self.connection_cycle_slo_engine = ConnectionCycleSloEngine(
             config.profile_config.thresholds.connection_cycle
         )
+        self.adaptive_baseline_engine = AdaptiveBaselineEngine(
+            config.profile_config.thresholds.adaptive_baseline
+        )
+        self._baseline_seeded = False
+        self._baseline_ssid: str | None = None
         self.networkmanager_event_monitor = NetworkManagerEventMonitor(config.interface)
         self.networkmanager_event_monitor.start()
 
@@ -76,6 +84,25 @@ class ConsoleSensorRuntime(SensorRuntime):
         if snapshot.diagnostic is not None and slo_evaluation.finding is not None:
             self.diagnostic_engine.extend_result(snapshot.diagnostic, [slo_evaluation.finding])
 
+        if not self._baseline_seeded or snapshot.wifi.ssid != self._baseline_ssid:
+            baseline_reference = self.baseline_repository.reference_values(
+                interface=snapshot.wifi.interface,
+                ssid=snapshot.wifi.ssid,
+                before=datetime.fromisoformat(snapshot.timestamp),
+                lookback_hours=(
+                    self.config.profile_config.thresholds.adaptive_baseline.lookback_hours
+                ),
+                max_samples=self.config.profile_config.thresholds.adaptive_baseline.max_samples,
+            )
+            self.adaptive_baseline_engine.seed(snapshot.wifi.ssid, baseline_reference)
+            self._baseline_ssid = snapshot.wifi.ssid
+            self._baseline_seeded = True
+
+        baseline_evaluation = self.adaptive_baseline_engine.evaluate(snapshot)
+        snapshot.adaptive_baseline = baseline_evaluation.metrics
+        if snapshot.diagnostic is not None and baseline_evaluation.findings:
+            self.diagnostic_engine.extend_result(snapshot.diagnostic, baseline_evaluation.findings)
+
         slo_diagnostic = DiagnosticResult(
             overall_status=(
                 slo_evaluation.finding.severity if slo_evaluation.finding is not None else "healthy"
@@ -90,9 +117,28 @@ class ConsoleSensorRuntime(SensorRuntime):
             timestamp=snapshot.timestamp,
             fresh_domains={"connection_cycle"} if slo_evaluation.metrics.fresh else set(),
         )
+
+        baseline_severity = "healthy"
+        if any(item.severity == "critical" for item in baseline_evaluation.findings):
+            baseline_severity = "critical"
+        elif baseline_evaluation.findings:
+            baseline_severity = "warning"
+        baseline_diagnostic = DiagnosticResult(
+            overall_status=baseline_severity,
+            probable_domain=("baseline" if baseline_evaluation.findings else None),
+            complete=True,
+            findings=baseline_evaluation.findings,
+        )
+        baseline_disabled = baseline_evaluation.metrics.status == "disabled"
+        baseline_incidents = self.incident_engine.evaluate(
+            baseline_diagnostic,
+            timestamp=snapshot.timestamp,
+            fresh_domains={"baseline"} if baseline_disabled else None,
+            fresh_codes=None if baseline_disabled else baseline_evaluation.fresh_codes,
+        )
         snapshot.incidents = IncidentEvaluation(
-            active_incidents=slo_incidents.active_incidents,
-            events=[*base_events, *slo_incidents.events],
+            active_incidents=baseline_incidents.active_incidents,
+            events=[*base_events, *slo_incidents.events, *baseline_incidents.events],
         )
 
         self.snapshot_repository.save(snapshot)

@@ -58,3 +58,22 @@ test("validates explicit gateway and severity order", () => {
   assert.match(errors, /Gateway target is required/);
   assert.match(errors, /Critical RSSI must be lower/);
 });
+
+test("accepts legacy thresholds without adaptive baseline", () => {
+  assert.deepEqual(validate(configuration()), []);
+});
+
+test("validates adaptive baseline sample and sigma ordering", () => {
+  const value = configuration();
+  value.thresholds.adaptive_baseline = {
+    enabled: true,
+    lookback_hours: 24,
+    minimum_samples: 100,
+    max_samples: 50,
+    warning_sigma: 6,
+    critical_sigma: 5,
+  };
+  const errors = validate(value).join(" ");
+  assert.match(errors, /maximum samples/i);
+  assert.match(errors, /critical deviation/i);
+});

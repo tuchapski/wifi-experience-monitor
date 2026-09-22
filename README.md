@@ -133,6 +133,25 @@ snapshots of the same cycle therefore cannot satisfy incident confirmation or
 recovery counters. Threshold changes remain pinned to the profile version selected
 when monitoring starts.
 
+## Adaptive same-SSID baseline
+
+The sensor can compare fresh measurements with its own recent history for the same
+interface and SSID. The reference model uses the median and median absolute deviation
+(MAD), so isolated historical spikes have less influence than they would with a mean
+and standard deviation. Metric-specific scale floors prevent a zero or near-zero MAD
+from turning negligible changes into anomalies.
+
+RSSI, TX retries, gateway/Internet latency, DNS, HTTPS and connection-cycle P95 are
+evaluated independently when they have enough reference samples. Cached synthetic-test
+results are not relearned as new measurements, and connection-cycle P95 enters the
+baseline only when a new measurable cycle updates that rolling statistic. Missing or
+insufficient history remains explicitly unavailable rather than being treated as zero.
+
+Adaptive findings complement the absolute thresholds in the active profile; they do
+not replace them. Warning/critical deviation multipliers, lookback and sample limits are
+versioned with the profile. Baseline incidents use stable per-metric codes and only
+advance confirmation or recovery when that specific metric has fresh evidence.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor

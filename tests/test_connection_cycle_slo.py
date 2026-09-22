@@ -3,7 +3,12 @@ from pydantic import ValidationError
 
 from wem.analysis.connection_cycle_slo import ConnectionCycleSloEngine
 from wem.models.metrics import ConnectionCycleMetrics
-from wem.profiles.models import ConnectionCycleThresholds, TestProfileConfig
+from wem.profiles.models import (
+    ConnectionCycleThresholds,
+)
+from wem.profiles.models import (
+    TestProfileConfig as ProfileConfiguration,
+)
 
 
 def cycle(session_id: str, duration_ms: float | None, *, session_type: str = "reconnect"):
@@ -65,7 +70,7 @@ def test_slo_warning_and_critical_use_rolling_p95():
 
 
 def test_profile_defaults_are_backward_compatible():
-    profile = TestProfileConfig.model_validate({})
+    profile = ProfileConfiguration.model_validate({})
     assert profile.thresholds.connection_cycle.window_size == 20
     assert profile.thresholds.connection_cycle.minimum_samples == 5
     assert profile.thresholds.connection_cycle.p95_warning_ms == 8000.0

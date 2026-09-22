@@ -73,6 +73,14 @@ const defaultConfiguration: TestProfileConfiguration = {
       p95_warning_ms: 8000,
       p95_critical_ms: 15000,
     },
+    adaptive_baseline: {
+      enabled: true,
+      lookback_hours: 24,
+      minimum_samples: 30,
+      max_samples: 1000,
+      warning_sigma: 3.5,
+      critical_sigma: 6,
+    },
   },
 };
 
@@ -431,6 +439,22 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
                   <NumberField label="P95 warning (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_warning_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_warning_ms = value ?? 0; })} />
                   <NumberField label="P95 critical (ms)" min={0.1} value={draft.configuration.thresholds.connection_cycle.p95_critical_ms} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.connection_cycle.p95_critical_ms = value ?? 0; })} />
                   <p className="metric-note">Only unique connection cycles with a measured network-ready duration enter the rolling P95.</p>
+                </fieldset>
+                <fieldset>
+                  <legend>Adaptive baseline</legend>
+                  <label className="profile-toggle">
+                    <input type="checkbox" checked={draft.configuration.thresholds.adaptive_baseline.enabled} onChange={(event) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.enabled = event.target.checked; })} />
+                    <span>Evaluate same-SSID historical deviations</span>
+                  </label>
+                  <NumberField label="Lookback (hours)" min={1} max={168} step={1} value={draft.configuration.thresholds.adaptive_baseline.lookback_hours} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.lookback_hours = value ?? 0; })} />
+                  <NumberField label="Minimum samples" min={10} max={5000} step={1} value={draft.configuration.thresholds.adaptive_baseline.minimum_samples} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.minimum_samples = value ?? 0; })} />
+                  <NumberField label="Maximum samples" min={30} max={10000} step={1} value={draft.configuration.thresholds.adaptive_baseline.max_samples} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.max_samples = value ?? 0; })} />
+                  <NumberField label="Warning deviation (robust σ)" min={0.1} max={20} value={draft.configuration.thresholds.adaptive_baseline.warning_sigma} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.warning_sigma = value ?? 0; })} />
+                  <NumberField label="Critical deviation (robust σ)" min={0.1} max={30} value={draft.configuration.thresholds.adaptive_baseline.critical_sigma} onChange={(value) => updateConfiguration((configuration) => { configuration.thresholds.adaptive_baseline.critical_sigma = value ?? 0; })} />
+                  <p className="metric-note">
+                    Uses the median and median absolute deviation from prior measurements on the
+                    same interface and SSID. Cached synthetic-test results are not learned twice.
+                  </p>
                 </fieldset>
               </div>
             </section>
