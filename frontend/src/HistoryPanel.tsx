@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { getHistoryInterfaces, getHistoryWindow, getReportUrl } from "./api";
+import { getExperienceEpisodes, getHistoryInterfaces, getHistoryWindow, getIncidentHistory, getReportUrl } from "./api";
 import HistoricalTimeline from "./HistoricalTimeline";
-import type { HistoryWindow } from "./types";
+import { buildTimelineEvents } from "./historyEventsModel";
+import type { ExperienceEpisode, HistoryWindow, IncidentRecord } from "./types";
 
 const format = (value: number | null | undefined) => value == null
   ? "Unavailable" : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -33,6 +34,9 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
   const [auto, setAuto] = useState(true);
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<HistoryWindow | null>(null);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [episodes, setEpisodes] = useState<ExperienceEpisode[]>([]);
+  const [eventNotice, setEventNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,6 +60,9 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
     let cancelled = false;
     let busy = false;
     setData(null);
+    setIncidents([]);
+    setEpisodes([]);
+    setEventNotice(null);
     async function refresh() {
       if (busy) return;
       busy = true;
@@ -65,8 +72,27 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
         start: new Date(end.getTime() - Number(period) * 1000).toISOString(), end: end.toISOString(),
       };
       try {
-        const result = await getHistoryWindow(selectedInterface, range.start, range.end, controller.signal);
-        if (!cancelled) { setData(result); setError(null); }
+        const [history, incidentResult, episodeResult] = await Promise.allSettled([
+          getHistoryWindow(selectedInterface, range.start, range.end, controller.signal),
+          getIncidentHistory(1000, controller.signal),
+          getExperienceEpisodes(200, controller.signal),
+        ]);
+        if (history.status === "rejected") throw history.reason;
+        if (!cancelled) {
+          setData(history.value);
+          setError(null);
+          setIncidents(incidentResult.status === "fulfilled" ? incidentResult.value : []);
+          setEpisodes(episodeResult.status === "fulfilled" ? episodeResult.value.episodes : []);
+          const notices = [
+            incidentResult.status === "rejected" ? "Incident events could not be loaded." : null,
+            episodeResult.status === "rejected" ? "Experience episodes could not be loaded." : null,
+            incidentResult.status === "fulfilled" && incidentResult.value.length === 1000
+              ? "Incident history reached its 1,000 record limit; older events may be missing." : null,
+            episodeResult.status === "fulfilled" && episodeResult.value.episodes.length === 200
+              ? "Episode history reached its 200 record limit; older events may be missing." : null,
+          ].filter(Boolean);
+          setEventNotice(notices.length ? notices.join(" ") : null);
+        }
       } catch (err) {
         if (!cancelled) { setError(err instanceof Error ? err.message : "Unable to load history."); setData(null); }
       } finally {
@@ -121,7 +147,10 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Timeline lines show averages of available readings per bucket. Empty buckets
         remain gaps, not zeros. Samples from different interfaces are never combined. DNS/HTTPS use the host route;
         retry ratios can exceed 100.</p>
-      {data.total_samples > 0 && <HistoricalTimeline data={data} />}
+      {(data.total_samples > 0 || buildTimelineEvents(data, incidents, episodes).length > 0) &&
+        <HistoricalTimeline data={data} incidents={incidents} episodes={episodes} eventNotice={eventNotice} />}
+      {data.total_samples === 0 && buildTimelineEvents(data, incidents, episodes).length === 0 &&
+        eventNotice && <p className="metric-note" role="status">{eventNotice}</p>}
       {data.service_slo_summary && Object.values(data.service_slo_summary).some(
         service => service.attempt_count > 0,
       ) && <section aria-labelledby="service-slo-history-title">

@@ -230,17 +230,21 @@ export function getActiveIncidents(
 
 export function getIncidentHistory(
   limit = 100,
+  signal?: AbortSignal,
 ): Promise<IncidentRecord[]> {
   return request<IncidentRecord[]>(
     `/incidents/history?limit=${limit}`,
+    { signal },
   );
 }
 
 export function getExperienceEpisodes(
   limit = 50,
+  signal?: AbortSignal,
 ): Promise<ExperienceEpisodeHistory> {
   return request<ExperienceEpisodeHistory>(
     `/episodes/history?limit=${limit}`,
+    { signal },
   );
 }
 

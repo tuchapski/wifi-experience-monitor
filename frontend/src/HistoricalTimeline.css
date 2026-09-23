@@ -74,6 +74,45 @@
   background: white;
 }
 
+.history-event-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.history-event-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  background: white;
+  border: 1px solid #e4e7ec;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.history-event-filters small {
+  color: #667085;
+}
+
+.history-event-swatch {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 3px;
+}
+
+.history-event-notice {
+  padding: 9px 12px;
+  color: #854a0e;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
 .history-event-disclosure {
   margin-top: 12px;
 }
