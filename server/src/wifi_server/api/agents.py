@@ -125,7 +125,7 @@ def telemetry(
     session: Annotated[Session, Depends(get_session)],
     metric: Annotated[str | None, Query(max_length=128)] = None,
     hours: Annotated[float, Query(gt=0, le=24)] = 1,
-    limit: Annotated[int, Query(ge=1, le=5000)] = 5000,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 5000,
 ) -> list[TelemetryPointResponse]:
     since = datetime.now(UTC) - timedelta(hours=hours)
     return get_agent_telemetry(session, agent_id, metric, since, limit)
