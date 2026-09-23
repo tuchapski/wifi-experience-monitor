@@ -1,0 +1,143 @@
+/* UI-3 historical explorer timeline. */
+
+.history-timeline {
+  margin: 18px 0 24px;
+  padding: 18px;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #fcfcfd;
+}
+
+.history-timeline-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 14px;
+}
+
+.history-timeline-heading > div > span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.history-timeline-heading h3 {
+  margin: 4px 0 0;
+}
+
+.history-timeline-heading p {
+  max-width: 620px;
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.history-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.history-overview-grid article {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: white;
+}
+
+.history-overview-grid span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.history-overview-grid strong {
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.history-plot-wrapper {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: white;
+}
+
+.history-event-disclosure {
+  margin-top: 12px;
+}
+
+.history-event-disclosure > summary {
+  cursor: pointer;
+  color: #175cd3;
+  font-weight: 700;
+}
+
+.history-event-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.history-event-list article {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(120px, auto) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-left: 3px solid #b42318;
+  border-radius: 6px;
+  background: white;
+}
+
+.history-event-list time,
+.history-event-list span {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.history-event-list strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .history-overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 750px) {
+  .history-timeline {
+    padding: 12px;
+  }
+
+  .history-timeline-heading {
+    flex-direction: column;
+  }
+
+  .history-timeline-heading p {
+    text-align: left;
+  }
+
+  .history-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-event-list article {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
