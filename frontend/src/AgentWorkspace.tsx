@@ -6,6 +6,7 @@ import {
   getAgentState,
   getAgentTelemetry,
 } from "./agentApi";
+import RecordingPanel from "./RecordingPanel";
 import type {
   AgentCurrentState,
   AgentSummary,
@@ -381,6 +382,8 @@ function AgentDetail({ agentId }: { agentId: string }) {
         <article><span>Channel</span><strong>{wifi?.channel ?? "—"}</strong><small>{wifi?.frequency_mhz ? `${wifi.frequency_mhz} MHz · ${wifi.channel_width_mhz ?? "—"} MHz` : "Frequency unavailable"}</small></article>
         <article><span>TX / RX</span><strong>{formatMetric(wifi?.tx_rate_mbps, "Mbps")}</strong><small>RX {formatMetric(wifi?.rx_rate_mbps, "Mbps")}</small></article>
       </section>
+
+      <RecordingPanel agent={agent} />
 
       <div className="agent-detail-grid">
         <section className="agent-panel">

@@ -1,0 +1,370 @@
+.recording-panel {
+  overflow: hidden;
+}
+
+.recording-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.recording-heading h2 {
+  margin: 2px 0 4px;
+  font-size: 19px;
+}
+
+.recording-heading p,
+.recording-history-heading p {
+  margin: 0;
+  color: #758194;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recording-start-form {
+  display: flex;
+  gap: 8px;
+}
+
+.recording-start-form input {
+  width: min(280px, 34vw);
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid #d9e1eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #23344b;
+  font: inherit;
+  font-size: 13px;
+}
+
+.recording-start-form input:focus {
+  border-color: #7ba3d2;
+  outline: 3px solid #e9f1fa;
+}
+
+.recording-start-form button,
+.recording-stop {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #245f9f;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.recording-start-form button:disabled,
+.recording-stop:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.recording-error {
+  margin: 14px 18px 0;
+  padding: 11px 13px;
+  border: 1px solid #f2c8c5;
+  border-radius: 9px;
+  background: #fff5f4;
+  color: #8f3029;
+  font-size: 12px;
+}
+
+.recording-active {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) repeat(3, minmax(90px, auto)) auto;
+  align-items: center;
+  gap: 18px;
+  margin: 18px;
+  padding: 17px 18px;
+  border: 1px solid #cfe0f3;
+  border-radius: 12px;
+  background: #f7fbff;
+}
+
+.recording-live-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e9f2fc;
+}
+
+.recording-live-mark i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d83d35;
+  box-shadow: 0 0 0 5px rgba(216, 61, 53, 0.12);
+}
+
+.recording-active-main {
+  min-width: 0;
+}
+
+.recording-active-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.recording-active-title > strong {
+  margin-right: 4px;
+  color: #1d314b;
+}
+
+.recording-active-id {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #8090a3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recording-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recording-stat span {
+  color: #8190a1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recording-stat strong {
+  color: #243850;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-stop {
+  background: #a73b35;
+}
+
+.recording-ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px;
+  padding: 15px 17px;
+  border: 1px dashed #d8e0ea;
+  border-radius: 11px;
+  background: #fbfcfe;
+}
+
+.recording-ready div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recording-ready strong {
+  color: #34475e;
+  font-size: 13px;
+}
+
+.recording-ready div > span {
+  color: #7d899a;
+  font-size: 12px;
+}
+
+.recording-ready-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #98a2b3;
+  box-shadow: 0 0 0 5px #f0f2f5;
+}
+
+.recording-ready-dot.online {
+  background: #2e9c69;
+  box-shadow: 0 0 0 5px #e8f6ef;
+}
+
+.recording-status,
+.recording-sync {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.recording-status-created,
+.recording-status-stopping {
+  background: #fff4dc;
+  color: #875e10;
+}
+
+.recording-status-recording {
+  background: #feeceb;
+  color: #9a332d;
+}
+
+.recording-status-completed {
+  background: #eaf8f0;
+  color: #186b45;
+}
+
+.recording-status-failed,
+.recording-sync-failed,
+.recording-sync-incomplete {
+  background: #fff0ef;
+  color: #9b342d;
+}
+
+.recording-status-cancelled,
+.recording-sync-pending {
+  background: #f0f2f5;
+  color: #657184;
+}
+
+.recording-sync-syncing {
+  background: #edf3fb;
+  color: #315f98;
+}
+
+.recording-sync-complete {
+  background: #eaf8f0;
+  color: #186b45;
+}
+
+.recording-history-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 22px 12px;
+  border-top: 1px solid #edf1f5;
+}
+
+.recording-history-heading h3 {
+  margin: 0 0 3px;
+  color: #2b3e56;
+  font-size: 14px;
+}
+
+.recording-history-heading > span {
+  color: #7d899a;
+  font-size: 11px;
+}
+
+.recording-table-wrap {
+  overflow-x: auto;
+}
+
+.recording-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.recording-table th {
+  padding: 10px 18px;
+  border-top: 1px solid #edf1f5;
+  border-bottom: 1px solid #e8edf3;
+  background: #f9fbfd;
+  color: #788597;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.recording-table td {
+  padding: 12px 18px;
+  border-bottom: 1px solid #edf1f5;
+  color: #394c63;
+  font-size: 12px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.recording-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.recording-table td:first-child {
+  min-width: 240px;
+  white-space: normal;
+}
+
+.recording-table td:first-child strong,
+.recording-table td:first-child small {
+  display: block;
+}
+
+.recording-table td:first-child small {
+  margin-top: 4px;
+  color: #8a95a4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+}
+
+.recording-empty {
+  display: grid;
+  min-height: 90px;
+  place-items: center;
+  color: #8a95a4;
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .recording-active {
+    grid-template-columns: auto minmax(180px, 1fr) repeat(2, minmax(80px, auto));
+  }
+
+  .recording-active .recording-stat:nth-of-type(3) {
+    display: none;
+  }
+
+  .recording-stop {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .recording-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recording-start-form {
+    flex-direction: column;
+  }
+
+  .recording-start-form input {
+    width: 100%;
+  }
+
+  .recording-active {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .recording-stat {
+    display: none;
+  }
+
+  .recording-stop {
+    grid-column: 1 / -1;
+  }
+}

@@ -79,3 +79,29 @@ export interface AgentWithState {
   agent: AgentSummary;
   state: AgentCurrentState | null;
 }
+
+export interface DiagnosticRecording {
+  id: string;
+  agent_id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sync_status: string;
+  profile_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  agent_version: string | null;
+  schema_version: number;
+  metrics_count: number;
+  events_count: number;
+  tests_count: number;
+  artifacts_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StartRecordingInput {
+  name: string;
+  description: string | null;
+  profile_id: string;
+}

@@ -1,6 +1,8 @@
 import type {
   AgentCurrentState,
   AgentSummary,
+  DiagnosticRecording,
+  StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
 
@@ -46,6 +48,36 @@ async function requestOptional<T>(path: string): Promise<T | null> {
   return response.json() as Promise<T>;
 }
 
+async function mutationRequest<T>(
+  path: string,
+  method: "POST",
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${API_ROOT}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let detail = `API request failed: ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // Response had no JSON body.
+    }
+    throw new Error(detail);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export function getAgents(): Promise<AgentSummary[]> {
   return request<AgentSummary[]>("/agents");
 }
@@ -72,5 +104,33 @@ export function getAgentTelemetry(
   });
   return request<TelemetryPoint[]>(
     `/agents/${encodeURIComponent(agentId)}/telemetry?${params.toString()}`,
+  );
+}
+
+export function getAgentRecordings(
+  agentId: string,
+): Promise<DiagnosticRecording[]> {
+  return request<DiagnosticRecording[]>(
+    `/agents/${encodeURIComponent(agentId)}/recordings`,
+  );
+}
+
+export function startAgentRecording(
+  agentId: string,
+  input: StartRecordingInput,
+): Promise<DiagnosticRecording> {
+  return mutationRequest<DiagnosticRecording>(
+    `/agents/${encodeURIComponent(agentId)}/recordings`,
+    "POST",
+    input,
+  );
+}
+
+export function stopRecording(
+  recordingId: string,
+): Promise<DiagnosticRecording> {
+  return mutationRequest<DiagnosticRecording>(
+    `/recordings/${encodeURIComponent(recordingId)}/stop`,
+    "POST",
   );
 }
