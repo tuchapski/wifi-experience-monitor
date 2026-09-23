@@ -3,14 +3,16 @@ import logging
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 
-from wifi_agent.api import AgentApiClient
+from wifi_agent.api import AgentApiClient, HeartbeatResult
 from wifi_agent.capabilities import discover_capabilities
 from wifi_agent.collectors import resolve_interface
 from wifi_agent.config import AgentSettings
 from wifi_agent.processors import CurrentStateSnapshot, TelemetryAggregator
+from wifi_agent.recording import RecordingController
 from wifi_agent.runtime import CurrentStateRuntime, TelemetrySyncEngine
 from wifi_agent.storage import AgentIdentity, AgentIdentityStore, TelemetrySpool
 from wifi_agent.system_info import collect_system_info
@@ -79,8 +81,12 @@ def _print_status(
         print(f"  - {capability.name}")
 
 
-def _heartbeat(settings: AgentSettings, identity: AgentIdentity) -> None:
-    result = AgentApiClient(settings).heartbeat(identity)
+def _heartbeat(
+    settings: AgentSettings,
+    identity: AgentIdentity,
+    recording: dict[str, Any] | None = None,
+) -> HeartbeatResult:
+    result = AgentApiClient(settings).heartbeat(identity, recording=recording)
     offset_ms = (result.server_time - datetime.now(UTC)).total_seconds() * 1000
     LOGGER.info(
         "heartbeat accepted agent_id=%s server_clock_offset_ms=%.1f commands=%d",
@@ -88,6 +94,7 @@ def _heartbeat(settings: AgentSettings, identity: AgentIdentity) -> None:
         offset_ms,
         len(result.commands),
     )
+    return result
 
 
 def _publish_snapshot(
@@ -138,6 +145,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
 
     aggregator = TelemetryAggregator(settings.telemetry_window_seconds)
     sync_engine = TelemetrySyncEngine(settings, identity, spool)
+    recording_controller = RecordingController(settings, identity, _database_path(settings))
 
     LOGGER.info("agent started agent_id=%s server=%s", identity.agent_id, settings.server_url)
     next_heartbeat = 0.0
@@ -149,7 +157,12 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         now = time.monotonic()
         if now >= next_heartbeat:
             try:
-                _heartbeat(settings, identity)
+                heartbeat = _heartbeat(
+                    settings,
+                    identity,
+                    recording_controller.heartbeat_payload(),
+                )
+                recording_controller.handle_commands(heartbeat.commands)
             except (httpx.HTTPError, OSError) as exc:
                 LOGGER.warning("heartbeat failed: %s", exc)
             next_heartbeat = now + settings.heartbeat_interval_seconds
@@ -157,6 +170,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         if runtime is not None and now >= next_collection:
             cycle = runtime.collect_cycle()
             aggregator.consume(cycle.observations)
+            recording_controller.consume(cycle.observations)
 
             if now >= next_state:
                 try:
@@ -180,6 +194,9 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             synced = sync_engine.sync_pending()
             if synced:
                 LOGGER.info("telemetry batches synchronized count=%d", synced)
+            recording_synced = recording_controller.sync_pending()
+            if recording_synced:
+                LOGGER.info("recording batches synchronized count=%d", recording_synced)
             next_sync = now + settings.telemetry_sync_interval_seconds
 
         due = [next_heartbeat, next_sync]

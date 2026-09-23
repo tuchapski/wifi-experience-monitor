@@ -4,9 +4,11 @@ import uvicorn
 from fastapi import FastAPI
 
 from wifi_server.api.agents import router as agents_router
+from wifi_server.api.recordings import router as recordings_router
 
 app = FastAPI(title="Wi-Fi Experience Monitor Server", version="0.1.0")
 app.include_router(agents_router)
+app.include_router(recordings_router)
 
 
 @app.get("/health")

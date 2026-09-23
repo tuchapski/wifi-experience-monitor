@@ -3,7 +3,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from wifi_server.config import ServerSettings
-from wifi_server.db import models  # noqa: F401
+from wifi_server.db import (
+    models,  # noqa: F401
+    recording_models,  # noqa: F401
+)
 from wifi_server.db.base import Base
 
 config = context.config

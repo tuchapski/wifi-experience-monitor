@@ -29,6 +29,7 @@ from wifi_server.services.agents import (
     process_heartbeat,
     update_current_state,
 )
+from wifi_server.services.recordings import get_pending_commands
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
@@ -69,7 +70,10 @@ def heartbeat(
     token = _bearer_token(authorization)
     agent = authenticate_agent(session, agent_id, token)
     remote_address = request.client.host if request.client else None
-    return process_heartbeat(session, settings, agent, payload, remote_address)
+    response = process_heartbeat(session, settings, agent, payload, remote_address)
+    commands = get_pending_commands(session, agent.id, datetime.now(UTC))
+    session.commit()
+    return response.model_copy(update={"commands": commands})
 
 
 @router.get("", response_model=list[AgentResponse])

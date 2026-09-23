@@ -1,0 +1,135 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
+
+from wifi_server.db.models import DiagnosticRecording
+from wifi_server.db.recording_models import AgentCommand
+from wifi_server.dependencies import get_session
+from wifi_server.recording_schemas import (
+    AgentCommandAckRequest,
+    RecordingBatchRequest,
+    RecordingBatchResponse,
+    RecordingManifestRequest,
+    RecordingManifestResponse,
+    RecordingResponse,
+    StartRecordingRequest,
+)
+from wifi_server.services.agents import authenticate_agent
+from wifi_server.services.recordings import (
+    acknowledge_command,
+    create_recording,
+    finalize_manifest,
+    get_recording,
+    ingest_recording_batch,
+    list_recordings,
+    request_stop_recording,
+)
+
+router = APIRouter(prefix="/api/v1", tags=["recordings"])
+
+
+def _bearer_token(authorization: str | None) -> str:
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+        )
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Expected Bearer agent token",
+        )
+    return token
+
+
+@router.post(
+    "/agents/{agent_id}/recordings",
+    response_model=RecordingResponse,
+    status_code=201,
+)
+def start_recording(
+    agent_id: str,
+    payload: StartRecordingRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> RecordingResponse:
+    return create_recording(session, agent_id, payload)
+
+
+@router.get(
+    "/agents/{agent_id}/recordings",
+    response_model=list[RecordingResponse],
+)
+def recordings(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> list[RecordingResponse]:
+    return list_recordings(session, agent_id)
+
+
+@router.get("/recordings/{recording_id}", response_model=RecordingResponse)
+def recording(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> RecordingResponse:
+    return get_recording(session, recording_id)
+
+
+@router.post("/recordings/{recording_id}/stop", response_model=RecordingResponse)
+def stop_recording(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> RecordingResponse:
+    return request_stop_recording(session, recording_id)
+
+
+@router.post("/commands/{command_id}/ack", status_code=204)
+def command_ack(
+    command_id: str,
+    payload: AgentCommandAckRequest,
+    session: Annotated[Session, Depends(get_session)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    command = session.get(AgentCommand, command_id)
+    if command is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
+    token = _bearer_token(authorization)
+    authenticate_agent(session, command.agent_id, token)
+    acknowledge_command(session, command, payload)
+
+
+@router.post(
+    "/recordings/{recording_id}/batches",
+    response_model=RecordingBatchResponse,
+)
+def recording_batch(
+    recording_id: str,
+    payload: RecordingBatchRequest,
+    session: Annotated[Session, Depends(get_session)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> RecordingBatchResponse:
+    recording = session.get(DiagnosticRecording, recording_id)
+    if recording is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
+    token = _bearer_token(authorization)
+    authenticate_agent(session, recording.agent_id, token)
+    return ingest_recording_batch(session, recording, payload)
+
+
+@router.post(
+    "/recordings/{recording_id}/manifest",
+    response_model=RecordingManifestResponse,
+)
+def recording_manifest(
+    recording_id: str,
+    payload: RecordingManifestRequest,
+    session: Annotated[Session, Depends(get_session)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> RecordingManifestResponse:
+    recording = session.get(DiagnosticRecording, recording_id)
+    if recording is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
+    token = _bearer_token(authorization)
+    authenticate_agent(session, recording.agent_id, token)
+    return finalize_manifest(session, recording, payload)

@@ -70,7 +70,11 @@ class AgentApiClient:
             enrolled_at=datetime.fromisoformat(payload["enrolled_at"]),
         )
 
-    def heartbeat(self, identity: AgentIdentity) -> HeartbeatResult:
+    def heartbeat(
+        self,
+        identity: AgentIdentity,
+        recording: dict[str, Any] | None = None,
+    ) -> HeartbeatResult:
         response = httpx.post(
             f"{self.settings.server_url}/api/v1/agents/{identity.agent_id}/heartbeat",
             headers={"Authorization": f"Bearer {identity.agent_token}"},
@@ -78,7 +82,7 @@ class AgentApiClient:
                 "timestamp": datetime.now(UTC).isoformat(),
                 "agent_version": __version__,
                 "config_revision": 0,
-                "recording": {"active": False},
+                "recording": recording or {"active": False},
                 "health": {
                     "collector": "ok",
                     "storage": "ok",
