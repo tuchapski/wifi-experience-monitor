@@ -106,10 +106,6 @@
   cursor: not-allowed;
 }
 
-.history-view-nav small {
-  color: #667085;
-}
-
 .history-view-heading {
   display: flex;
   align-items: flex-start;
@@ -139,16 +135,6 @@
   cursor: pointer;
 }
 
-.history-marker-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  color: #475467;
-  cursor: pointer;
-  font-size: 13px;
-}
-
 .history-plot-wrapper {
   width: 100%;
   min-width: 0;
@@ -158,14 +144,14 @@
   background: white;
 }
 
-.history-event-filters {
+.history-overlay-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 18px;
   margin: 0 0 12px;
 }
 
-.history-event-filters label {
+.history-overlay-controls label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -177,23 +163,10 @@
   font-size: 12px;
 }
 
-.history-event-filters small {
+.history-chart-loading {
+  margin: 0;
+  padding: 24px;
   color: #667085;
-}
-
-.history-event-swatch {
-  width: 9px;
-  height: 9px;
-  flex: none;
-  border-radius: 3px;
-}
-
-.history-event-notice {
-  padding: 9px 12px;
-  color: #854a0e;
-  background: #fffaeb;
-  border: 1px solid #fedf89;
-  border-radius: 7px;
   font-size: 13px;
 }
 

@@ -115,8 +115,11 @@ function hoverText(
 }
 
 
-export function buildTimelineSeries(data: HistoryWindow): TimelineSeries[] {
-  return TIMELINE_METRICS.map((definition) => ({
+export function buildTimelineSeries(
+  data: HistoryWindow,
+  row?: TimelineMetricDefinition["row"],
+): TimelineSeries[] {
+  return TIMELINE_METRICS.filter((definition) => row === undefined || definition.row === row).map((definition) => ({
     ...definition,
     x: data.points.map((point) => point.timestamp),
     y: data.points.map((point) => point.metrics[definition.key]?.avg ?? null),

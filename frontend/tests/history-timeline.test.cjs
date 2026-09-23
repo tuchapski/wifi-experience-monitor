@@ -72,6 +72,16 @@ test("timeline model keeps all eight historical metric series", () => {
 });
 
 
+test("focused views build only their own series while preserving missing readings", () => {
+  const data = windowFixture();
+  const wifi = buildTimelineSeries(data, "wifi");
+  assert.deepEqual(wifi.map((item) => item.key), ["signal_dbm"]);
+  assert.deepEqual(wifi[0].y, [-60, null]);
+  assert.deepEqual(buildTimelineSeries(data, "latency").map((item) => item.row),
+    ["latency", "latency", "latency", "latency"]);
+});
+
+
 test("historical overview counts events, cycles and observed application outages", () => {
   assert.deepEqual(historicalOverview(windowFixture()), {
     totalSamples: 2,
