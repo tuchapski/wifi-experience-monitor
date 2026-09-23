@@ -6,7 +6,7 @@ import HistoryPanel from "./HistoryPanel";
 import ExperienceScorePanel from "./ExperienceScorePanel";
 import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
 import CorrelationPanel from "./CorrelationPanel";
-import ApplicationTargetsPanel from "./ApplicationTargetsPanel";
+import ApplicationsPanel from "./ApplicationsPanel";
 import ExperienceEpisodesPanel from "./ExperienceEpisodesPanel";
 import ServiceSloPanel from "./ServiceSloPanel";
 import ProfileSettings from "./ProfileSettings";
@@ -28,6 +28,7 @@ import type {
 } from "./types";
 
 import "./App.css";
+import "./UiArchitecture.css";
 
 
 function formatNumber(
@@ -161,52 +162,53 @@ function TestDetails({ outcome }: { outcome?: TestOutcome }) {
   </small>;
 }
 
-type AppTab = "dashboard" | "rf" | "incidents" | "reports" | "settings";
+type AppTab = "dashboard" | "wifi" | "applications" | "incidents" | "history" | "settings";
 
 const tabs: { id: AppTab; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
-  { id: "rf", label: "RF" },
+  { id: "wifi", label: "Wi-Fi" },
+  { id: "applications", label: "Applications" },
   { id: "incidents", label: "Incidents" },
-  { id: "reports", label: "Reports" },
+  { id: "history", label: "History" },
   { id: "settings", label: "Settings" },
 ];
 
-function TabNavigation({
+const legacyTabAliases: Record<string, AppTab> = {
+  rf: "wifi",
+  reports: "history",
+};
+
+function tabFromHash(): AppTab {
+  const raw = window.location.hash.slice(1);
+  const candidate = legacyTabAliases[raw] ?? raw;
+  return tabs.some((tab) => tab.id === candidate) ? candidate as AppTab : "dashboard";
+}
+
+function PrimaryNavigation({
   activeTab,
-  onChange,
+  incidentCount,
 }: {
   activeTab: AppTab;
-  onChange: (tab: AppTab) => void;
+  incidentCount: number;
 }) {
   return (
-    <div className="app-tabs" role="tablist" aria-label="Application sections">
+    <nav className="app-tabs" aria-label="Primary navigation">
       {tabs.map((tab) => (
-        <button
+        <a
           key={tab.id}
-          id={`tab-${tab.id}`}
-          role="tab"
-          type="button"
+          id={`nav-${tab.id}`}
+          href={`#${tab.id}`}
           className={activeTab === tab.id ? "app-tab app-tab-active" : "app-tab"}
-          aria-selected={activeTab === tab.id}
-          aria-controls={`panel-${tab.id}`}
-          tabIndex={activeTab === tab.id ? 0 : -1}
-          onClick={() => onChange(tab.id)}
-          onKeyDown={(event) => {
-            const index = tabs.findIndex((item) => item.id === tab.id);
-            const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
-              : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
-              : event.key === "Home" ? 0
-              : event.key === "End" ? tabs.length - 1 : null;
-            if (next === null) return;
-            event.preventDefault();
-            onChange(tabs[next].id);
-            document.getElementById(`tab-${tabs[next].id}`)?.focus();
-          }}
+          aria-current={activeTab === tab.id ? "page" : undefined}
         >
           {tab.label}
-        </button>
+          {tab.id === "incidents" && incidentCount > 0 && <>
+            <span className="nav-badge" aria-hidden="true">{incidentCount}</span>
+            <span className="sr-only">{incidentCount} active incidents</span>
+          </>}
+        </a>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -270,7 +272,7 @@ function IncidentPanel({
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AppTab>(() => tabFromHash());
   const [sensorStatus, setSensorStatus] = useState<SensorStatus | null>(null);
   const [storedSnapshot, setSnapshot] =
     useState<SensorSnapshot | null>(null);
@@ -350,6 +352,17 @@ function App() {
 
 
   useEffect(() => {
+    const handleHashChange = () => setActiveTab(tabFromHash());
+    const canonicalHash = `#${tabFromHash()}`;
+    if (window.location.hash !== canonicalHash) {
+      window.history.replaceState(null, "", canonicalHash);
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+
+  useEffect(() => {
     void refresh();
 
     const timer = window.setInterval(
@@ -388,15 +401,14 @@ function App() {
 
       <SensorControl onStatusChange={setSensorStatus} />
       {error !== null && <div className="error" role="alert">{error}</div>}
-      <TabNavigation activeTab={activeTab} onChange={setActiveTab} />
+      <PrimaryNavigation activeTab={activeTab} incidentCount={activeIncidents.length} />
 
-      <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard"
-        tabIndex={0} hidden={activeTab !== "dashboard"}>
+      <section id="section-dashboard" aria-labelledby="nav-dashboard"
+        hidden={activeTab !== "dashboard"}>
         {snapshot ? (<>
       <ExperienceScorePanel score={snapshot.experience_score} />
       <CorrelationPanel correlation={snapshot.correlation} />
       <ServiceSloPanel slo={snapshot.service_slo} />
-      <ApplicationTargetsPanel targets={snapshot.connectivity.application_targets} />
       <AdaptiveBaselinePanel baseline={snapshot.adaptive_baseline} />
       {snapshot.diagnostic?.complete === false && (
         <div className="empty-state">
@@ -797,14 +809,23 @@ function App() {
         </>) : <div className="empty-state">{waitingMessage}</div>}
       </section>
 
-      <section id="panel-rf" role="tabpanel" aria-labelledby="tab-rf"
-        tabIndex={0} hidden={activeTab !== "rf"}>
+      <section id="section-wifi" aria-labelledby="nav-wifi"
+        hidden={activeTab !== "wifi"}>
         {snapshot ? <WifiDetails snapshot={snapshot} />
           : <div className="empty-state">{waitingMessage}</div>}
       </section>
 
-      <section id="panel-incidents" role="tabpanel" aria-labelledby="tab-incidents"
-        tabIndex={0} hidden={activeTab !== "incidents"}>
+      <section id="section-applications" aria-labelledby="nav-applications"
+        hidden={activeTab !== "applications"}>
+        <ApplicationsPanel
+          targets={snapshot?.connectivity.application_targets}
+          sensorRunning={sensorStatus?.running ?? false}
+          active={activeTab === "applications"}
+        />
+      </section>
+
+      <section id="section-incidents" aria-labelledby="nav-incidents"
+        hidden={activeTab !== "incidents"}>
         <ExperienceEpisodesPanel history={episodeHistory} />
         <IncidentPanel
           activeIncidents={activeIncidents}
@@ -814,13 +835,13 @@ function App() {
         />
       </section>
 
-      <section id="panel-reports" role="tabpanel" aria-labelledby="tab-reports"
-        tabIndex={0} hidden={activeTab !== "reports"}>
+      <section id="section-history" aria-labelledby="nav-history"
+        hidden={activeTab !== "history"}>
         <HistoryPanel currentInterface={sensorStatus?.interface} />
       </section>
 
-      <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings"
-        tabIndex={0} hidden={activeTab !== "settings"}>
+      <section id="section-settings" aria-labelledby="nav-settings"
+        hidden={activeTab !== "settings"}>
         <ProfileSettings sensorRunning={sensorStatus?.running ?? false} />
       </section>
     </main>

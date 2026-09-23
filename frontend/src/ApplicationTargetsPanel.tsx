@@ -27,7 +27,7 @@ export default function ApplicationTargetsPanel({
 
   return (
     <section className="panel">
-      <h2>Application targets</h2>
+      <h2>Current application health</h2>
       <p className="metric-note">
         Target-aware probes use the host network route. HTTP timings are cumulative milestones
         from transaction start: DNS complete, TCP connected, TLS complete, first byte and total.

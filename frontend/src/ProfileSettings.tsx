@@ -269,43 +269,6 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
     });
   }
 
-  function addApplicationTarget() {
-    updateConfiguration((configuration) => {
-      let suffix = configuration.application_targets.length + 1;
-      const used = new Set(configuration.application_targets.map((item) => item.name.toLowerCase()));
-      while (used.has(`application ${suffix}`)) suffix += 1;
-      configuration.application_targets.push({
-        name: `Application ${suffix}`,
-        kind: "http",
-        target: "https://example.com",
-        port: null,
-        enabled: true,
-        interval_seconds: 60,
-        timeout_seconds: 5,
-      });
-    });
-  }
-
-  function updateApplicationTarget(
-    index: number,
-    field: keyof TestProfileConfiguration["application_targets"][number],
-    value: string | number | boolean | null,
-  ) {
-    updateConfiguration((configuration) => {
-      const target = configuration.application_targets[index];
-      if (target === undefined) return;
-      Object.assign(target, { [field]: value });
-      if (field === "kind" && value !== "tcp") target.port = null;
-      if (field === "kind" && value === "tcp" && target.port === null) target.port = 443;
-    });
-  }
-
-  function removeApplicationTarget(index: number) {
-    updateConfiguration((configuration) => {
-      configuration.application_targets.splice(index, 1);
-    });
-  }
-
   function beginCreate() {
     setSelectedId(null);
     setDraft(newProfile());
@@ -454,7 +417,10 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
 
             <section className="panel profile-section">
               <h2>Synthetic tests</h2>
-              <p className="metric-note">Enabled intervals must be integer multiples of the Wi-Fi sampling interval.</p>
+              <p className="metric-note">
+                Enabled intervals must be integer multiples of the Wi-Fi sampling interval.
+                User-defined application targets are managed in Applications.
+              </p>
               <div className="test-profile-grid">
                 {(Object.keys(draft.configuration.tests) as Array<keyof TestProfileConfiguration["tests"]>).map((name) => {
                   const test = draft.configuration.tests[name];
@@ -481,53 +447,6 @@ function ProfileSettings({ sensorRunning }: { sensorRunning: boolean }) {
                   );
                 })}
               </div>
-            </section>
-
-            <section className="panel profile-section">
-              <div className="profile-heading">
-                <div>
-                  <h2>Application targets</h2>
-                  <p className="metric-note">
-                    Monitor real application dependencies with HTTP/HTTPS, TCP or DNS probes.
-                    These probes use the host route and do not prove binding to the selected Wi-Fi interface.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={addApplicationTarget}
-                  disabled={draft.configuration.application_targets.length >= 20}
-                >
-                  Add target
-                </button>
-              </div>
-              {draft.configuration.application_targets.length === 0 ? (
-                <div className="empty-state">No application targets configured.</div>
-              ) : (
-                <div className="test-profile-grid">
-                  {draft.configuration.application_targets.map((target, index) => (
-                    <fieldset key={`${index}-${target.name}`} className="test-profile-card">
-                      <legend>{target.name || `Target ${index + 1}`}</legend>
-                      <label className="profile-toggle">
-                        <input
-                          type="checkbox"
-                          checked={target.enabled}
-                          onChange={(event) => updateApplicationTarget(index, "enabled", event.target.checked)}
-                        />
-                        <span>Enabled</span>
-                      </label>
-                      <label><span>Name</span><input value={target.name} maxLength={80} onChange={(event) => updateApplicationTarget(index, "name", event.target.value)} /></label>
-                      <label><span>Type</span><select value={target.kind} onChange={(event) => updateApplicationTarget(index, "kind", event.target.value)}><option value="http">HTTP / HTTPS</option><option value="tcp">TCP</option><option value="dns">DNS</option></select></label>
-                      <label><span>{target.kind === "http" ? "URL" : target.kind === "tcp" ? "Host / IP" : "DNS query"}</span><input value={target.target} onChange={(event) => updateApplicationTarget(index, "target", event.target.value)} /></label>
-                      {target.kind === "tcp" && (
-                        <NumberField label="TCP port" value={target.port} min={1} max={65535} step={1} onChange={(value) => updateApplicationTarget(index, "port", value)} />
-                      )}
-                      <NumberField label="Interval (seconds)" value={target.interval_seconds} min={1} max={86400} onChange={(value) => updateApplicationTarget(index, "interval_seconds", value ?? 0)} />
-                      <NumberField label="Timeout (seconds)" value={target.timeout_seconds} min={0.1} max={300} nullable onChange={(value) => updateApplicationTarget(index, "timeout_seconds", value)} />
-                      <button type="button" className="link-button" onClick={() => removeApplicationTarget(index)}>Remove target</button>
-                    </fieldset>
-                  ))}
-                </div>
-              )}
             </section>
 
             <section className="panel profile-section">
