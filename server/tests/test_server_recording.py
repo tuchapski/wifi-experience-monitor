@@ -3,9 +3,19 @@ from unittest.mock import Mock
 
 from sqlalchemy.orm import Session
 from wifi_server.db.models import Agent, DiagnosticRecording
-from wifi_server.db.recording_models import AgentCommand, RecordingBatch, RecordingMetric
+from wifi_server.db.recording_models import (
+    AgentCommand,
+    RecordingBatch,
+    RecordingEvent,
+    RecordingMetric,
+)
 from wifi_server.recording_schemas import RecordingBatchRequest, StartRecordingRequest
-from wifi_server.services.recordings import create_recording, ingest_recording_batch
+from wifi_server.services.recordings import (
+    create_recording,
+    get_recording_events,
+    get_recording_metrics,
+    ingest_recording_batch,
+)
 
 
 def _agent() -> Agent:
@@ -94,3 +104,47 @@ def test_recording_batch_persists_raw_metric() -> None:
     assert response.status == "accepted"
     assert recording.metrics_count == 1
     assert recording.sync_status == "syncing"
+
+
+def test_recording_metric_and_event_queries_map_persisted_data() -> None:
+    now = datetime.now(UTC)
+    recording = Mock(spec=DiagnosticRecording)
+    metric = RecordingMetric(
+        recording_id="rec_test",
+        observed_at=now,
+        metric="wifi.rssi_dbm",
+        value=-57,
+        unit="dBm",
+        labels={"interface": "wlp0s20f3"},
+        received_at=now,
+    )
+    event = RecordingEvent(
+        recording_id="rec_test",
+        observed_at=now,
+        event_type="state.changed",
+        severity="info",
+        data={
+            "metric": "wifi.channel",
+            "previous": 36,
+            "current": 44,
+        },
+        received_at=now,
+    )
+    session = Mock(spec=Session)
+    session.get.return_value = recording
+    session.scalars.return_value.all.side_effect = [[metric], [event]]
+
+    metrics = get_recording_metrics(
+        session,
+        "rec_test",
+        "wifi.rssi_dbm",
+        100,
+    )
+    events = get_recording_events(session, "rec_test", 100)
+
+    assert len(metrics) == 1
+    assert metrics[0].metric == "wifi.rssi_dbm"
+    assert metrics[0].value == -57
+    assert len(events) == 1
+    assert events[0].event_type == "state.changed"
+    assert events[0].data["current"] == 44

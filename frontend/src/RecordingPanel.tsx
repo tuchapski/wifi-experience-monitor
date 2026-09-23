@@ -55,6 +55,10 @@ function syncClass(status: string): string {
   return `recording-sync recording-sync-${status}`;
 }
 
+function navigateToRecording(agentId: string, recordingId: string): void {
+  window.location.hash = `#agents/${encodeURIComponent(agentId)}/recordings/${encodeURIComponent(recordingId)}`;
+}
+
 export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
   const [recordings, setRecordings] = useState<DiagnosticRecording[]>([]);
   const [recordingName, setRecordingName] = useState("");
@@ -276,7 +280,13 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
               {recordings.map((recording) => (
                 <tr key={recording.id}>
                   <td>
-                    <strong>{recording.name}</strong>
+                    <button
+                      type="button"
+                      className="recording-name-link"
+                      onClick={() => navigateToRecording(agent.id, recording.id)}
+                    >
+                      {recording.name}
+                    </button>
                     <small>{recording.id}</small>
                   </td>
                   <td>

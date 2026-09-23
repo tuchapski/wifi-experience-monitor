@@ -2,6 +2,8 @@ import type {
   AgentCurrentState,
   AgentSummary,
   DiagnosticRecording,
+  RecordingEvent,
+  RecordingMetricPoint,
   StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
@@ -132,5 +134,39 @@ export function stopRecording(
   return mutationRequest<DiagnosticRecording>(
     `/recordings/${encodeURIComponent(recordingId)}/stop`,
     "POST",
+  );
+}
+
+export function getRecording(
+  recordingId: string,
+): Promise<DiagnosticRecording> {
+  return request<DiagnosticRecording>(
+    `/recordings/${encodeURIComponent(recordingId)}`,
+  );
+}
+
+export function getRecordingMetrics(
+  recordingId: string,
+  metric: string,
+  limit = 50000,
+): Promise<RecordingMetricPoint[]> {
+  const params = new URLSearchParams({
+    metric,
+    limit: String(limit),
+  });
+  return request<RecordingMetricPoint[]>(
+    `/recordings/${encodeURIComponent(recordingId)}/metrics?${params.toString()}`,
+  );
+}
+
+export function getRecordingEvents(
+  recordingId: string,
+  limit = 5000,
+): Promise<RecordingEvent[]> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+  });
+  return request<RecordingEvent[]>(
+    `/recordings/${encodeURIComponent(recordingId)}/events?${params.toString()}`,
   );
 }

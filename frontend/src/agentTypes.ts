@@ -105,3 +105,20 @@ export interface StartRecordingInput {
   description: string | null;
   profile_id: string;
 }
+
+export interface RecordingMetricPoint {
+  observed_at: string;
+  metric: string;
+  value: number;
+  unit: string | null;
+  labels: Record<string, unknown>;
+  received_at: string;
+}
+
+export interface RecordingEvent {
+  observed_at: string;
+  event_type: string;
+  severity: string;
+  data: Record<string, unknown>;
+  received_at: string;
+}

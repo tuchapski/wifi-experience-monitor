@@ -16,8 +16,10 @@ from wifi_server.recording_schemas import (
     AgentCommandAckRequest,
     RecordingBatchRequest,
     RecordingBatchResponse,
+    RecordingEventResponse,
     RecordingManifestRequest,
     RecordingManifestResponse,
+    RecordingMetricResponse,
     RecordingResponse,
     StartRecordingRequest,
 )
@@ -114,6 +116,60 @@ def list_recordings(session: Session, agent_id: str) -> list[RecordingResponse]:
 
 def get_recording(session: Session, recording_id: str) -> RecordingResponse:
     return _response(_get_recording(session, recording_id))
+
+
+def get_recording_metrics(
+    session: Session,
+    recording_id: str,
+    metric: str | None,
+    limit: int,
+) -> list[RecordingMetricResponse]:
+    _get_recording(session, recording_id)
+    query = select(RecordingMetric).where(RecordingMetric.recording_id == recording_id)
+    if metric:
+        query = query.where(RecordingMetric.metric == metric)
+    records = list(
+        session.scalars(query.order_by(RecordingMetric.observed_at.desc()).limit(limit)).all()
+    )
+    records.reverse()
+    return [
+        RecordingMetricResponse(
+            observed_at=record.observed_at,
+            metric=record.metric,
+            value=record.value,
+            unit=record.unit,
+            labels=record.labels,
+            received_at=record.received_at,
+        )
+        for record in records
+    ]
+
+
+def get_recording_events(
+    session: Session,
+    recording_id: str,
+    limit: int,
+) -> list[RecordingEventResponse]:
+    _get_recording(session, recording_id)
+    records = list(
+        session.scalars(
+            select(RecordingEvent)
+            .where(RecordingEvent.recording_id == recording_id)
+            .order_by(RecordingEvent.observed_at.desc())
+            .limit(limit)
+        ).all()
+    )
+    records.reverse()
+    return [
+        RecordingEventResponse(
+            observed_at=record.observed_at,
+            event_type=record.event_type,
+            severity=record.severity,
+            data=record.data,
+            received_at=record.received_at,
+        )
+        for record in records
+    ]
 
 
 def get_pending_commands(

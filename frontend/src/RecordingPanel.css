@@ -308,7 +308,23 @@
   white-space: normal;
 }
 
-.recording-table td:first-child strong,
+.recording-name-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2a4669;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  text-align: left;
+}
+
+.recording-name-link:hover {
+  color: #245f9f;
+  text-decoration: underline;
+}
+
+.recording-name-link,
 .recording-table td:first-child small {
   display: block;
 }

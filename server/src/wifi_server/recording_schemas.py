@@ -30,6 +30,23 @@ class RecordingResponse(BaseModel):
     updated_at: datetime
 
 
+class RecordingMetricResponse(BaseModel):
+    observed_at: datetime
+    metric: str
+    value: float
+    unit: str | None
+    labels: dict[str, Any]
+    received_at: datetime
+
+
+class RecordingEventResponse(BaseModel):
+    observed_at: datetime
+    event_type: str
+    severity: str
+    data: dict[str, Any]
+    received_at: datetime
+
+
 class AgentCommandAckRequest(BaseModel):
     status: Literal["acked", "failed"]
     data: dict[str, Any] = Field(default_factory=dict)

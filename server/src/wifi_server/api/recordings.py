@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from wifi_server.db.models import DiagnosticRecording
@@ -10,8 +10,10 @@ from wifi_server.recording_schemas import (
     AgentCommandAckRequest,
     RecordingBatchRequest,
     RecordingBatchResponse,
+    RecordingEventResponse,
     RecordingManifestRequest,
     RecordingManifestResponse,
+    RecordingMetricResponse,
     RecordingResponse,
     StartRecordingRequest,
 )
@@ -21,6 +23,8 @@ from wifi_server.services.recordings import (
     create_recording,
     finalize_manifest,
     get_recording,
+    get_recording_events,
+    get_recording_metrics,
     ingest_recording_batch,
     list_recordings,
     request_stop_recording,
@@ -74,6 +78,31 @@ def recording(
     session: Annotated[Session, Depends(get_session)],
 ) -> RecordingResponse:
     return get_recording(session, recording_id)
+
+
+@router.get(
+    "/recordings/{recording_id}/metrics",
+    response_model=list[RecordingMetricResponse],
+)
+def recording_metrics(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    metric: Annotated[str | None, Query(max_length=128)] = None,
+    limit: Annotated[int, Query(ge=1, le=50000)] = 20000,
+) -> list[RecordingMetricResponse]:
+    return get_recording_metrics(session, recording_id, metric, limit)
+
+
+@router.get(
+    "/recordings/{recording_id}/events",
+    response_model=list[RecordingEventResponse],
+)
+def recording_events(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=10000)] = 5000,
+) -> list[RecordingEventResponse]:
+    return get_recording_events(session, recording_id, limit)
 
 
 @router.post("/recordings/{recording_id}/stop", response_model=RecordingResponse)

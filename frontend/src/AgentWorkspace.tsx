@@ -7,6 +7,7 @@ import {
   getAgentTelemetry,
 } from "./agentApi";
 import RecordingPanel from "./RecordingPanel";
+import RecordingDetail from "./RecordingDetail";
 import type {
   AgentCurrentState,
   AgentSummary,
@@ -29,9 +30,26 @@ const RANGE_OPTIONS = [
   { hours: 24, label: "24h" },
 ] as const;
 
-function selectedAgentFromHash(): string | null {
-  const match = window.location.hash.match(/^#agents\/(.+)$/);
-  return match ? decodeURIComponent(match[1]) : null;
+interface WorkspaceRoute {
+  agentId: string | null;
+  recordingId: string | null;
+}
+
+function routeFromHash(): WorkspaceRoute {
+  const recordingMatch = window.location.hash.match(
+    /^#agents\/([^/]+)\/recordings\/([^/]+)$/,
+  );
+  if (recordingMatch) {
+    return {
+      agentId: decodeURIComponent(recordingMatch[1]),
+      recordingId: decodeURIComponent(recordingMatch[2]),
+    };
+  }
+  const agentMatch = window.location.hash.match(/^#agents\/([^/]+)$/);
+  return {
+    agentId: agentMatch ? decodeURIComponent(agentMatch[1]) : null,
+    recordingId: null,
+  };
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -474,13 +492,13 @@ function AgentDetail({ agentId }: { agentId: string }) {
 }
 
 export default function AgentWorkspace() {
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => selectedAgentFromHash());
+  const [route, setRoute] = useState<WorkspaceRoute>(() => routeFromHash());
 
   useEffect(() => {
     if (!window.location.hash) {
       window.history.replaceState(null, "", "#agents");
     }
-    const handleHash = () => setSelectedAgentId(selectedAgentFromHash());
+    const handleHash = () => setRoute(routeFromHash());
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
@@ -498,7 +516,13 @@ export default function AgentWorkspace() {
       </header>
 
       <div className="agent-content">
-        {selectedAgentId ? <AgentDetail agentId={selectedAgentId} /> : <AgentList />}
+        {route.agentId && route.recordingId ? (
+          <RecordingDetail agentId={route.agentId} recordingId={route.recordingId} />
+        ) : route.agentId ? (
+          <AgentDetail agentId={route.agentId} />
+        ) : (
+          <AgentList />
+        )}
       </div>
     </main>
   );
