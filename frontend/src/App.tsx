@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import SensorControl from "./SensorControl";
-import WifiDetails from "./WifiDetails";
+import WifiExperienceView from "./WifiExperienceView";
 import HistoryPanel from "./HistoryPanel";
 import CurrentExperienceDashboard from "./CurrentExperienceDashboard";
 import ExperienceScorePanel from "./ExperienceScorePanel";
@@ -822,7 +822,7 @@ function App() {
 
       <section id="section-wifi" aria-labelledby="nav-wifi"
         hidden={activeTab !== "wifi"}>
-        {snapshot ? <WifiDetails snapshot={snapshot} />
+        {snapshot ? <WifiExperienceView snapshot={snapshot} />
           : <div className="empty-state">{waitingMessage}</div>}
       </section>
 

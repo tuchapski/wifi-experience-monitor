@@ -1,0 +1,216 @@
+/* UI-2 Wi-Fi experience view. */
+
+.wifi-experience-overview {
+  border-left: 5px solid #98a2b3;
+}
+
+.wifi-experience-healthy {
+  border-left-color: #17803d;
+}
+
+.wifi-experience-warning {
+  border-left-color: #d97706;
+}
+
+.wifi-experience-critical {
+  border-left-color: #c62828;
+}
+
+.wifi-overview-heading,
+.wifi-section-heading,
+.wifi-overview-metric-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wifi-overview-heading h2,
+.wifi-section-heading h2 {
+  margin: 3px 0 0;
+}
+
+.wifi-eyebrow {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wifi-status-pill {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wifi-status-healthy {
+  color: #05603a;
+  background: #ecfdf3;
+}
+
+.wifi-status-warning {
+  color: #854a0e;
+  background: #fffaeb;
+}
+
+.wifi-status-critical {
+  color: #b42318;
+  background: #fff1f0;
+}
+
+.wifi-status-unavailable {
+  color: #475467;
+  background: #f2f4f7;
+}
+
+.wifi-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0 18px;
+}
+
+.wifi-context-chips span,
+.wifi-support-state {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 12px;
+}
+
+.wifi-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wifi-overview-metric {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #f9fafb;
+}
+
+.wifi-overview-metric-heading > span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wifi-overview-metric > strong {
+  display: block;
+  margin: 9px 0 5px;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.wifi-overview-metric > small {
+  display: block;
+  color: #667085;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.wifi-connection-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.wifi-connection-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.wifi-connection-summary span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.wifi-connection-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.wifi-detail-disclosure {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fcfcfd;
+}
+
+.wifi-detail-disclosure > summary {
+  cursor: pointer;
+  color: #175cd3;
+  font-weight: 700;
+}
+
+.wifi-detail-disclosure[open] > summary {
+  margin-bottom: 14px;
+}
+
+.wifi-detail-disclosure .wifi-metric-grid {
+  margin-top: 4px;
+}
+
+.wifi-advanced dl {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
+  gap: 8px 16px;
+  margin-bottom: 0;
+}
+
+.wifi-advanced dt {
+  color: #667085;
+}
+
+.wifi-advanced dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .wifi-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wifi-connection-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .wifi-overview-grid,
+  .wifi-connection-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wifi-overview-heading,
+  .wifi-section-heading {
+    flex-direction: column;
+  }
+
+  .wifi-advanced dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wifi-advanced dd {
+    margin-bottom: 8px;
+  }
+}
