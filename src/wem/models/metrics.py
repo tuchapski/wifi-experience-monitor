@@ -141,6 +141,10 @@ class ApplicationTargetMetric:
     scope: str = "host"
     latency_ms: float | None = None
     status_code: int | None = None
+    dns_ms: float | None = None
+    tcp_connect_ms: float | None = None
+    tls_handshake_ms: float | None = None
+    ttfb_ms: float | None = None
     observed_at: str | None = None
     fresh: bool = True
     age_seconds: float | None = 0.0
@@ -178,6 +182,10 @@ class ConnectivityMetrics:
 
     https_success: bool | None = None
     https_status_code: int | None = None
+    https_dns_ms: float | None = None
+    https_tcp_connect_ms: float | None = None
+    https_tls_handshake_ms: float | None = None
+    https_ttfb_ms: float | None = None
     https_total_time_ms: float | None = None
 
 

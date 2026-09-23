@@ -30,7 +30,15 @@ TEST_FIELDS = {
         "internet_latency_max_ms",
         "internet_jitter_ms",
     ),
-    "https": ("https_success", "https_status_code", "https_total_time_ms"),
+    "https": (
+        "https_success",
+        "https_status_code",
+        "https_dns_ms",
+        "https_tcp_connect_ms",
+        "https_tls_handshake_ms",
+        "https_ttfb_ms",
+        "https_total_time_ms",
+    ),
 }
 
 

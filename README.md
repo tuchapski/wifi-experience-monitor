@@ -194,6 +194,18 @@ incidents and deterministic correlation. Incident and episode records are curren
 sensor-database scoped rather than keyed by interface, which is disclosed in the
 report when a database may contain history from more than one interface.
 
+## HTTP transaction breakdown
+
+HTTP/HTTPS probes use one `curl` transaction and retain milestone timings for DNS
+completion, TCP connection, TLS completion, first response byte (TTFB) and total
+transaction time. Milestones are cumulative from the transaction start; TLS remains
+unavailable for plain HTTP. Transport/application failures remain target failures,
+while missing `curl` or a collector-side execution timeout is recorded as a
+measurement error rather than silently treated as application downtime.
+
+These HTTP probes use the host route and therefore do not prove that traffic traversed
+the selected Wi-Fi interface.
+
 ## Evidence correlation
 
 The correlation engine combines existing diagnostic findings instead of inventing a

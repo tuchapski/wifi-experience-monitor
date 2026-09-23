@@ -449,6 +449,10 @@ export interface ApplicationTargetMetric {
   scope: "host";
   latency_ms: number | null;
   status_code: number | null;
+  dns_ms: number | null;
+  tcp_connect_ms: number | null;
+  tls_handshake_ms: number | null;
+  ttfb_ms: number | null;
   observed_at: string | null;
   fresh: boolean;
   age_seconds: number | null;
@@ -483,6 +487,10 @@ export interface ConnectivityMetrics {
 
   https_success: boolean | null;
   https_status_code: number | null;
+  https_dns_ms: number | null;
+  https_tcp_connect_ms: number | null;
+  https_tls_handshake_ms: number | null;
+  https_ttfb_ms: number | null;
   https_total_time_ms: number | null;
 }
 

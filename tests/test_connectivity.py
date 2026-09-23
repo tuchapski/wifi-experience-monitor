@@ -9,6 +9,7 @@ from wem.profiles.models import (
     TestConfigurations as ConnectivityConfigurations,
 )
 from wem.tests_engine.connectivity import ConnectivityTester
+from wem.tests_engine.http_transaction import HttpTransactionResult
 
 PING_SUCCESS_OUTPUT = """
 PING target (192.168.15.1) 56(84) bytes of data.
@@ -23,13 +24,13 @@ rtt min/avg/max/mdev = 9.800/10.500/11.200/0.500 ms
 """
 
 
-@patch("wem.tests_engine.connectivity.urllib.request.urlopen")
+@patch("wem.tests_engine.connectivity.probe_http_transaction")
 @patch("wem.tests_engine.connectivity.socket.getaddrinfo")
 @patch("wem.tests_engine.connectivity.run_command")
 def test_connectivity_tester_success(
     mock_run_command,
     mock_getaddrinfo,
-    mock_urlopen,
+    mock_http_probe,
 ) -> None:
     mock_run_command.return_value = CommandResult(
         stdout=PING_SUCCESS_OUTPUT,
@@ -46,11 +47,16 @@ def test_connectivity_tester_success(
             ("104.20.23.154", 0),
         )
     ]
-
-    response = MagicMock()
-    response.status = 200
-
-    mock_urlopen.return_value.__enter__.return_value = response
+    mock_http_probe.return_value = HttpTransactionResult(
+        status="passed",
+        reason="HTTP response: 200.",
+        status_code=200,
+        dns_ms=3.0,
+        tcp_connect_ms=8.0,
+        tls_handshake_ms=20.0,
+        ttfb_ms=35.0,
+        total_ms=40.0,
+    )
 
     tester = ConnectivityTester(
         interface="wlp0s20f3",
@@ -78,6 +84,11 @@ def test_connectivity_tester_success(
 
     assert metrics.https_success is True
     assert metrics.https_status_code == 200
+    assert metrics.https_dns_ms == 3.0
+    assert metrics.https_tcp_connect_ms == 8.0
+    assert metrics.https_tls_handshake_ms == 20.0
+    assert metrics.https_ttfb_ms == 35.0
+    assert metrics.https_total_time_ms == 40.0
 
     assert tester.errors == []
 
@@ -200,11 +211,18 @@ def test_profile_can_override_automatic_gateway(mock_run_command) -> None:
     assert metrics.gateway_reachable is True
 
 
-@patch("wem.tests_engine.connectivity.urllib.request.urlopen")
-def test_http_application_target_records_status_and_latency(mock_urlopen) -> None:
-    response = MagicMock()
-    response.status = 204
-    mock_urlopen.return_value.__enter__.return_value = response
+@patch("wem.tests_engine.connectivity.probe_http_transaction")
+def test_http_application_target_records_status_and_latency(mock_http_probe) -> None:
+    mock_http_probe.return_value = HttpTransactionResult(
+        status="passed",
+        reason="HTTP response: 204.",
+        status_code=204,
+        dns_ms=4.0,
+        tcp_connect_ms=9.0,
+        tls_handshake_ms=22.0,
+        ttfb_ms=41.0,
+        total_ms=45.0,
+    )
     tester = ConnectivityTester("wlan0", "192.0.2.1")
     target = ApplicationTargetConfig(
         name="Portal",
@@ -218,7 +236,11 @@ def test_http_application_target_records_status_and_latency(mock_urlopen) -> Non
 
     assert metric.status == "passed"
     assert metric.status_code == 204
-    assert metric.latency_ms is not None
+    assert metric.latency_ms == 45.0
+    assert metric.dns_ms == 4.0
+    assert metric.tcp_connect_ms == 9.0
+    assert metric.tls_handshake_ms == 22.0
+    assert metric.ttfb_ms == 41.0
     assert metric.scope == "host"
 
 

@@ -555,6 +555,13 @@ function App() {
           </strong>
 
           <TestDetails outcome={snapshot.connectivity.tests?.https} />
+          <small>
+            <br />Milestones from transaction start
+            <br />DNS {formatNumber(snapshot.connectivity.https_dns_ms, " ms")}
+            {" · "}TCP {formatNumber(snapshot.connectivity.https_tcp_connect_ms, " ms")}
+            {" · "}TLS {formatNumber(snapshot.connectivity.https_tls_handshake_ms, " ms")}
+            {" · "}TTFB {formatNumber(snapshot.connectivity.https_ttfb_ms, " ms")}
+          </small>
 
         </div>
 

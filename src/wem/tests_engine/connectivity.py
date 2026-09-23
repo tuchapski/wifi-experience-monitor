@@ -1,8 +1,6 @@
 import re
 import socket
 import time
-import urllib.error
-import urllib.request
 
 from wem.collectors.command import run_command
 from wem.models.metrics import ApplicationTargetMetric, ConnectivityMetrics, TestOutcome
@@ -10,6 +8,7 @@ from wem.profiles.models import (
     ApplicationTargetConfig,
     TestConfigurations,
 )
+from wem.tests_engine.http_transaction import probe_http_transaction
 
 
 class ConnectivityTester:
@@ -177,53 +176,25 @@ class ConnectivityTester:
         self,
         metrics: ConnectivityMetrics,
     ) -> None:
-        request = urllib.request.Request(
+        result = probe_http_transaction(
             self.https_url,
-            method="GET",
-            headers={"User-Agent": "wifi-experience-monitor/0.1"},
+            self.tests.https.timeout_seconds or 5.0,
         )
-
-        failure_reason = "Test failed."
-        started = time.perf_counter()
-
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=self.tests.https.timeout_seconds or 5.0,
-            ) as response:
-                elapsed = (time.perf_counter() - started) * 1000
-
-                metrics.https_status_code = response.status
-
-                metrics.https_success = 200 <= response.status < 400
-
-                metrics.https_total_time_ms = round(
-                    elapsed,
-                    3,
-                )
-
-        except (
-            urllib.error.URLError,
-            TimeoutError,
-        ) as exc:
-            elapsed = (time.perf_counter() - started) * 1000
-
-            metrics.https_success = False
-
-            metrics.https_total_time_ms = round(
-                elapsed,
-                3,
-            )
-
-            failure_reason = f"HTTPS test failed: {exc}"
-            if isinstance(exc, urllib.error.HTTPError):
-                metrics.https_status_code = exc.code
+        metrics.https_status_code = result.status_code
+        metrics.https_dns_ms = result.dns_ms
+        metrics.https_tcp_connect_ms = result.tcp_connect_ms
+        metrics.https_tls_handshake_ms = result.tls_handshake_ms
+        metrics.https_ttfb_ms = result.ttfb_ms
+        metrics.https_total_time_ms = result.total_ms
+        metrics.https_success = (
+            result.status == "passed" if result.status in {"passed", "failed"} else None
+        )
+        if result.status == "error":
+            self.errors.append(f"HTTPS collection failed: {result.reason}")
 
         metrics.tests["https"] = TestOutcome(
-            "passed" if metrics.https_success else "failed",
-            f"HTTPS response: {metrics.https_status_code}."
-            if metrics.https_success
-            else failure_reason,
+            result.status,
+            result.reason,
             "host",
         )
 
@@ -251,6 +222,10 @@ class ConnectivityTester:
         reason: str,
         latency_ms: float | None,
         status_code: int | None = None,
+        dns_ms: float | None = None,
+        tcp_connect_ms: float | None = None,
+        tls_handshake_ms: float | None = None,
+        ttfb_ms: float | None = None,
     ) -> ApplicationTargetMetric:
         return ApplicationTargetMetric(
             name=config.name,
@@ -261,47 +236,32 @@ class ConnectivityTester:
             reason=reason,
             latency_ms=latency_ms,
             status_code=status_code,
+            dns_ms=dns_ms,
+            tcp_connect_ms=tcp_connect_ms,
+            tls_handshake_ms=tls_handshake_ms,
+            ttfb_ms=ttfb_ms,
         )
 
     def _test_application_http(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
-        request = urllib.request.Request(
+        result = probe_http_transaction(
             config.target,
-            method="GET",
-            headers={"User-Agent": "wifi-experience-monitor/0.1"},
+            config.timeout_seconds or 5.0,
         )
-        started = time.perf_counter()
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=config.timeout_seconds or 5.0,
-            ) as response:
-                elapsed = round((time.perf_counter() - started) * 1000, 3)
-                status_code = int(response.status)
-                passed = 200 <= status_code < 400
-                return self._target_metric(
-                    config,
-                    status="passed" if passed else "failed",
-                    reason=f"HTTP response: {status_code}.",
-                    latency_ms=elapsed,
-                    status_code=status_code,
-                )
-        except urllib.error.HTTPError as exc:
-            elapsed = round((time.perf_counter() - started) * 1000, 3)
-            return self._target_metric(
-                config,
-                status="failed",
-                reason=f"HTTP response: {exc.code}.",
-                latency_ms=elapsed,
-                status_code=exc.code,
+        if result.status == "error":
+            self.errors.append(
+                f"application target collection failed for {config.name}: {result.reason}"
             )
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            elapsed = round((time.perf_counter() - started) * 1000, 3)
-            return self._target_metric(
-                config,
-                status="failed",
-                reason=f"HTTP target failed: {exc}",
-                latency_ms=elapsed,
-            )
+        return self._target_metric(
+            config,
+            status=result.status,
+            reason=result.reason,
+            latency_ms=result.total_ms,
+            status_code=result.status_code,
+            dns_ms=result.dns_ms,
+            tcp_connect_ms=result.tcp_connect_ms,
+            tls_handshake_ms=result.tls_handshake_ms,
+            ttfb_ms=result.ttfb_ms,
+        )
 
     def _test_application_tcp(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
         assert config.port is not None
@@ -459,5 +419,13 @@ _TEST_FIELDS = {
         "internet_latency_max_ms",
         "internet_jitter_ms",
     ),
-    "https": ("https_success", "https_status_code", "https_total_time_ms"),
+    "https": (
+        "https_success",
+        "https_status_code",
+        "https_dns_ms",
+        "https_tcp_connect_ms",
+        "https_tls_handshake_ms",
+        "https_ttfb_ms",
+        "https_total_time_ms",
+    ),
 }

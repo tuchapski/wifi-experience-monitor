@@ -6,6 +6,17 @@ function formatLatency(value: number | null): string {
 }
 
 
+function formatHttpMilestones(target: ApplicationTargetMetric): string {
+  if (target.kind !== "http") return "—";
+  return [
+    `DNS ${formatLatency(target.dns_ms)}`,
+    `TCP ${formatLatency(target.tcp_connect_ms)}`,
+    `TLS ${formatLatency(target.tls_handshake_ms)}`,
+    `TTFB ${formatLatency(target.ttfb_ms)}`,
+  ].join(" · ");
+}
+
+
 export default function ApplicationTargetsPanel({
   targets,
 }: {
@@ -18,8 +29,9 @@ export default function ApplicationTargetsPanel({
     <section className="panel">
       <h2>Application targets</h2>
       <p className="metric-note">
-        Target-aware probes use the host network route. Results describe reachability and
-        end-to-end probe latency, not Wi-Fi-interface binding or application transaction phases.
+        Target-aware probes use the host network route. HTTP timings are cumulative milestones
+        from transaction start: DNS complete, TCP connected, TLS complete, first byte and total.
+        TLS is unavailable for plain HTTP.
       </p>
       <div className="table-wrapper">
         <table>
@@ -29,7 +41,8 @@ export default function ApplicationTargetsPanel({
               <th>Type</th>
               <th>Target</th>
               <th>Status</th>
-              <th>Latency</th>
+              <th>Total</th>
+              <th>HTTP milestones</th>
               <th>Evidence</th>
             </tr>
           </thead>
@@ -43,6 +56,7 @@ export default function ApplicationTargetsPanel({
                   {target.status.toUpperCase()}{target.fresh ? "" : ` · cached ${target.age_seconds ?? "?"}s`}
                 </td>
                 <td>{formatLatency(target.latency_ms)}</td>
+                <td>{formatHttpMilestones(target)}</td>
                 <td>{target.reason}</td>
               </tr>
             ))}
