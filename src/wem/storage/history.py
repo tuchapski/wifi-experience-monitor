@@ -7,6 +7,7 @@ from typing import cast as typing_cast
 
 from sqlalchemy import Integer, cast, func, select
 
+from wem.analysis.application_availability import summarize_application_availability
 from wem.analysis.connection_cycle_stats import summarize_connection_cycles
 from wem.analysis.service_slo_stats import summarize_service_executions
 from wem.storage.database import Database
@@ -126,6 +127,7 @@ class HistoryRepository:
         events: list[dict[str, object]] = []
         cycles_by_session: dict[str, dict[str, object]] = {}
         service_payloads: list[dict[str, object]] = []
+        application_samples: list[tuple[datetime, dict[str, object]]] = []
         for timestamp, snapshot_json in event_rows:
             try:
                 loaded = json.loads(snapshot_json)
@@ -135,6 +137,7 @@ class HistoryRepository:
                 payload = {}
                 changes = []
             service_payloads.append(payload)
+            application_samples.append((timestamp.replace(tzinfo=UTC), payload))
             for change in changes:
                 events.append({"timestamp": timestamp.replace(tzinfo=UTC).isoformat(), **change})
             cycle = payload.get("connection_cycle")
@@ -148,6 +151,10 @@ class HistoryRepository:
         )
         connection_cycle_summary = summarize_connection_cycles(connection_cycles)
         service_slo_summary = summarize_service_executions(service_payloads)
+        application_availability = summarize_application_availability(
+            application_samples,
+            window_end=end,
+        )
         points: list[dict[str, object]] = []
         for index in range(math.ceil(duration / seconds)):
             row = rows.get(index)
@@ -186,6 +193,7 @@ class HistoryRepository:
             "connection_cycles": connection_cycles,
             "connection_cycle_summary": connection_cycle_summary,
             "service_slo_summary": service_slo_summary,
+            "application_availability": application_availability,
             "summary": summary,
         }
         if include_comparison:
@@ -208,6 +216,10 @@ class HistoryRepository:
                 "service_slo": {
                     "current": service_slo_summary,
                     "previous": previous["service_slo_summary"],
+                },
+                "application_availability": {
+                    "current": application_availability,
+                    "previous": previous["application_availability"],
                 },
             }
         return result

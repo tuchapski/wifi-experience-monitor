@@ -24,6 +24,14 @@ const groups: { title: string; unit: string; series: Series[] }[] = [
 const format = (value: number | null | undefined) => value == null
   ? "Unavailable" : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 const date = (value: string) => new Date(value).toLocaleString();
+const formatAvailability = (value: number | null | undefined) => value == null
+  ? "Unavailable" : `${format(value)}%`;
+const formatDuration = (seconds: number | null | undefined) => {
+  if (seconds == null || !Number.isFinite(seconds)) return "Unavailable";
+  if (seconds < 60) return `${format(seconds)} s`;
+  if (seconds < 3600) return `${format(seconds / 60)} min`;
+  return `${format(seconds / 3600)} h`;
+};
 const comparisonMetrics = [
   { key: "signal_dbm", label: "RSSI", unit: "dBm", higherIsBetter: true },
   { key: "gateway_latency_avg_ms", label: "Gateway latency", unit: "ms", higherIsBetter: false },
@@ -254,6 +262,50 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
           </tr>)}</tbody>
         </table></div>
       </section>}
+      {data.application_availability && data.application_availability.targets.some(
+        target => target.attempt_count > 0,
+      ) && <section aria-labelledby="application-availability-title">
+        <h3 id="application-availability-title">Application availability &amp; outage accounting</h3>
+        <p className="metric-note">
+          Availability is execution-based: fresh passed / (passed + failed). Collection errors,
+          skipped/disabled probes and cached results do not enter the denominator. An observed outage
+          starts at the first fresh failed probe and ends at the first later fresh passed probe.
+          Open outage duration is bounded by the selected window end; these intervals reflect probe
+          observations, not exact packet-level outage boundaries.
+        </p>
+        <div className="table-wrapper"><table>
+          <thead><tr><th>Target</th><th>Availability</th><th>Success / Failure / Error</th>
+            <th>Outages</th><th>Observed outage</th><th>Longest outage</th><th>State</th></tr></thead>
+          <tbody>{data.application_availability.targets.filter(target =>
+            target.attempt_count > 0).map(target => <tr key={target.identity}>
+            <td><strong>{target.name}</strong><br /><small>{target.kind.toUpperCase()} ·
+              {" "}{target.target}{target.port !== null ? `:${target.port}` : ""}</small></td>
+            <td>{formatAvailability(target.availability_percent)}</td>
+            <td>{target.success_count} / {target.failure_count} /
+              {" "}{target.measurement_error_count}</td>
+            <td>{target.outage_count}</td>
+            <td>{formatDuration(target.observed_outage_seconds)}</td>
+            <td>{formatDuration(target.longest_observed_outage_seconds)}</td>
+            <td>{target.open_outage ? "OPEN · recovery not observed" : "No open outage"}</td>
+          </tr>)}</tbody>
+        </table></div>
+        {data.application_availability.targets.some(target => target.outages.length > 0) && <>
+          <h4>Observed outage intervals</h4>
+          <div className="table-wrapper"><table>
+            <thead><tr><th>Target</th><th>Started</th><th>Last failed probe</th>
+              <th>Recovery observation</th><th>Observed duration</th><th>Failed probes</th></tr></thead>
+            <tbody>{data.application_availability.targets.flatMap(target =>
+              target.outages.map(outage => <tr key={`${target.identity}-${outage.started_at}`}>
+                <td>{target.name}</td>
+                <td>{date(outage.started_at)}</td>
+                <td>{date(outage.last_failed_at)}</td>
+                <td>{outage.ended_at ? date(outage.ended_at) : "Not observed in selected window"}</td>
+                <td>{formatDuration(outage.duration_seconds)}</td>
+                <td>{outage.failure_count}</td>
+              </tr>))}</tbody>
+          </table></div>
+        </>}
+      </section>}
       {data.connection_cycle_summary && data.connection_cycle_summary.total_cycles > 0 && <section
         aria-labelledby="connection-cycle-summary-title">
         <h3 id="connection-cycle-summary-title">Connection cycle statistics</h3>
@@ -318,6 +370,29 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
               <em>{trend === "improved" ? "Improved" : trend === "worse" ? "Worse" : "Stable / unavailable"}</em>
             </article>;
           })()}
+        </div>}
+        {data.comparison.application_availability &&
+          data.comparison.application_availability.current.targets.length > 0 && <div className="table-wrapper">
+          <h4>Application availability compared with previous period</h4>
+          <table>
+            <thead><tr><th>Target</th><th>Current</th><th>Previous</th><th>Delta</th></tr></thead>
+            <tbody>{data.comparison.application_availability.current.targets.map(target => {
+              const previous = data.comparison?.application_availability?.previous.targets.find(
+                item => item.identity === target.identity,
+              );
+              const currentValue = target.availability_percent;
+              const previousValue = previous?.availability_percent ?? null;
+              const delta = currentValue !== null && previousValue !== null
+                ? currentValue - previousValue : null;
+              return <tr key={target.identity}>
+                <td>{target.name}<br /><small>{target.target}</small></td>
+                <td>{formatAvailability(currentValue)}</td>
+                <td>{formatAvailability(previousValue)}</td>
+                <td>{delta === null ? "Unavailable" :
+                  `${delta >= 0 ? "+" : ""}${format(delta)} pp`}</td>
+              </tr>;
+            })}</tbody>
+          </table>
         </div>}
         <div className="history-comparison-grid">
           {comparisonMetrics.map(item => {

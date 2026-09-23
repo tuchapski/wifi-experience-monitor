@@ -812,6 +812,39 @@ export interface ServiceSloHistoryMetric {
 
 export type ServiceSloHistorySummary = Record<string, ServiceSloHistoryMetric>;
 
+export interface ApplicationOutageInterval {
+  started_at: string;
+  last_failed_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  failure_count: number;
+  recovered: boolean;
+}
+
+export interface ApplicationAvailabilityTarget {
+  identity: string;
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  outage_count: number;
+  open_outage: boolean;
+  observed_outage_seconds: number;
+  longest_observed_outage_seconds: number | null;
+  outages: ApplicationOutageInterval[];
+}
+
+export interface ApplicationAvailabilitySummary {
+  target_count: number;
+  targets: ApplicationAvailabilityTarget[];
+}
+
 export interface HistorySummary {
   sample_count: number;
   metrics: Record<string, HistoryAggregate>;
@@ -829,6 +862,10 @@ export interface HistoryComparison {
   service_slo?: {
     current: ServiceSloHistorySummary;
     previous: ServiceSloHistorySummary;
+  };
+  application_availability?: {
+    current: ApplicationAvailabilitySummary;
+    previous: ApplicationAvailabilitySummary;
   };
 }
 
@@ -849,6 +886,7 @@ export interface HistoryWindow {
   connection_cycles?: ConnectionCycleMetrics[];
   connection_cycle_summary?: ConnectionCycleSummary;
   service_slo_summary?: ServiceSloHistorySummary;
+  application_availability?: ApplicationAvailabilitySummary;
   summary?: HistorySummary;
   comparison?: HistoryComparison;
 }

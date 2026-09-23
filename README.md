@@ -206,6 +206,21 @@ measurement error rather than silently treated as application downtime.
 These HTTP probes use the host route and therefore do not prove that traffic traversed
 the selected Wi-Fi interface.
 
+## Application availability and outage accounting
+
+History windows derive per-target application availability from fresh definitive probe
+executions. Availability is execution-based: passed / (passed + failed). Collection
+errors, skipped or disabled probes and cached results are excluded from the denominator
+so sensor uncertainty is not silently converted into service downtime.
+
+An observed outage starts with the first fresh failed probe and remains open until a
+later fresh passed probe is observed. Measurement errors do not close an outage. For
+an outage still open at the end of the selected history window, observed duration is
+bounded by that window end and recovery remains explicitly unobserved. These durations
+are sampling-bounded observations rather than exact packet-level outage timestamps.
+Targets are keyed by name, type, destination and port so a profile change that reuses a
+name for a different destination does not merge unrelated availability histories.
+
 ## Evidence correlation
 
 The correlation engine combines existing diagnostic findings instead of inventing a
