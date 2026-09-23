@@ -11,7 +11,7 @@ const compiled = ts.transpileModule(source, {
 const loaded = { exports: {} };
 new Function("require", "module", "exports", compiled)(require, loaded, loaded.exports);
 
-const { buildTimelineEvents, escapeHover } = loaded.exports;
+const { buildTimelineEvents, buildWifiIncidentEvents, escapeHover } = loaded.exports;
 const start = "2026-09-22T10:00:00Z";
 const end = "2026-09-22T11:00:00Z";
 
@@ -64,4 +64,18 @@ test("invalid and outside timestamps are omitted; hover content is escaped", () 
   assert.deepEqual(events, []);
   assert.equal(escapeHover('<img src="x" onerror=\'alert(1)\'>&'),
     "&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;");
+});
+
+test("Wi-Fi incident overlay excludes other domains and keeps observed interval bounds", () => {
+  const incidents = [
+    { id: 1, domain: "wifi", code: "WIFI_LOW_SIGNAL", severity: "warning", message: "Weak signal",
+      started_at: "2026-09-22T09:55:00Z", ended_at: "2026-09-22T10:15:00Z" },
+    { id: 2, domain: "dns", code: "DNS_FAILURE", severity: "critical", message: "DNS down",
+      started_at: "2026-09-22T10:20:00Z", ended_at: null },
+  ];
+  const events = buildWifiIncidentEvents(windowFixture(), incidents);
+  assert.deepEqual(events.map((event) => event.label), ["WIFI_LOW_SIGNAL · warning"]);
+  assert.equal(events[0].start, "2026-09-22T10:00:00.000Z");
+  assert.equal(events[0].end, "2026-09-22T10:15:00.000Z");
+  assert.equal(events[0].scope, "sensor");
 });

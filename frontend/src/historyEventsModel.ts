@@ -129,6 +129,11 @@ export function buildTimelineEvents(
   return events.sort((a, b) => time(a.start) - time(b.start));
 }
 
+export function buildWifiIncidentEvents(data: HistoryWindow, incidents: IncidentRecord[]): TimelineEvent[] {
+  return buildTimelineEvents(data, incidents.filter((incident) =>
+    incident.domain.toLowerCase() === "wifi"), []).filter((event) => event.kind === "incident");
+}
+
 export function escapeHover(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");

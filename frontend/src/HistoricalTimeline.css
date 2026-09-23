@@ -163,10 +163,13 @@
   font-size: 12px;
 }
 
-.history-chart-loading {
-  margin: 0;
-  padding: 24px;
-  color: #667085;
+.history-incident-notice {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  color: #854a0e;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  border-radius: 7px;
   font-size: 13px;
 }
 

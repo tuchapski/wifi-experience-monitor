@@ -1,15 +1,16 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Plot from "react-plotly.js";
 import type { Config, Data, Layout } from "plotly.js";
 
+import { getIncidentHistory } from "./api";
 import {
   buildTimelineSeries,
   historicalOverview,
 } from "./historyTimelineModel";
 import type { TimelineMetricDefinition } from "./historyTimelineModel";
-import { buildTimelineEvents, escapeHover, EVENT_LANES } from "./historyEventsModel";
+import { buildTimelineEvents, buildWifiIncidentEvents, escapeHover } from "./historyEventsModel";
 import type { TimelineEvent } from "./historyEventsModel";
-import type { HistoryWindow } from "./types";
+import type { HistoryWindow, IncidentRecord } from "./types";
 
 import "./HistoricalTimeline.css";
 
@@ -49,44 +50,42 @@ function duration(seconds: number): string {
 }
 
 
-const WIFI_LANES = EVENT_LANES.filter((lane) =>
-  lane.kind === "connection" || lane.kind === "roam" || lane.kind === "environment");
-
 export default function HistoricalTimeline({ data }: { data: HistoryWindow }) {
   const [showEnvironmentChanges, setShowEnvironmentChanges] = useState(false);
-  const [showWifiEvents, setShowWifiEvents] = useState(false);
+  const [showWifiIncidents, setShowWifiIncidents] = useState(false);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [incidentError, setIncidentError] = useState<string | null>(null);
   const [view, setView] = useState<HistoryView>("wifi");
   const [savedRange, setSavedRange] = useState<SavedRange | null>(null);
   const [resetRevision, setResetRevision] = useState(0);
-  const plotWrapper = useRef<HTMLDivElement>(null);
-  const [plotWidth, setPlotWidth] = useState(0);
 
-  useLayoutEffect(() => {
-    const node = plotWrapper.current;
-    if (!node) return;
-    const measure = () => {
-      const width = node.clientWidth;
-      if (width > 0) setPlotWidth((previous) => previous === width ? previous : width);
-    };
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(node);
-    window.addEventListener("resize", measure);
-    const frame = requestAnimationFrame(measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", measure);
-      cancelAnimationFrame(frame);
-    };
-  }, []);
+  useEffect(() => {
+    if (!showWifiIncidents) return;
+    const controller = new AbortController();
+    getIncidentHistory(1000, controller.signal)
+      .then((records) => {
+        if (!controller.signal.aborted) {
+          setIncidents(records);
+          setIncidentError(records.length === 1000
+            ? "Incident history reached its 1,000 record limit; older Wi-Fi incidents may be missing."
+            : null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setIncidents([]);
+          setIncidentError("Wi-Fi incidents could not be loaded.");
+        }
+      });
+    return () => controller.abort();
+  }, [showWifiIncidents, data.end]);
 
   const series = buildTimelineSeries(data, view);
   const overview = historicalOverview(data);
   const events = buildTimelineEvents(data, [], []);
-  const visibleEvents = events.filter((event) =>
-    (showEnvironmentChanges && (event.kind === "roam" || event.kind === "environment")) ||
-    (showWifiEvents && event.kind === "connection"));
-  const showEvents = visibleEvents.length > 0;
-  const plotHeight = showEvents ? 560 : 430;
+  const environmentEvents = showEnvironmentChanges
+    ? events.filter((event) => event.kind === "roam" || event.kind === "environment") : [];
+  const wifiIncidents = showWifiIncidents ? buildWifiIncidentEvents(data, incidents) : [];
   const rangeDurationMs = Math.max(1, Date.parse(data.end) - Date.parse(data.start));
   const viewDefinition = VIEWS.find((item) => item.id === view)!;
   const hasMatchingRange = savedRange?.interfaceName === data.interface &&
@@ -126,62 +125,61 @@ export default function HistoricalTimeline({ data }: { data: HistoryWindow }) {
     hovertemplate: "%{text}<extra></extra>",
   }));
 
-  const eventTraces: Data[] = showEvents ? WIFI_LANES.flatMap((lane) => {
-    const items = visibleEvents.filter((event) => event.kind === lane.kind);
-    const spans = items.filter((event) => event.end !== null);
-    const points = items.filter((event) => event.end === null);
-    const traces: Data[] = [];
-    if (spans.length) traces.push({
-      type: "scatter", mode: "lines+markers", showlegend: false, yaxis: "y2",
-      x: spans.flatMap((event) => [event.start, event.end!, null]),
-      y: spans.flatMap(() => [lane.lane, lane.lane, null]),
-      text: spans.flatMap((event) => [tooltip(event), tooltip(event), ""]),
-      connectgaps: false,
-      line: { color: lane.color, width: 8 },
-      marker: { color: lane.color, size: 7, symbol: lane.symbol },
-      hovertemplate: "%{text}<extra></extra>",
-    });
-    if (points.length) traces.push({
-      type: "scatter", mode: "markers", showlegend: false, yaxis: "y2",
-      x: points.map((event) => event.start),
-      y: points.map(() => lane.lane),
-      text: points.map(tooltip),
-      marker: { color: lane.color, size: 11, symbol: lane.symbol },
-      hovertemplate: "%{text}<extra></extra>",
-    });
-    return traces;
-  }) : [];
+  const metricValues = series.flatMap((item) => item.y.filter((value): value is number =>
+    value !== null && Number.isFinite(value)));
+  const markerY = metricValues.length ? metricValues.reduce((highest, value) =>
+    Math.max(highest, value), -Infinity) : 0;
+  const incidentTraces: Data[] = wifiIncidents.length ? [{
+    type: "scatter", mode: "markers", showlegend: false,
+    x: wifiIncidents.map((event) => event.start),
+    y: wifiIncidents.map(() => markerY),
+    text: wifiIncidents.map(tooltip),
+    marker: { color: "#b42318", size: 12, symbol: "x" },
+    hovertemplate: "%{text}<extra></extra>",
+    cliponaxis: false,
+  }] : [];
 
-  const eventShapes: NonNullable<Layout["shapes"]> = showEvents ? visibleEvents
-    .filter((event) => event.kind === "environment" || event.kind === "roam")
-    .map((event) => ({
-      type: "line",
-      xref: "x",
-      yref: "paper",
+  const eventShapes: NonNullable<Layout["shapes"]> = [
+    ...environmentEvents.map((event) => ({
+      type: "line" as const,
+      xref: "x" as const,
+      yref: "paper" as const,
       x0: event.start,
       x1: event.start,
       y0: 0,
-      y1: data.total_samples === 0 ? 0 : 0.72,
+      y1: 1,
       line: {
-        color: EVENT_LANES.find((lane) => lane.kind === event.kind)!.color,
+        color: event.kind === "roam" ? "#00857a" : "#667085",
         width: 1,
-        dash: "dot",
+        dash: "dot" as const,
       },
-    })) : [];
+    })),
+    ...wifiIncidents.filter((event) => event.end !== null).map((event) => ({
+      type: "rect" as const,
+      xref: "x" as const,
+      yref: "paper" as const,
+      x0: event.start,
+      x1: event.end!,
+      y0: 0,
+      y1: 1,
+      fillcolor: "rgba(180, 35, 24, 0.10)",
+      line: { width: 0 },
+      layer: "below" as const,
+    })),
+  ];
 
   const layout: Partial<Layout> = {
-    autosize: false,
-    width: plotWidth,
-    height: plotHeight,
+    autosize: true,
+    height: 430,
     margin: {
-      l: showEvents ? 140 : 75,
+      l: 75,
       r: 24,
       t: 65,
       b: 65,
     },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "#ffffff",
-    hovermode: showEvents ? "closest" : "x unified",
+    hovermode: "x unified",
     dragmode: "zoom",
     showlegend: metricTraces.length > 1,
     legend: {
@@ -202,26 +200,14 @@ export default function HistoricalTimeline({ data }: { data: HistoryWindow }) {
     },
     yaxis: {
       title: data.total_samples === 0 ? undefined : { text: viewDefinition.unit },
-      domain: showEvents ? [0, data.total_samples === 0 ? 0.01 : 0.72] : undefined,
-      visible: data.total_samples > 0,
       gridcolor: "#eaecf0",
       zeroline: false,
       rangemode: view === "loss" || view === "retries" ? "tozero" : undefined,
     },
-    yaxis2: showEvents ? {
-      domain: data.total_samples === 0 ? [0.05, 1] : [0.78, 1],
-      range: [-0.5, 2.5],
-      tickvals: WIFI_LANES.map((lane) => lane.lane),
-      ticktext: WIFI_LANES.map((lane) => lane.label),
-      tickfont: { size: 10 },
-      showgrid: false,
-      zeroline: false,
-      fixedrange: true,
-    } : undefined,
   };
 
   const config: Partial<Config> = {
-    responsive: false,
+    responsive: true,
     displaylogo: false,
     scrollZoom: true,
   };
@@ -288,15 +274,21 @@ export default function HistoricalTimeline({ data }: { data: HistoryWindow }) {
         <label><input type="checkbox" checked={showEnvironmentChanges}
           onChange={(event) => setShowEnvironmentChanges(event.target.checked)} />
           Mark Wi-Fi environment changes on this graph</label>
-        <label><input type="checkbox" checked={showWifiEvents}
-          onChange={(event) => setShowWifiEvents(event.target.checked)} />
-          Show Wifi Events</label>
+        <label><input type="checkbox" checked={showWifiIncidents}
+          onChange={(event) => {
+            setIncidents([]);
+            setIncidentError(null);
+            setShowWifiIncidents(event.target.checked);
+          }} />
+          Show Wifi Incidents</label>
       </div>
 
-      <div className="history-plot-wrapper" ref={plotWrapper}>
-        {plotWidth > 0 ? <Plot
+      {incidentError && showWifiIncidents && <p className="history-incident-notice" role="status">{incidentError}</p>}
+
+      <div className="history-plot-wrapper">
+        <Plot
           key={`${view}-${resetRevision}`}
-          data={[...metricTraces, ...eventTraces]}
+          data={[...metricTraces, ...incidentTraces]}
           layout={layout}
           config={config}
           onRelayout={(update: Record<string, unknown>) => {
@@ -306,14 +298,16 @@ export default function HistoricalTimeline({ data }: { data: HistoryWindow }) {
               start: range[0], end: range[1], interfaceName: data.interface, durationMs: rangeDurationMs,
             });
           }}
-          style={{ width: `${plotWidth}px`, height: `${plotHeight}px` }}
-        /> : <p role="status" className="history-chart-loading">Preparing historical chart…</p>}
+          style={{ width: "100%", height: "430px" }}
+          useResizeHandler
+        />
       </div>
 
       <p className="metric-note">
         Lines show bucket averages; hover retains min/max and P50/P95/P99. Missing readings remain gaps.
-        DNS/HTTPS use the host route. Wi-Fi events show connection cycles for this interface;
-        environment changes show BSSID and other Wi-Fi changes. Event bars are clipped to the selected period.
+        DNS/HTTPS use the host route. Wi-Fi incident markers and shaded intervals are sensor-wide records
+        and cannot be attributed to this interface alone. Environment markers show BSSID and other
+        Wi-Fi changes for this interface. Incident intervals are clipped to the selected period.
       </p>
 
       {data.events.length > 0 && (

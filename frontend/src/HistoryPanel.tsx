@@ -1,7 +1,6 @@
 import { Component, lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getHistoryInterfaces, getHistoryWindow, getReportUrl } from "./api";
-import { buildTimelineEvents } from "./historyEventsModel";
 import type { HistoryWindow } from "./types";
 
 const HistoricalTimeline = lazy(() => import("./HistoricalTimeline"));
@@ -143,13 +142,11 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <p className="metric-note">Timeline lines show averages of available readings per bucket. Empty buckets
         remain gaps, not zeros. Samples from different interfaces are never combined. DNS/HTTPS use the host route;
         retry ratios can exceed 100.</p>
-      {(data.total_samples > 0 || buildTimelineEvents(data, [], []).some((event) =>
-        event.kind === "connection" || event.kind === "roam" || event.kind === "environment")) &&
-        <HistoricalChartBoundary key={`${selectedInterface}-${period}`}>
-          <Suspense fallback={<p role="status">Preparing historical charts…</p>}>
-            <HistoricalTimeline data={data} />
-          </Suspense>
-        </HistoricalChartBoundary>}
+      <HistoricalChartBoundary key={`${selectedInterface}-${period}`}>
+        <Suspense fallback={<p role="status">Preparing historical charts…</p>}>
+          <HistoricalTimeline data={data} />
+        </Suspense>
+      </HistoricalChartBoundary>
       {data.service_slo_summary && Object.values(data.service_slo_summary).some(
         service => service.attempt_count > 0,
       ) && <section aria-labelledby="service-slo-history-title">
