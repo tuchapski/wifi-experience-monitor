@@ -65,6 +65,90 @@
   overflow-wrap: anywhere;
 }
 
+.history-view-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  margin: 16px 0;
+  border-radius: 9px;
+  background: #f2f4f7;
+}
+
+.history-view-nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #475467;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.history-view-nav button:hover:not(:disabled) {
+  background: white;
+}
+
+.history-view-nav button.history-view-active {
+  color: #175cd3;
+  background: white;
+  border-color: #d0d5dd;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+}
+
+.history-view-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.history-view-nav small {
+  color: #667085;
+}
+
+.history-view-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 12px;
+}
+
+.history-view-heading h4,
+.history-view-heading p {
+  margin: 0;
+}
+
+.history-view-heading p {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.history-view-heading button {
+  flex: none;
+  padding: 6px 10px;
+  color: #175cd3;
+  background: white;
+  border: 1px solid #d0d5dd;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.history-marker-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #475467;
+  cursor: pointer;
+  font-size: 13px;
+}
+
 .history-plot-wrapper {
   width: 100%;
   min-width: 0;
@@ -173,6 +257,11 @@
 
   .history-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-view-nav button {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 
   .history-event-list article {

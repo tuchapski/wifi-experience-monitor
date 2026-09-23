@@ -1,8 +1,26 @@
-import { useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { getExperienceEpisodes, getHistoryInterfaces, getHistoryWindow, getIncidentHistory, getReportUrl } from "./api";
-import HistoricalTimeline from "./HistoricalTimeline";
 import { buildTimelineEvents } from "./historyEventsModel";
 import type { ExperienceEpisode, HistoryWindow, IncidentRecord } from "./types";
+
+const HistoricalTimeline = lazy(() => import("./HistoricalTimeline"));
+
+class HistoricalChartBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return <div className="empty-state" role="alert">
+      The historical chart could not be displayed. The measurements and comparisons below are still available.
+      <button type="button" onClick={() => this.setState({ failed: false })}>Retry chart</button>
+    </div>;
+    return this.props.children;
+  }
+}
 
 const format = (value: number | null | undefined) => value == null
   ? "Unavailable" : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -148,7 +166,11 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
         remain gaps, not zeros. Samples from different interfaces are never combined. DNS/HTTPS use the host route;
         retry ratios can exceed 100.</p>
       {(data.total_samples > 0 || buildTimelineEvents(data, incidents, episodes).length > 0) &&
-        <HistoricalTimeline data={data} incidents={incidents} episodes={episodes} eventNotice={eventNotice} />}
+        <HistoricalChartBoundary key={`${selectedInterface}-${period}`}>
+          <Suspense fallback={<p role="status">Preparing historical charts…</p>}>
+            <HistoricalTimeline data={data} incidents={incidents} episodes={episodes} eventNotice={eventNotice} />
+          </Suspense>
+        </HistoricalChartBoundary>}
       {data.total_samples === 0 && buildTimelineEvents(data, incidents, episodes).length === 0 &&
         eventNotice && <p className="metric-note" role="status">{eventNotice}</p>}
       {data.service_slo_summary && Object.values(data.service_slo_summary).some(

@@ -848,7 +848,7 @@ function App() {
 
       <section id="section-history" aria-labelledby="nav-history"
         hidden={activeTab !== "history"}>
-        <HistoryPanel currentInterface={sensorStatus?.interface} />
+        {activeTab === "history" && <HistoryPanel currentInterface={sensorStatus?.interface} />}
       </section>
 
       <section id="section-settings" aria-labelledby="nav-settings"
