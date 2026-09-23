@@ -4,6 +4,7 @@ from wem.models.metrics import (
     WifiDeltaMetrics,
     WifiMetrics,
 )
+from wem.profiles.defaults import default_profile_config
 
 
 def test_healthy_snapshot() -> None:
@@ -54,6 +55,20 @@ def test_low_wifi_signal_warning() -> None:
 
     assert result.overall_status == "warning"
     assert result.probable_domain == "wifi"
+
+    assert any(finding.code == "WIFI_LOW_SIGNAL" for finding in result.findings)
+
+
+def test_profile_thresholds_drive_diagnostics() -> None:
+    profile = default_profile_config()
+    profile.thresholds.wifi.rssi_warning_dbm = -65
+    engine = DiagnosticEngine(profile)
+
+    result = engine.analyze(
+        wifi=WifiMetrics(interface="wlp0s20f3", associated=True, signal_dbm=-68),
+        wifi_delta=None,
+        connectivity=ConnectivityMetrics(),
+    )
 
     assert any(finding.code == "WIFI_LOW_SIGNAL" for finding in result.findings)
 

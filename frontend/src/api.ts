@@ -1,10 +1,15 @@
 import type {
+  ExperienceEpisodeHistory,
   HistoryRecord,
   HistoryWindow,
   IncidentRecord,
   SensorConfiguration,
   SensorSnapshot,
   SensorStatus,
+  TestProfile,
+  TestProfileSummary,
+  TestProfileVersion,
+  TestProfileWrite,
   WirelessInterface,
 } from "./types";
 
@@ -39,11 +44,22 @@ async function request<T>(
     try {
       const body =
         await response.json() as {
-          detail?: string;
+          detail?: string | Array<{
+            loc?: Array<string | number>;
+            msg?: string;
+          }>;
         };
 
-      if (body.detail) {
+      if (typeof body.detail === "string") {
         detail = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        detail = body.detail
+          .map((item) => {
+            const location = item.loc?.slice(1).join(" → ");
+            return [location, item.msg].filter(Boolean).join(": ");
+          })
+          .filter(Boolean)
+          .join("; ") || detail;
       }
     } catch {
       // Response had no JSON body.
@@ -130,6 +146,49 @@ export function stopSensor(
 }
 
 
+export function getProfiles(): Promise<TestProfileSummary[]> {
+  return request<TestProfileSummary[]>("/profiles");
+}
+
+
+export function getProfile(profileId: number): Promise<TestProfile> {
+  return request<TestProfile>(`/profiles/${profileId}`);
+}
+
+
+export function createProfile(profile: TestProfileWrite): Promise<TestProfile> {
+  return request<TestProfile>("/profiles", {
+    method: "POST",
+    body: JSON.stringify(profile),
+  });
+}
+
+
+export function updateProfile(
+  profileId: number,
+  profile: TestProfileWrite,
+): Promise<TestProfile> {
+  return request<TestProfile>(`/profiles/${profileId}`, {
+    method: "PUT",
+    body: JSON.stringify(profile),
+  });
+}
+
+
+export function activateProfile(profileId: number): Promise<TestProfile> {
+  return request<TestProfile>(`/profiles/${profileId}/activate`, {
+    method: "POST",
+  });
+}
+
+
+export function getProfileVersions(
+  profileId: number,
+): Promise<TestProfileVersion[]> {
+  return request<TestProfileVersion[]>(`/profiles/${profileId}/versions`);
+}
+
+
 export async function getLatestSnapshot(
 ): Promise<SensorSnapshot | null> {
   const response = await fetch(
@@ -174,6 +233,14 @@ export function getIncidentHistory(
 ): Promise<IncidentRecord[]> {
   return request<IncidentRecord[]>(
     `/incidents/history?limit=${limit}`,
+  );
+}
+
+export function getExperienceEpisodes(
+  limit = 50,
+): Promise<ExperienceEpisodeHistory> {
+  return request<ExperienceEpisodeHistory>(
+    `/episodes/history?limit=${limit}`,
   );
 }
 

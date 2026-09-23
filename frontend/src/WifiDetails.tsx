@@ -37,6 +37,18 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
     ["Reported rate width", number(wifi.tx_channel_width_mhz, " MHz"), number(wifi.rx_channel_width_mhz, " MHz")],
     ["Short GI (HT/VHT)", state(wifi.tx_short_gi), state(wifi.rx_short_gi)],
   ];
+  const cycle = snapshot.connection_cycle;
+  const cycleSlo = snapshot.connection_cycle_slo;
+  const stageLabels: Record<string, string> = {
+    association: "Association",
+    authentication: "Authentication",
+    authorization: "Authorization",
+    dhcp: "IPv4 address",
+    ipv4: "IPv4 address",
+    gateway: "Gateway",
+    dns: "DNS",
+    network_ready: "Network ready",
+  };
   return (
     <>
       <section className="panel" aria-labelledby="wifi-survey-title">
@@ -109,6 +121,74 @@ export default function WifiDetails({ snapshot }: { snapshot: SensorSnapshot }) 
           <dt>Protected management frames</dt><dd>{state(wifi.mfp_enabled)}</dd>
           <dt>Power saving</dt><dd>{state(wifi.power_save)}</dd>
         </dl>
+      </section>
+      <section className="panel" aria-labelledby="connection-cycle-title">
+        <h2 id="connection-cycle-title">Connection cycle</h2>
+        {!cycle ? <p className="metric-note">No connection session has been observed yet.</p> : <>
+          <div className="wifi-metric-grid">
+            <div><span>Session type</span><strong>{cycle.session_type.replaceAll("_", " ")}</strong></div>
+            <div><span>Current state</span><strong>{cycle.state}</strong></div>
+            <div><span>Network ready estimate</span><strong>{number(cycle.total_time_ms, " ms")}</strong></div>
+            <div><span>Sampling resolution</span><strong>{number(cycle.sample_resolution_ms, " ms")}</strong></div>
+            <div><span>Timing source</span><strong>{cycle.timing_source?.replaceAll("_", " ") ?? "sampling"}</strong></div>
+            <div><span>D-Bus monitor</span><strong>{cycle.event_monitor_status ?? "unavailable"}</strong></div>
+            <div><span>NetworkManager state</span><strong>{cycle.networkmanager_state_name ?? "Unavailable"}</strong></div>
+            <div><span>D-Bus events observed</span><strong>{number(cycle.networkmanager_event_count)}</strong></div>
+          </div>
+          <p className="metric-note">
+            Started: {cycle.started_at ? new Date(cycle.started_at).toLocaleString() : "not observed"}
+            {" · "}Last observed: {new Date(cycle.last_observed_at).toLocaleString()}
+          </p>
+          {cycle.event_monitor_reason
+            ? <p className="metric-note">D-Bus monitor: {cycle.event_monitor_reason}</p>
+            : null}
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Stage</th><th>Status</th><th>Elapsed</th><th>Source</th><th>Evidence</th></tr></thead>
+              <tbody>{Object.entries(cycle.stages).map(([key, stage]) => (
+                <tr key={key}>
+                  <td>{stageLabels[key] ?? key}</td>
+                  <td>{stage.status}</td>
+                  <td>{stage.elapsed_ms == null ? "Unknown" : `${number(stage.elapsed_ms, " ms")}${stage.estimated ? " · estimated" : ""}`}</td>
+                  <td>{stage.source?.replaceAll("_", " ") ?? "sampling"}</td>
+                  <td>{stage.reason}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <ul className="metric-note">{cycle.limitations.map(item => <li key={item}>{item}</li>)}</ul>
+        </>}
+        {cycleSlo && <>
+          <h3>Rolling connection-cycle SLO</h3>
+          <div className="wifi-metric-grid">
+            <div><span>SLO status</span><strong>{cycleSlo.status.replaceAll("_", " ")}</strong></div>
+            <div><span>Network-ready P95</span><strong>{number(cycleSlo.p95_ms, " ms")}</strong></div>
+            <div><span>Measured cycles</span><strong>{cycleSlo.sample_count} / {cycleSlo.window_size}</strong></div>
+            <div><span>Minimum samples</span><strong>{cycleSlo.minimum_samples}</strong></div>
+            <div><span>Warning threshold</span><strong>{number(cycleSlo.warning_threshold_ms, " ms")}</strong></div>
+            <div><span>Critical threshold</span><strong>{number(cycleSlo.critical_threshold_ms, " ms")}</strong></div>
+          </div>
+          <p className="metric-note">{cycleSlo.reason}</p>
+          {cycleSlo.stages && Object.keys(cycleSlo.stages).length > 0 && <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Milestone</th><th>Status</th><th>P95 from start</th><th>Samples</th><th>Warning</th><th>Critical</th></tr></thead>
+              <tbody>{Object.entries(cycleSlo.stages).map(([key, stage]) => (
+                <tr key={key}>
+                  <td>{stageLabels[key] ?? stage.label}</td>
+                  <td><strong className={`status-${stage.status}`}>{stage.status.replaceAll("_", " ")}</strong></td>
+                  <td>{number(stage.p95_ms, " ms")}</td>
+                  <td>{stage.sample_count} / {cycleSlo.window_size}</td>
+                  <td>{number(stage.warning_threshold_ms, " ms")}</td>
+                  <td>{number(stage.critical_threshold_ms, " ms")}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <p className="metric-note">
+              Milestone P95 is elapsed time from connection start to that observation.
+              It is not the isolated duration of the preceding protocol phase.
+            </p>
+          </div>}
+        </>}
       </section>
       <section className="panel" aria-labelledby="wifi-retries-title">
         <h2 id="wifi-retries-title">Wi-Fi retransmissions and counters</h2>

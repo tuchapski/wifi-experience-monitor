@@ -7,6 +7,9 @@ from typing import cast as typing_cast
 
 from sqlalchemy import Integer, cast, func, select
 
+from wem.analysis.application_availability import summarize_application_availability
+from wem.analysis.connection_cycle_stats import summarize_connection_cycles
+from wem.analysis.service_slo_stats import summarize_service_executions
 from wem.storage.database import Database
 from wem.storage.models import SnapshotRecord
 
@@ -122,13 +125,36 @@ class HistoryRepository:
                     summary_values[name].append(numeric_value)
 
         events: list[dict[str, object]] = []
+        cycles_by_session: dict[str, dict[str, object]] = {}
+        service_payloads: list[dict[str, object]] = []
+        application_samples: list[tuple[datetime, dict[str, object]]] = []
         for timestamp, snapshot_json in event_rows:
             try:
-                changes = json.loads(snapshot_json).get("environment_changes", [])
+                loaded = json.loads(snapshot_json)
+                payload = loaded if isinstance(loaded, dict) else {}
+                changes = payload.get("environment_changes", [])
             except (TypeError, json.JSONDecodeError):
+                payload = {}
                 changes = []
+            service_payloads.append(payload)
+            application_samples.append((timestamp.replace(tzinfo=UTC), payload))
             for change in changes:
                 events.append({"timestamp": timestamp.replace(tzinfo=UTC).isoformat(), **change})
+            cycle = payload.get("connection_cycle")
+            if isinstance(cycle, dict):
+                session_id = cycle.get("session_id")
+                if isinstance(session_id, str) and session_id:
+                    cycles_by_session[session_id] = cycle
+        connection_cycles = sorted(
+            cycles_by_session.values(),
+            key=lambda cycle: str(cycle.get("last_observed_at", "")),
+        )
+        connection_cycle_summary = summarize_connection_cycles(connection_cycles)
+        service_slo_summary = summarize_service_executions(service_payloads)
+        application_availability = summarize_application_availability(
+            application_samples,
+            window_end=end,
+        )
         points: list[dict[str, object]] = []
         for index in range(math.ceil(duration / seconds)):
             row = rows.get(index)
@@ -164,6 +190,10 @@ class HistoryRepository:
             "total_samples": sum(typing_cast(int, point["sample_count"]) for point in points),
             "points": points,
             "events": events,
+            "connection_cycles": connection_cycles,
+            "connection_cycle_summary": connection_cycle_summary,
+            "service_slo_summary": service_slo_summary,
+            "application_availability": application_availability,
             "summary": summary,
         }
         if include_comparison:
@@ -179,6 +209,18 @@ class HistoryRepository:
                 "previous": previous["summary"],
                 "previous_start": previous["start"],
                 "previous_end": previous["end"],
+                "connection_cycles": {
+                    "current": connection_cycle_summary,
+                    "previous": previous["connection_cycle_summary"],
+                },
+                "service_slo": {
+                    "current": service_slo_summary,
+                    "previous": previous["service_slo_summary"],
+                },
+                "application_availability": {
+                    "current": application_availability,
+                    "previous": previous["application_availability"],
+                },
             }
         return result
 

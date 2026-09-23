@@ -173,6 +173,31 @@ def test_info_does_not_create_incident() -> None:
     assert result.events == []
 
 
+def test_cached_finding_does_not_advance_incident_confirmation() -> None:
+    engine = IncidentEngine(critical_open_samples=2)
+    diagnostic = DiagnosticResult(
+        overall_status="critical",
+        probable_domain="dns",
+        findings=[
+            DiagnosticFinding(
+                severity="critical",
+                domain="dns",
+                code="DNS_FAILURE",
+                message="DNS failed",
+            )
+        ],
+    )
+
+    first = engine.evaluate(diagnostic, fresh_domains={"dns"})
+    cached = engine.evaluate(diagnostic, fresh_domains={"wifi"})
+    second_execution = engine.evaluate(diagnostic, fresh_domains={"dns"})
+
+    assert first.active_incidents == []
+    assert cached.active_incidents == []
+    assert len(second_execution.active_incidents) == 1
+    assert second_execution.events[0].action == "opened"
+
+
 def test_restore_active_incident() -> None:
     engine = IncidentEngine()
 

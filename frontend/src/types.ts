@@ -25,6 +25,151 @@ export interface SensorStatus {
   interval_seconds: number;
 
   last_error: string | null;
+
+  session_id: number | null;
+  profile_id: number;
+  profile_version_id: number;
+  profile_name: string;
+  profile_version: number;
+}
+
+
+export interface SyntheticTestConfiguration {
+  enabled: boolean;
+  interval_seconds: number;
+  timeout_seconds: number | null;
+}
+
+export interface ApplicationTargetConfiguration extends SyntheticTestConfiguration {
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+}
+
+export interface ServiceSloTargetConfiguration {
+  availability_warning_percent: number;
+  availability_critical_percent: number;
+  latency_p95_warning_ms: number;
+  latency_p95_critical_ms: number;
+  packet_loss_p95_warning_percent: number | null;
+  packet_loss_p95_critical_percent: number | null;
+}
+
+export interface ConnectionStageP95ThresholdConfiguration {
+  p95_warning_ms: number;
+  p95_critical_ms: number;
+}
+
+export interface TestProfileConfiguration {
+  schema_version: 1;
+  sampling: {
+    wifi_interval_seconds: number;
+  };
+  tests: {
+    gateway: SyntheticTestConfiguration & {
+      automatic_gateway: boolean;
+      target: string | null;
+    };
+    dns: SyntheticTestConfiguration & {
+      query: string;
+    };
+    internet: SyntheticTestConfiguration & {
+      target: string;
+    };
+    https: SyntheticTestConfiguration & {
+      url: string;
+    };
+  };
+  application_targets: ApplicationTargetConfiguration[];
+  thresholds: {
+    wifi: {
+      rssi_warning_dbm: number;
+      rssi_critical_dbm: number;
+      retry_warning_percent: number;
+      retry_critical_percent: number;
+      tx_failure_critical_percent: number;
+    };
+    gateway: {
+      latency_warning_ms: number;
+      packet_loss_warning_percent: number;
+      packet_loss_critical_percent: number;
+    };
+    dns: {
+      latency_warning_ms: number;
+    };
+    internet: {
+      latency_warning_ms: number;
+      packet_loss_warning_percent: number;
+      packet_loss_critical_percent: number;
+    };
+    https: {
+      response_warning_ms: number;
+    };
+    connection_cycle: {
+      window_size: number;
+      minimum_samples: number;
+      p95_warning_ms: number;
+      p95_critical_ms: number;
+      stages: {
+        association: ConnectionStageP95ThresholdConfiguration;
+        authentication: ConnectionStageP95ThresholdConfiguration;
+        ipv4: ConnectionStageP95ThresholdConfiguration;
+        gateway: ConnectionStageP95ThresholdConfiguration;
+        dns: ConnectionStageP95ThresholdConfiguration;
+      };
+    };
+    adaptive_baseline: {
+      enabled: boolean;
+      lookback_hours: number;
+      minimum_samples: number;
+      max_samples: number;
+      warning_sigma: number;
+      critical_sigma: number;
+    };
+    service_slo: {
+      enabled: boolean;
+      window_size: number;
+      minimum_samples: number;
+      gateway: ServiceSloTargetConfiguration;
+      internet: ServiceSloTargetConfiguration;
+      dns: ServiceSloTargetConfiguration;
+      https: ServiceSloTargetConfiguration;
+    };
+  };
+}
+
+export interface TestProfileSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  active: boolean;
+  version: number;
+  version_id: number;
+  created_at: string;
+  updated_at: string;
+  version_created_at: string;
+}
+
+export interface TestProfile extends TestProfileSummary {
+  configuration: TestProfileConfiguration;
+}
+
+export interface TestProfileVersion {
+  id: number;
+  profile_id: number;
+  version: number;
+  active: boolean;
+  created_at: string;
+  configuration: TestProfileConfiguration;
+}
+
+export interface TestProfileWrite {
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  configuration: TestProfileConfiguration;
 }
 
 
@@ -143,13 +288,179 @@ export interface NetworkMetrics {
 
 
 export interface TestOutcome {
-  status: "passed" | "failed" | "error" | "skipped" | "unavailable" | "observed";
+  status: "passed" | "failed" | "error" | "skipped" | "disabled" | "unavailable" | "observed";
   reason: string;
   scope: string;
+  observed_at?: string | null;
+  fresh?: boolean;
+  age_seconds?: number | null;
+}
+
+export interface ConnectionStageMetric {
+  status: "observed" | "pending" | "unavailable";
+  observed_at: string | null;
+  elapsed_ms: number | null;
+  estimated: boolean;
+  reason: string;
+  source?: "sampling" | "networkmanager_dbus";
+}
+
+export interface ConnectionCycleMetrics {
+  session_id: string;
+  session_type: "observed_existing" | "initial_connect" | "reconnect" | "roam" | "network_change" | "reassociation";
+  state: "connecting" | "ready" | "disconnected";
+  ssid: string | null;
+  bssid: string | null;
+  started_at: string | null;
+  last_observed_at: string;
+  completed_at: string | null;
+  total_time_ms: number | null;
+  sample_resolution_ms: number | null;
+  stages: Record<string, ConnectionStageMetric>;
+  limitations: string[];
+  timing_source?: "sampling" | "networkmanager_dbus+sampling";
+  event_monitor_status?: "not_started" | "active" | "unavailable" | "error" | "stopped";
+  event_monitor_reason?: string | null;
+  networkmanager_state?: number | null;
+  networkmanager_state_name?: string | null;
+  networkmanager_event_count?: number;
+}
+
+export interface ConnectionStageSloMetric {
+  stage: string;
+  label: string;
+  status: "insufficient_data" | "healthy" | "warning" | "critical";
+  sample_count: number;
+  minimum_samples: number;
+  p95_ms: number | null;
+  warning_threshold_ms: number;
+  critical_threshold_ms: number;
+  latest_ms: number | null;
+  fresh: boolean;
+  reason: string;
+}
+
+export interface ConnectionCycleSloMetrics {
+  status: "insufficient_data" | "healthy" | "warning" | "critical";
+  sample_count: number;
+  minimum_samples: number;
+  window_size: number;
+  p95_ms: number | null;
+  warning_threshold_ms: number;
+  critical_threshold_ms: number;
+  latest_cycle_ms: number | null;
+  fresh: boolean;
+  reason: string;
+  stages?: Record<string, ConnectionStageSloMetric>;
+}
+
+export interface AdaptiveBaselineMetric {
+  key: string;
+  label: string;
+  unit: string;
+  status: "unavailable" | "insufficient_data" | "healthy" | "warning" | "critical";
+  current: number | null;
+  baseline_median: number | null;
+  baseline_mad: number | null;
+  robust_sigma: number | null;
+  deviation_sigma: number | null;
+  sample_count: number;
+  minimum_samples: number;
+  reason: string;
+}
+
+export interface AdaptiveBaselineMetrics {
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  ssid: string | null;
+  lookback_hours: number;
+  minimum_samples: number;
+  max_samples: number;
+  warning_sigma: number;
+  critical_sigma: number;
+  metrics: AdaptiveBaselineMetric[];
+  fresh: boolean;
+  reason: string;
+}
+
+export interface ServiceSloMetric {
+  service: string;
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  latency_sample_count: number;
+  latency_p95_ms: number | null;
+  packet_loss_sample_count: number;
+  packet_loss_p95_percent: number | null;
+  availability_warning_percent: number;
+  availability_critical_percent: number;
+  latency_p95_warning_ms: number;
+  latency_p95_critical_ms: number;
+  packet_loss_p95_warning_percent: number | null;
+  packet_loss_p95_critical_percent: number | null;
+  fresh: boolean;
+  reason: string;
+}
+
+export interface ServiceSloMetrics {
+  status: "disabled" | "insufficient_data" | "healthy" | "warning" | "critical";
+  enabled: boolean;
+  window_size: number;
+  minimum_samples: number;
+  services: Record<string, ServiceSloMetric>;
+  fresh: boolean;
+  reason: string;
+}
+
+export interface CorrelationEvidence {
+  code: string;
+  source: "current_diagnostic" | "rolling_service_slo" | "adaptive_baseline" | "connection_cycle_slo" | "isolation";
+  severity: "critical" | "warning" | "info";
+  message: string;
+}
+
+export interface CorrelationHypothesis {
+  domain: string;
+  label: string;
+  support: "strong" | "moderate" | "weak";
+  evidence: CorrelationEvidence[];
+  limitations: string[];
+}
+
+export interface CorrelationAssessment {
+  policy_version: string;
+  status: "no_degradation" | "correlated" | "ambiguous" | "insufficient_data";
+  primary_domain: string | null;
+  hypotheses: CorrelationHypothesis[];
+  limitations: string[];
+  reason: string;
+}
+
+export interface ApplicationTargetMetric {
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+  status: "passed" | "failed" | "error" | "skipped" | "disabled";
+  reason: string;
+  scope: "host";
+  latency_ms: number | null;
+  status_code: number | null;
+  dns_ms: number | null;
+  tcp_connect_ms: number | null;
+  tls_handshake_ms: number | null;
+  ttfb_ms: number | null;
+  observed_at: string | null;
+  fresh: boolean;
+  age_seconds: number | null;
 }
 
 export interface ConnectivityMetrics {
   tests?: Record<string, TestOutcome>;
+  application_targets?: Record<string, ApplicationTargetMetric>;
 
   gateway_reachable: boolean | null;
 
@@ -176,6 +487,10 @@ export interface ConnectivityMetrics {
 
   https_success: boolean | null;
   https_status_code: number | null;
+  https_dns_ms: number | null;
+  https_tcp_connect_ms: number | null;
+  https_tls_handshake_ms: number | null;
+  https_ttfb_ms: number | null;
   https_total_time_ms: number | null;
 }
 
@@ -358,6 +673,21 @@ export interface SensorSnapshot {
   collector_errors: string[];
 
   recommendations?: Recommendation[];
+  connection_cycle?: ConnectionCycleMetrics | null;
+  connection_cycle_slo?: ConnectionCycleSloMetrics | null;
+  adaptive_baseline?: AdaptiveBaselineMetrics | null;
+  service_slo?: ServiceSloMetrics | null;
+  correlation?: CorrelationAssessment | null;
+
+  monitoring?: {
+    session_id: number;
+    profile: {
+      profile_id: number;
+      profile_version_id: number;
+      name: string;
+      version: number;
+    };
+  } | null;
 }
 
 
@@ -419,6 +749,30 @@ export interface IncidentRecord {
 }
 
 
+export interface ExperienceEpisode {
+  episode_id: string;
+  status: "active" | "ended";
+  severity: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  incident_count: number;
+  incident_ids: number[];
+  codes: string[];
+  domains: string[];
+  correlation_status: "correlated" | "mixed" | "unavailable";
+  primary_domain: string | null;
+  correlation_sample_count: number;
+  correlation_domain_counts: Record<string, number>;
+  correlation_reason: string;
+}
+
+export interface ExperienceEpisodeHistory {
+  merge_gap_seconds: number;
+  episodes: ExperienceEpisode[];
+}
+
+
 export interface HistoryAggregate {
   avg: number | null;
   min: number | null;
@@ -427,6 +781,68 @@ export interface HistoryAggregate {
   p50: number | null;
   p95: number | null;
   p99: number | null;
+}
+
+export interface ConnectionCycleAggregate extends HistoryAggregate {
+  sources?: Record<string, number>;
+}
+
+export interface ConnectionCycleSummary {
+  total_cycles: number;
+  ready_cycles: number;
+  measurable_cycles: number;
+  unmeasured_cycles: number;
+  by_type: Record<string, number>;
+  by_state: Record<string, number>;
+  by_timing_source: Record<string, number>;
+  total_time_ms: ConnectionCycleAggregate;
+  stages: Record<string, ConnectionCycleAggregate>;
+}
+
+export interface ServiceSloHistoryMetric {
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  latency_ms: HistoryAggregate;
+  packet_loss_percent: HistoryAggregate;
+}
+
+export type ServiceSloHistorySummary = Record<string, ServiceSloHistoryMetric>;
+
+export interface ApplicationOutageInterval {
+  started_at: string;
+  last_failed_at: string;
+  ended_at: string | null;
+  duration_seconds: number;
+  failure_count: number;
+  recovered: boolean;
+}
+
+export interface ApplicationAvailabilityTarget {
+  identity: string;
+  name: string;
+  kind: "http" | "tcp" | "dns";
+  target: string;
+  port: number | null;
+  attempt_count: number;
+  measurable_count: number;
+  success_count: number;
+  failure_count: number;
+  measurement_error_count: number;
+  availability_percent: number | null;
+  outage_count: number;
+  open_outage: boolean;
+  observed_outage_seconds: number;
+  longest_observed_outage_seconds: number | null;
+  outages: ApplicationOutageInterval[];
+}
+
+export interface ApplicationAvailabilitySummary {
+  target_count: number;
+  targets: ApplicationAvailabilityTarget[];
 }
 
 export interface HistorySummary {
@@ -439,6 +855,18 @@ export interface HistoryComparison {
   previous: HistorySummary;
   previous_start: string;
   previous_end: string;
+  connection_cycles?: {
+    current: ConnectionCycleSummary;
+    previous: ConnectionCycleSummary;
+  };
+  service_slo?: {
+    current: ServiceSloHistorySummary;
+    previous: ServiceSloHistorySummary;
+  };
+  application_availability?: {
+    current: ApplicationAvailabilitySummary;
+    previous: ApplicationAvailabilitySummary;
+  };
 }
 
 export interface HistoryPoint {
@@ -455,6 +883,10 @@ export interface HistoryWindow {
   total_samples: number;
   points: HistoryPoint[];
   events: EnvironmentChange[];
+  connection_cycles?: ConnectionCycleMetrics[];
+  connection_cycle_summary?: ConnectionCycleSummary;
+  service_slo_summary?: ServiceSloHistorySummary;
+  application_availability?: ApplicationAvailabilitySummary;
   summary?: HistorySummary;
   comparison?: HistoryComparison;
 }

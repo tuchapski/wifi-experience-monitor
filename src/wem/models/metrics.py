@@ -125,11 +125,35 @@ class TestOutcome:
     status: str
     reason: str
     scope: str = "selected_interface"
+    observed_at: str | None = None
+    fresh: bool = True
+    age_seconds: float | None = 0.0
+
+
+@dataclass(slots=True)
+class ApplicationTargetMetric:
+    name: str
+    kind: str
+    target: str
+    port: int | None
+    status: str
+    reason: str
+    scope: str = "host"
+    latency_ms: float | None = None
+    status_code: int | None = None
+    dns_ms: float | None = None
+    tcp_connect_ms: float | None = None
+    tls_handshake_ms: float | None = None
+    ttfb_ms: float | None = None
+    observed_at: str | None = None
+    fresh: bool = True
+    age_seconds: float | None = 0.0
 
 
 @dataclass(slots=True)
 class ConnectivityMetrics:
     tests: dict[str, TestOutcome] = field(default_factory=dict)
+    application_targets: dict[str, ApplicationTargetMetric] = field(default_factory=dict)
 
     gateway_reachable: bool | None = None
 
@@ -158,7 +182,165 @@ class ConnectivityMetrics:
 
     https_success: bool | None = None
     https_status_code: int | None = None
+    https_dns_ms: float | None = None
+    https_tcp_connect_ms: float | None = None
+    https_tls_handshake_ms: float | None = None
+    https_ttfb_ms: float | None = None
     https_total_time_ms: float | None = None
+
+
+@dataclass(slots=True)
+class ConnectionStageMetric:
+    status: str
+    observed_at: str | None = None
+    elapsed_ms: float | None = None
+    estimated: bool = False
+    reason: str = ""
+    source: str = "sampling"
+
+
+@dataclass(slots=True)
+class ConnectionCycleMetrics:
+    session_id: str
+    session_type: str
+    state: str
+    ssid: str | None
+    bssid: str | None
+    started_at: str | None
+    last_observed_at: str
+    completed_at: str | None
+    total_time_ms: float | None
+    sample_resolution_ms: float | None
+    stages: dict[str, ConnectionStageMetric] = field(default_factory=dict)
+    limitations: list[str] = field(default_factory=list)
+    timing_source: str = "sampling"
+    event_monitor_status: str = "unavailable"
+    event_monitor_reason: str | None = None
+    networkmanager_state: int | None = None
+    networkmanager_state_name: str | None = None
+    networkmanager_event_count: int = 0
+
+
+@dataclass(slots=True)
+class ConnectionStageSloMetric:
+    stage: str
+    label: str
+    status: str
+    sample_count: int
+    minimum_samples: int
+    p95_ms: float | None
+    warning_threshold_ms: float
+    critical_threshold_ms: float
+    latest_ms: float | None
+    fresh: bool
+    reason: str
+
+
+@dataclass(slots=True)
+class ConnectionCycleSloMetrics:
+    status: str
+    sample_count: int
+    minimum_samples: int
+    window_size: int
+    p95_ms: float | None
+    warning_threshold_ms: float
+    critical_threshold_ms: float
+    latest_cycle_ms: float | None
+    fresh: bool
+    reason: str
+    stages: dict[str, ConnectionStageSloMetric] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class AdaptiveBaselineMetric:
+    key: str
+    label: str
+    unit: str
+    status: str
+    current: float | None
+    baseline_median: float | None
+    baseline_mad: float | None
+    robust_sigma: float | None
+    deviation_sigma: float | None
+    sample_count: int
+    minimum_samples: int
+    reason: str
+
+
+@dataclass(slots=True)
+class AdaptiveBaselineMetrics:
+    status: str
+    ssid: str | None
+    lookback_hours: int
+    minimum_samples: int
+    max_samples: int
+    warning_sigma: float
+    critical_sigma: float
+    metrics: list[AdaptiveBaselineMetric] = field(default_factory=list)
+    fresh: bool = False
+    reason: str = ""
+
+
+@dataclass(slots=True)
+class ServiceSloMetric:
+    service: str
+    status: str
+    attempt_count: int
+    measurable_count: int
+    success_count: int
+    failure_count: int
+    measurement_error_count: int
+    availability_percent: float | None
+    latency_sample_count: int
+    latency_p95_ms: float | None
+    packet_loss_sample_count: int
+    packet_loss_p95_percent: float | None
+    availability_warning_percent: float
+    availability_critical_percent: float
+    latency_p95_warning_ms: float
+    latency_p95_critical_ms: float
+    packet_loss_p95_warning_percent: float | None
+    packet_loss_p95_critical_percent: float | None
+    fresh: bool
+    reason: str
+
+
+@dataclass(slots=True)
+class ServiceSloMetrics:
+    status: str
+    enabled: bool
+    window_size: int
+    minimum_samples: int
+    services: dict[str, ServiceSloMetric] = field(default_factory=dict)
+    fresh: bool = False
+    reason: str = ""
+
+
+@dataclass(slots=True)
+class CorrelationEvidence:
+    code: str
+    source: str
+    severity: str
+    message: str
+
+
+@dataclass(slots=True)
+class CorrelationHypothesis:
+    domain: str
+    label: str
+    support: str
+    evidence: list[CorrelationEvidence] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class CorrelationAssessment:
+    policy_version: str
+    status: str
+    primary_domain: str | None
+    hypotheses: list[CorrelationHypothesis] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+    reason: str = ""
 
 
 @dataclass(slots=True)
@@ -315,6 +497,20 @@ class ExperienceScore:
 
 
 @dataclass(slots=True)
+class ProfileReference:
+    profile_id: int
+    profile_version_id: int
+    name: str
+    version: int
+
+
+@dataclass(slots=True)
+class MonitoringContext:
+    session_id: int
+    profile: ProfileReference
+
+
+@dataclass(slots=True)
 class SensorSnapshot:
     timestamp: str
 
@@ -337,6 +533,12 @@ class SensorSnapshot:
     collector_errors: list[str] = field(default_factory=list)
 
     experience_score: ExperienceScore | None = None
+    connection_cycle: ConnectionCycleMetrics | None = None
+    connection_cycle_slo: ConnectionCycleSloMetrics | None = None
+    adaptive_baseline: AdaptiveBaselineMetrics | None = None
+    service_slo: ServiceSloMetrics | None = None
+    correlation: CorrelationAssessment | None = None
+    monitoring: MonitoringContext | None = None
 
     @classmethod
     def create(
@@ -353,6 +555,7 @@ class SensorSnapshot:
         recommendations: list[Recommendation] | None = None,
         errors: list[str] | None = None,
         experience_score: ExperienceScore | None = None,
+        monitoring: MonitoringContext | None = None,
     ) -> "SensorSnapshot":
         return cls(
             timestamp=datetime.now(UTC).isoformat(),
@@ -368,6 +571,7 @@ class SensorSnapshot:
             recommendations=recommendations or [],
             collector_errors=errors or [],
             experience_score=experience_score,
+            monitoring=monitoring,
         )
 
     def to_dict(

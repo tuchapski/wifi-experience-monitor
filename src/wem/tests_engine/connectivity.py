@@ -1,11 +1,14 @@
 import re
 import socket
 import time
-import urllib.error
-import urllib.request
 
 from wem.collectors.command import run_command
-from wem.models.metrics import ConnectivityMetrics, TestOutcome
+from wem.models.metrics import ApplicationTargetMetric, ConnectivityMetrics, TestOutcome
+from wem.profiles.models import (
+    ApplicationTargetConfig,
+    TestConfigurations,
+)
+from wem.tests_engine.http_transaction import probe_http_transaction
 
 
 class ConnectivityTester:
@@ -16,30 +19,58 @@ class ConnectivityTester:
         dns_query: str = "example.com",
         internet_target: str = "1.1.1.1",
         https_url: str = "https://example.com",
+        tests: TestConfigurations | None = None,
     ):
         self.interface = interface
         self.gateway = gateway
-        self.dns_query = dns_query
-        self.internet_target = internet_target
-        self.https_url = https_url
+        self.tests = tests.model_copy(deep=True) if tests is not None else TestConfigurations()
+        if tests is None:
+            self.tests.dns.query = dns_query
+            self.tests.internet.target = internet_target
+            self.tests.https.url = https_url
+
+        self.dns_query = self.tests.dns.query
+        self.internet_target = self.tests.internet.target
+        self.https_url = self.tests.https.url
 
         self.errors: list[str] = []
 
     def run(self) -> ConnectivityMetrics:
         metrics = ConnectivityMetrics()
 
-        self._test_gateway(metrics)
-        self._test_dns(metrics)
-        self._test_internet(metrics)
-        self._test_https(metrics)
+        for name in ("gateway", "dns", "internet", "https"):
+            config = getattr(self.tests, name)
+            if config.enabled:
+                partial = self.run_test(name)
+                metrics.tests.update(partial.tests)
+                for field_name in _TEST_FIELDS[name]:
+                    setattr(metrics, field_name, getattr(partial, field_name))
+            else:
+                metrics.tests[name] = TestOutcome("disabled", "Test disabled by profile.")
 
+        return metrics
+
+    def run_test(self, name: str) -> ConnectivityMetrics:
+        metrics = ConnectivityMetrics()
+        runners = {
+            "gateway": self._test_gateway,
+            "dns": self._test_dns,
+            "internet": self._test_internet,
+            "https": self._test_https,
+        }
+        try:
+            runner = runners[name]
+        except KeyError as exc:
+            raise ValueError(f"Unknown connectivity test: {name}") from exc
+        runner(metrics)
         return metrics
 
     def _test_gateway(
         self,
         metrics: ConnectivityMetrics,
     ) -> None:
-        if self.gateway is None:
+        target = self.gateway if self.tests.gateway.automatic_gateway else self.tests.gateway.target
+        if target is None:
             metrics.tests["gateway"] = TestOutcome("skipped", "No gateway was identified.")
             return
 
@@ -50,7 +81,7 @@ class ConnectivityTester:
             latency_avg,
             latency_max,
             jitter,
-        ) = self._ping(self.gateway)
+        ) = self._ping(target, timeout=self.tests.gateway.timeout_seconds)
 
         metrics.gateway_reachable = reachable
         metrics.gateway_packet_loss_percent = packet_loss
@@ -59,7 +90,7 @@ class ConnectivityTester:
         metrics.gateway_latency_max_ms = latency_max
         metrics.gateway_jitter_ms = jitter
 
-        metrics.tests["gateway"] = self._ping_outcome(reachable, self.gateway)
+        metrics.tests["gateway"] = self._ping_outcome(reachable, target)
 
     def _test_dns(
         self,
@@ -71,24 +102,35 @@ class ConnectivityTester:
         started = time.perf_counter()
 
         try:
-            result = socket.getaddrinfo(
-                self.dns_query,
-                None,
-                family=socket.AF_INET,
-            )
+            timeout = self.tests.dns.timeout_seconds
+            if timeout is None:
+                result = socket.getaddrinfo(
+                    self.dns_query,
+                    None,
+                    family=socket.AF_INET,
+                )
+                address = str(result[0][4][0]) if result else None
+            else:
+                command_result = run_command(
+                    ["getent", "ahostsv4", self.dns_query],
+                    timeout=timeout,
+                )
+                if not command_result.success:
+                    raise OSError(command_result.stderr or "No IPv4 address was returned.")
+                first_line = command_result.stdout.splitlines()[0]
+                address = first_line.split()[0] if first_line else None
 
             elapsed = (time.perf_counter() - started) * 1000
 
-            metrics.dns_success = bool(result)
+            metrics.dns_success = address is not None
             metrics.dns_latency_ms = round(
                 elapsed,
                 3,
             )
 
-            if result:
-                metrics.dns_result = str(result[0][4][0])
+            metrics.dns_result = address
 
-        except OSError as exc:
+        except (OSError, IndexError) as exc:
             elapsed = (time.perf_counter() - started) * 1000
 
             metrics.dns_success = False
@@ -116,7 +158,10 @@ class ConnectivityTester:
             latency_avg,
             latency_max,
             jitter,
-        ) = self._ping(self.internet_target)
+        ) = self._ping(
+            self.internet_target,
+            timeout=self.tests.internet.timeout_seconds,
+        )
 
         metrics.internet_reachable = reachable
         metrics.internet_packet_loss_percent = packet_loss
@@ -131,55 +176,148 @@ class ConnectivityTester:
         self,
         metrics: ConnectivityMetrics,
     ) -> None:
-        request = urllib.request.Request(
+        result = probe_http_transaction(
             self.https_url,
-            method="GET",
-            headers={"User-Agent": "wifi-experience-monitor/0.1"},
+            self.tests.https.timeout_seconds or 5.0,
         )
-
-        failure_reason = "Test failed."
-        started = time.perf_counter()
-
-        try:
-            with urllib.request.urlopen(
-                request,
-                timeout=5,
-            ) as response:
-                elapsed = (time.perf_counter() - started) * 1000
-
-                metrics.https_status_code = response.status
-
-                metrics.https_success = 200 <= response.status < 400
-
-                metrics.https_total_time_ms = round(
-                    elapsed,
-                    3,
-                )
-
-        except (
-            urllib.error.URLError,
-            TimeoutError,
-        ) as exc:
-            elapsed = (time.perf_counter() - started) * 1000
-
-            metrics.https_success = False
-
-            metrics.https_total_time_ms = round(
-                elapsed,
-                3,
-            )
-
-            failure_reason = f"HTTPS test failed: {exc}"
-            if isinstance(exc, urllib.error.HTTPError):
-                metrics.https_status_code = exc.code
+        metrics.https_status_code = result.status_code
+        metrics.https_dns_ms = result.dns_ms
+        metrics.https_tcp_connect_ms = result.tcp_connect_ms
+        metrics.https_tls_handshake_ms = result.tls_handshake_ms
+        metrics.https_ttfb_ms = result.ttfb_ms
+        metrics.https_total_time_ms = result.total_ms
+        metrics.https_success = (
+            result.status == "passed" if result.status in {"passed", "failed"} else None
+        )
+        if result.status == "error":
+            self.errors.append(f"HTTPS collection failed: {result.reason}")
 
         metrics.tests["https"] = TestOutcome(
-            "passed" if metrics.https_success else "failed",
-            f"HTTPS response: {metrics.https_status_code}."
-            if metrics.https_success
-            else failure_reason,
+            result.status,
+            result.reason,
             "host",
         )
+
+    def run_application_target(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        try:
+            if config.kind == "http":
+                return self._test_application_http(config)
+            if config.kind == "tcp":
+                return self._test_application_tcp(config)
+            return self._test_application_dns(config)
+        except Exception as exc:
+            self.errors.append(f"application target collection failed for {config.name}: {exc}")
+            return self._target_metric(
+                config,
+                status="error",
+                reason=f"Application target collection error: {exc}",
+                latency_ms=None,
+            )
+
+    @staticmethod
+    def _target_metric(
+        config: ApplicationTargetConfig,
+        *,
+        status: str,
+        reason: str,
+        latency_ms: float | None,
+        status_code: int | None = None,
+        dns_ms: float | None = None,
+        tcp_connect_ms: float | None = None,
+        tls_handshake_ms: float | None = None,
+        ttfb_ms: float | None = None,
+    ) -> ApplicationTargetMetric:
+        return ApplicationTargetMetric(
+            name=config.name,
+            kind=config.kind,
+            target=config.target,
+            port=config.port,
+            status=status,
+            reason=reason,
+            latency_ms=latency_ms,
+            status_code=status_code,
+            dns_ms=dns_ms,
+            tcp_connect_ms=tcp_connect_ms,
+            tls_handshake_ms=tls_handshake_ms,
+            ttfb_ms=ttfb_ms,
+        )
+
+    def _test_application_http(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        result = probe_http_transaction(
+            config.target,
+            config.timeout_seconds or 5.0,
+        )
+        if result.status == "error":
+            self.errors.append(
+                f"application target collection failed for {config.name}: {result.reason}"
+            )
+        return self._target_metric(
+            config,
+            status=result.status,
+            reason=result.reason,
+            latency_ms=result.total_ms,
+            status_code=result.status_code,
+            dns_ms=result.dns_ms,
+            tcp_connect_ms=result.tcp_connect_ms,
+            tls_handshake_ms=result.tls_handshake_ms,
+            ttfb_ms=result.ttfb_ms,
+        )
+
+    def _test_application_tcp(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        assert config.port is not None
+        started = time.perf_counter()
+        try:
+            with socket.create_connection(
+                (config.target, config.port),
+                timeout=config.timeout_seconds or 5.0,
+            ):
+                pass
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="passed",
+                reason=f"TCP connection to {config.target}:{config.port} succeeded.",
+                latency_ms=elapsed,
+            )
+        except (OSError, TimeoutError) as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"TCP connection failed: {exc}",
+                latency_ms=elapsed,
+            )
+
+    def _test_application_dns(self, config: ApplicationTargetConfig) -> ApplicationTargetMetric:
+        started = time.perf_counter()
+        try:
+            timeout = config.timeout_seconds
+            if timeout is None:
+                result = socket.getaddrinfo(config.target, None, family=socket.AF_INET)
+                address = str(result[0][4][0]) if result else None
+            else:
+                command_result = run_command(["getent", "ahostsv4", config.target], timeout=timeout)
+                if not command_result.success:
+                    raise OSError(command_result.stderr or "No IPv4 address was returned.")
+                first_line = command_result.stdout.splitlines()[0]
+                address = first_line.split()[0] if first_line else None
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            if address is None:
+                raise OSError("No IPv4 address was returned.")
+            return self._target_metric(
+                config,
+                status="passed",
+                reason=f"System resolver returned {address}.",
+                latency_ms=elapsed,
+            )
+        except (OSError, IndexError) as exc:
+            elapsed = round((time.perf_counter() - started) * 1000, 3)
+            return self._target_metric(
+                config,
+                status="failed",
+                reason=f"DNS target failed: {exc}",
+                latency_ms=elapsed,
+            )
 
     def _ping_outcome(self, reachable: bool | None, target: str) -> TestOutcome:
         if reachable is None:
@@ -194,6 +332,7 @@ class ConnectivityTester:
     def _ping(
         self,
         target: str,
+        timeout: float | None = None,
     ) -> tuple[
         bool | None,
         float | None,
@@ -215,7 +354,7 @@ class ConnectivityTester:
                 "2",
                 target,
             ],
-            timeout=6,
+            timeout=timeout or 6.0,
         )
 
         output = result.stdout
@@ -260,3 +399,33 @@ class ConnectivityTester:
             latency_max,
             jitter,
         )
+
+
+_TEST_FIELDS = {
+    "gateway": (
+        "gateway_reachable",
+        "gateway_packet_loss_percent",
+        "gateway_latency_min_ms",
+        "gateway_latency_avg_ms",
+        "gateway_latency_max_ms",
+        "gateway_jitter_ms",
+    ),
+    "dns": ("dns_success", "dns_latency_ms", "dns_query", "dns_result"),
+    "internet": (
+        "internet_reachable",
+        "internet_packet_loss_percent",
+        "internet_latency_min_ms",
+        "internet_latency_avg_ms",
+        "internet_latency_max_ms",
+        "internet_jitter_ms",
+    ),
+    "https": (
+        "https_success",
+        "https_status_code",
+        "https_dns_ms",
+        "https_tcp_connect_ms",
+        "https_tls_handshake_ms",
+        "https_ttfb_ms",
+        "https_total_time_ms",
+    ),
+}
