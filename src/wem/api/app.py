@@ -447,15 +447,33 @@ def create_app(
         start: datetime,
         end: datetime,
         interface: str = Query(min_length=1, max_length=64),
+        reference_start: datetime | None = None,
+        reference_end: datetime | None = None,
     ) -> HTMLResponse:
+        if (reference_start is None) != (reference_end is None):
+            raise HTTPException(
+                status_code=422, detail="Provide both reference_start and reference_end."
+            )
         try:
-            window = HistoryRepository(database).window(
+            history_repository = HistoryRepository(database)
+            window = history_repository.window(
                 interface,
                 start,
                 end,
                 max_points=600,
-                include_comparison=True,
+                include_comparison=reference_start is None,
             )
+            if reference_start is not None and reference_end is not None:
+                reference = history_repository.window(
+                    interface,
+                    reference_start,
+                    reference_end,
+                    max_points=600,
+                    include_comparison=False,
+                )
+                window["comparison"] = history_repository.build_comparison(
+                    window, reference, reference_type="custom"
+                )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -204,25 +204,32 @@ class HistoryRepository:
                 max_points,
                 include_comparison=False,
             )
-            result["comparison"] = {
-                "current": summary,
-                "previous": previous["summary"],
-                "previous_start": previous["start"],
-                "previous_end": previous["end"],
-                "connection_cycles": {
-                    "current": connection_cycle_summary,
-                    "previous": previous["connection_cycle_summary"],
-                },
-                "service_slo": {
-                    "current": service_slo_summary,
-                    "previous": previous["service_slo_summary"],
-                },
-                "application_availability": {
-                    "current": application_availability,
-                    "previous": previous["application_availability"],
-                },
-            }
+            result["comparison"] = self.build_comparison(result, previous)
         return result
+
+    @staticmethod
+    def build_comparison(
+        current: dict[str, object], reference: dict[str, object], reference_type: str = "previous"
+    ) -> dict[str, object]:
+        return {
+            "current": current["summary"],
+            "previous": reference["summary"],
+            "previous_start": reference["start"],
+            "previous_end": reference["end"],
+            "reference_type": reference_type,
+            "connection_cycles": {
+                "current": current["connection_cycle_summary"],
+                "previous": reference["connection_cycle_summary"],
+            },
+            "service_slo": {
+                "current": current["service_slo_summary"],
+                "previous": reference["service_slo_summary"],
+            },
+            "application_availability": {
+                "current": current["application_availability"],
+                "previous": reference["application_availability"],
+            },
+        }
 
     @staticmethod
     def _summary(

@@ -268,10 +268,16 @@ def _executive_observations(
 
     comparison = window.get("comparison")
     if isinstance(comparison, dict):
-        observations.append(
-            "Period-over-period values below compare this window with the immediately preceding "
-            "window of equal duration; deltas are descriptive and are not an automatic verdict."
-        )
+        if comparison.get("reference_type") == "custom":
+            observations.append(
+                "Comparison values below use the selected reference period; durations and sample "
+                "counts may differ. Deltas are descriptive and are not an automatic verdict."
+            )
+        else:
+            observations.append(
+                "Period-over-period values below compare this window with the immediately preceding "
+                "window of equal duration; deltas are descriptive and are not an automatic verdict."
+            )
     return "".join(f"<li>{escape(item)}</li>" for item in observations)
 
 
@@ -383,6 +389,39 @@ def render_html_report(
     observations = _executive_observations(incidents, episodes, service_summary, window)
     comparison = window.get("comparison")
     previous_period = "Unavailable"
+    custom_reference = isinstance(comparison, dict) and comparison.get("reference_type") == "custom"
+    reference_label = (
+        "Chosen reference period" if custom_reference else "Previous equivalent period"
+    )
+    column_label = "Reference" if custom_reference else "Previous"
+    sample_counts = ""
+    if custom_reference:
+        comparison_description = (
+            "Current values are compared with the chosen reference period. Durations and sample "
+            "counts may differ; delta = current − reference and is descriptive, not an automatic verdict."
+        )
+        current_summary = comparison.get("current") if isinstance(comparison, dict) else None
+        reference_summary = comparison.get("previous") if isinstance(comparison, dict) else None
+        selected_count = (
+            current_summary.get("sample_count", "Unknown")
+            if isinstance(current_summary, dict)
+            else "Unknown"
+        )
+        reference_count = (
+            reference_summary.get("sample_count", "Unknown")
+            if isinstance(reference_summary, dict)
+            else "Unknown"
+        )
+        sample_counts = (
+            f" Selected samples: {escape(str(selected_count))}; "
+            f"reference samples: {escape(str(reference_count))}."
+        )
+    else:
+        comparison_description = (
+            "Current values are compared with the immediately preceding equivalent period. "
+            "Delta = current − previous; positive or negative values are descriptive and are not "
+            "automatically classified as better or worse."
+        )
     if isinstance(comparison, dict):
         previous_period = f"{comparison.get('previous_start', 'Unknown')} – {comparison.get('previous_end', 'Unknown')}"
     return f"""<!doctype html>
@@ -397,10 +436,10 @@ h1{{margin:0 0 8px}}h2,h3{{margin-top:0}}.muted{{color:#667085;font-size:13px;li
 table{{border-collapse:collapse;width:100%;font-size:13px}}th,td{{padding:10px;text-align:left;border-bottom:1px solid #e4e7ec;vertical-align:top}}th{{color:#667085}}
 @media(max-width:900px){{main{{padding:16px}}.summary,.charts,.executive{{grid-template-columns:1fr}}}}@media print{{body{{background:#fff}}main{{padding:0}}header,section,article{{box-shadow:none;border:1px solid #e4e7ec;break-inside:avoid}}}}
 </style></head><body><main>
-<header><span class="badge">Report v2</span><h1>Wi-Fi Experience Executive Report</h1><p class="muted">Interface: <strong>{interface}</strong><br>Selected period: {start} – {end}<br>Previous equivalent period: {escape(previous_period)}</p></header>
+<header><span class="badge">Report v2</span><h1>Wi-Fi Experience Executive Report</h1><p class="muted">Interface: <strong>{interface}</strong><br>Selected period: {start} – {end}<br>{reference_label}: {escape(previous_period)}</p></header>
 <section><h2>Executive overview</h2><div class="summary executive"><div class="card">Stored samples<strong>{samples}</strong></div><div class="card">Experience episodes<strong>{len(episodes)}</strong></div><div class="card">Incident intervals<strong>{len(incidents)}</strong></div><div class="card">Critical incidents<strong>{critical_incidents}</strong></div></div><h3>Key observations</h3><ul class="observations">{observations}</ul><p class="muted">Correlated episodes with one primary domain: {correlated_episodes}. Executive observations are derived from stored measurements, incidents and deterministic correlation evidence; they are not proof of physical root cause.</p></section>
 <section><h2>Experience episodes</h2><table><thead><tr><th>Severity</th><th>Status</th><th>Started</th><th>Ended</th><th>Duration</th><th>Incidents</th><th>Correlation</th><th>Codes</th></tr></thead><tbody>{_episode_rows(episodes)}</tbody></table><p class="muted">Episodes group incident intervals separated by no more than the configured episode merge gap. Correlation is assigned only from stored correlated snapshots inside each episode.</p></section>
-<section><h2>Period-over-period comparison</h2><p class="muted">Current values are compared with the immediately preceding equivalent period. Delta = current − previous; positive or negative values are descriptive and are not automatically classified as better or worse.</p><table><thead><tr><th>Metric</th><th>Current</th><th>Previous</th><th>Delta</th></tr></thead><tbody>{_comparison_rows(window)}</tbody></table><h3>Synthetic-service availability</h3><table><thead><tr><th>Service</th><th>Current</th><th>Previous</th><th>Delta</th></tr></thead><tbody>{_service_comparison_rows(window)}</tbody></table></section>
+<section><h2>{"Selected vs reference comparison" if custom_reference else "Period-over-period comparison"}</h2><p class="muted">{escape(comparison_description)}{sample_counts}</p><table><thead><tr><th>Metric</th><th>Current</th><th>{column_label}</th><th>Delta</th></tr></thead><tbody>{_comparison_rows(window)}</tbody></table><h3>Synthetic-service availability</h3><table><thead><tr><th>Service</th><th>Current</th><th>{column_label}</th><th>Delta</th></tr></thead><tbody>{_service_comparison_rows(window)}</tbody></table></section>
 <section><h2>Synthetic service SLA/SLO observations</h2><table><thead><tr><th>Service</th><th>Availability</th><th>Success / Failure / Error</th><th>Latency P95</th><th>Latency P99</th><th>Packet-loss P95</th></tr></thead><tbody>{service_rows}</tbody></table><p class="muted">Availability uses only fresh definitive passed/failed executions. Collection errors are reported separately and excluded from the denominator. These are selected-period observations; rolling compliance is evaluated against the profile-pinned runtime SLO policy.</p></section>
 <section><h2>Connection cycle statistics</h2><div class="summary">{cycle_summary_cards}</div><h3>Cycles by type</h3><table><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>{type_rows}</tbody></table><h3>Stage timing percentiles</h3><table><thead><tr><th>Stage</th><th>Samples</th><th>P50</th><th>P95</th><th>P99</th></tr></thead><tbody>{stage_rows}</tbody></table><p class="muted">Percentiles exclude unknown durations rather than treating them as zero.</p></section>
 <section><h2>Measurements</h2><div class="charts">{charts}</div></section>

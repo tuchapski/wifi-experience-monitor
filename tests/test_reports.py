@@ -109,6 +109,54 @@ def test_html_report_rejects_invalid_range(tmp_path):
     assert response.status_code == 422
 
 
+def test_html_report_uses_chosen_reference_and_validates_both_dates(tmp_path):
+    path = str(tmp_path / "reference-report.db")
+    database = Database(path)
+    database.initialize()
+    start = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    reference_start = start - timedelta(hours=2)
+    with database.session() as session:
+        for timestamp, signal in (
+            (reference_start + timedelta(minutes=1), -80),
+            (start + timedelta(minutes=1), -60),
+        ):
+            session.add(
+                SnapshotRecord(
+                    timestamp=timestamp.replace(tzinfo=None),
+                    interface="wlan0",
+                    signal_dbm=signal,
+                    snapshot_json=json.dumps({"wifi": {"signal_dbm": signal}}),
+                )
+            )
+        session.commit()
+
+    params = {
+        "interface": "wlan0",
+        "start": start.isoformat(),
+        "end": (start + timedelta(hours=1)).isoformat(),
+        "reference_start": reference_start.isoformat(),
+        "reference_end": (reference_start + timedelta(hours=1)).isoformat(),
+    }
+    with TestClient(create_app(path)) as client:
+        response = client.get("/reports/html", params=params)
+        missing_end = client.get(
+            "/reports/html",
+            params={key: value for key, value in params.items() if key != "reference_end"},
+        )
+        invalid_range = client.get(
+            "/reports/html", params={**params, "reference_end": reference_start.isoformat()}
+        )
+
+    assert response.status_code == 200
+    assert "Chosen reference period" in response.text
+    assert "Selected vs reference comparison" in response.text
+    assert "Selected samples: 1; reference samples: 1" in response.text
+    assert "+20.00 dBm" in response.text
+    assert "immediately preceding equivalent period" not in response.text
+    assert missing_end.status_code == 422
+    assert invalid_range.status_code == 422
+
+
 def test_report_renders_percentile_data_from_history():
     html = render_html_report(
         {

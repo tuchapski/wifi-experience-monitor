@@ -180,8 +180,11 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
       <label className="history-auto"><input type="checkbox" checked={auto} disabled={period === "custom"}
         onChange={event => setAuto(event.target.checked)} /> Refresh every 30 seconds</label>
       <button type="button" onClick={() => setRevision(value => value + 1)} disabled={loading}>Refresh</button>
-      {data && <button type="button" onClick={() => window.open(
-        getReportUrl(selectedInterface, data.start, data.end), "_blank", "noopener,noreferrer")}>Open HTML report</button>}
+      {data && <button type="button" disabled={comparisonMode === "custom" && !comparison}
+        onClick={() => window.open(getReportUrl(selectedInterface, data.start, data.end,
+          comparisonMode === "custom" && comparison ? {
+            start: comparison.previous_start, end: comparison.previous_end,
+          } : undefined), "_blank", "noopener,noreferrer")}>Open HTML report</button>}
     </div>
     {period === "custom" && <div className="history-controls">
       <label>Start · local time<input type="datetime-local" value={customStart} onChange={event => setCustomStart(event.target.value)} /></label>
@@ -348,7 +351,6 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
           {" "}{date(comparison.previous_end)} ({comparison.previous.sample_count.toLocaleString()} samples).
           Values use available readings; missing values remain unavailable.
           {comparisonMode === "custom" && " Different durations or sample counts can affect the comparison."}
-          {comparisonMode === "custom" && " The HTML report still uses the previous equivalent period."}
         </p>
         {comparison.connection_cycles && <div className="history-comparison-grid">
           {(() => {

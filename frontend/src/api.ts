@@ -269,7 +269,14 @@ export function getHistoryWindow(
   return request<HistoryWindow>(`/history/window?${query}`, { signal });
 }
 
-export function getReportUrl(interfaceName: string, start: string, end: string): string {
+export function getReportUrl(
+  interfaceName: string, start: string, end: string,
+  reference?: { start: string; end: string },
+): string {
   const query = new URLSearchParams({ interface: interfaceName, start, end });
+  if (reference) {
+    query.set("reference_start", reference.start);
+    query.set("reference_end", reference.end);
+  }
   return `${API_URL}/reports/html?${query}`;
 }
