@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import SensorControl from "./SensorControl";
 import WifiDetails from "./WifiDetails";
 import HistoryPanel from "./HistoryPanel";
+import CurrentExperienceDashboard from "./CurrentExperienceDashboard";
 import ExperienceScorePanel from "./ExperienceScorePanel";
 import AdaptiveBaselinePanel from "./AdaptiveBaselinePanel";
 import CorrelationPanel from "./CorrelationPanel";
@@ -405,6 +406,14 @@ function App() {
 
       <section id="section-dashboard" aria-labelledby="nav-dashboard"
         hidden={activeTab !== "dashboard"}>
+        <CurrentExperienceDashboard
+          snapshot={snapshot}
+          activeIncidents={activeIncidents}
+          waitingMessage={waitingMessage}
+        />
+        {snapshot && <details className="dashboard-detail-disclosure">
+          <summary>Detailed dashboard evidence</summary>
+          <div className="dashboard-detail-disclosure-content">
         {snapshot ? (<>
       <ExperienceScorePanel score={snapshot.experience_score} />
       <CorrelationPanel correlation={snapshot.correlation} />
@@ -807,6 +816,8 @@ function App() {
 
 
         </>) : <div className="empty-state">{waitingMessage}</div>}
+          </div>
+        </details>}
       </section>
 
       <section id="section-wifi" aria-labelledby="nav-wifi"
