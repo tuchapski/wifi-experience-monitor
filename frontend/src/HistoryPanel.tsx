@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { getHistoryInterfaces, getHistoryWindow, getReportUrl } from "./api";
+import { compareHistoryWindows } from "./historyComparisonModel";
 import type { HistoryWindow } from "./types";
 
 const HistoricalTimeline = lazy(() => import("./HistoricalTimeline"));
@@ -51,6 +52,13 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
   const [auto, setAuto] = useState(true);
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<HistoryWindow | null>(null);
+  const [comparisonMode, setComparisonMode] = useState<"previous" | "custom">("previous");
+  const [referenceStart, setReferenceStart] = useState("");
+  const [referenceEnd, setReferenceEnd] = useState("");
+  const [referenceRange, setReferenceRange] = useState<{ start: string; end: string } | null>(null);
+  const [referenceData, setReferenceData] = useState<HistoryWindow | null>(null);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rangeError, setRangeError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,6 +108,31 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
     return () => { cancelled = true; controller.abort(); if (timer !== undefined) window.clearInterval(timer); };
   }, [selectedInterface, period, customRange, auto, revision]);
 
+  useEffect(() => {
+    if (comparisonMode !== "custom" || !referenceRange || !selectedInterface) {
+      setReferenceData(null);
+      setReferenceLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setReferenceData(null);
+    setReferenceError(null);
+    setReferenceLoading(true);
+    getHistoryWindow(selectedInterface, referenceRange.start, referenceRange.end, controller.signal, false)
+      .then((window) => {
+        if (!controller.signal.aborted) setReferenceData(window);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) setReferenceError(
+          err instanceof Error ? err.message : "Unable to load the reference period.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setReferenceLoading(false);
+      });
+    return () => controller.abort();
+  }, [comparisonMode, referenceRange, selectedInterface]);
+
   function applyRange() {
     const start = new Date(customStart), end = new Date(customEnd);
     const seconds = (end.getTime() - start.getTime()) / 1000;
@@ -109,6 +142,28 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
     setRangeError(null);
     setCustomRange({ start: start.toISOString(), end: end.toISOString() });
   }
+
+  function applyReferenceRange() {
+    const start = new Date(referenceStart), end = new Date(referenceEnd);
+    const seconds = (end.getTime() - start.getTime()) / 1000;
+    if (!Number.isFinite(seconds) || seconds < 1 || seconds > 604800) {
+      setReferenceRange(null);
+      setReferenceData(null);
+      setReferenceError("Choose a reference start and end with a positive range of at most seven days.");
+      return;
+    }
+    setReferenceError(null);
+    setReferenceRange({ start: start.toISOString(), end: end.toISOString() });
+  }
+
+  const comparison = data && (comparisonMode === "previous" ? data.comparison
+    : referenceData ? compareHistoryWindows(data, referenceData) : null);
+  const comparedTargets = comparison?.application_availability ? [
+    ...comparison.application_availability.current.targets,
+    ...comparison.application_availability.previous.targets.filter((reference) =>
+      !comparison.application_availability?.current.targets.some((current) =>
+        current.identity === reference.identity)),
+  ] : [];
 
   return <section className="panel history-panel" aria-labelledby="history-title">
     <h2 id="history-title">Historical explorer</h2>
@@ -264,34 +319,64 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
           </tr>)}</tbody>
         </table></div>
       </section>}
-      {data.comparison && <section className="history-comparison" aria-labelledby="history-comparison-title">
-        <h3 id="history-comparison-title">Compared with the previous equivalent period</h3>
-        <p className="metric-note">Previous period: {date(data.comparison.previous_start)} – {date(data.comparison.previous_end)}.
-          Values use all available readings; unavailable metrics remain unavailable.</p>
-        {data.comparison.connection_cycles && <div className="history-comparison-grid">
+      <section className="history-comparison" aria-labelledby="history-comparison-title">
+        <h3 id="history-comparison-title">Compare periods</h3>
+        <div className="history-comparison-controls">
+          <label>Reference period<select value={comparisonMode} onChange={event =>
+            setComparisonMode(event.target.value as "previous" | "custom")}>
+            <option value="previous">Previous equivalent period</option>
+            <option value="custom">Choose reference dates</option>
+          </select></label>
+          {comparisonMode === "custom" && <>
+            <label>Reference start · local time<input type="datetime-local" value={referenceStart}
+              onChange={event => setReferenceStart(event.target.value)} /></label>
+            <label>Reference end · local time<input type="datetime-local" value={referenceEnd}
+              onChange={event => setReferenceEnd(event.target.value)} /></label>
+            <button type="button" onClick={applyReferenceRange}>Compare</button>
+          </>}
+        </div>
+        {comparisonMode === "custom" && !referenceRange &&
+          <p className="metric-note">Choose a reference period to compare with the selected History period.</p>}
+        {comparisonMode === "custom" && referenceLoading &&
+          <p className="metric-note" role="status">Loading reference period…</p>}
+        {comparisonMode === "custom" && referenceError &&
+          <p className="error" role="alert">{referenceError}</p>}
+        {comparison && <>
+        <p className="metric-note">
+          Selected: {date(data.start)} – {date(data.end)} ({comparison.current.sample_count.toLocaleString()} samples).<br />
+          {comparisonMode === "custom" ? "Reference" : "Previous"}: {date(comparison.previous_start)} –
+          {" "}{date(comparison.previous_end)} ({comparison.previous.sample_count.toLocaleString()} samples).
+          Values use available readings; missing values remain unavailable.
+          {comparisonMode === "custom" && " Different durations or sample counts can affect the comparison."}
+          {comparisonMode === "custom" && " The HTML report still uses the previous equivalent period."}
+        </p>
+        {comparison.connection_cycles && <div className="history-comparison-grid">
           {(() => {
-            const current = data.comparison?.connection_cycles?.current.total_time_ms.p95;
-            const previous = data.comparison?.connection_cycles?.previous.total_time_ms.p95;
+            const current = comparison.connection_cycles?.current.total_time_ms.p95;
+            const previous = comparison.connection_cycles?.previous.total_time_ms.p95;
             const delta = current != null && previous != null ? current - previous : null;
             const trend = delta == null || Math.abs(delta) < 0.005 ? "flat" : delta < 0 ? "improved" : "worse";
             return <article className={`history-comparison-card trend-${trend}`}>
               <span>Connection ready time · P95</span><strong>{format(current)} ms</strong>
+              <small>Reference: {format(previous)} ms</small>
               <small>{delta == null ? "No comparable measured cycles" :
-                `${delta >= 0 ? "+" : ""}${format(delta)} ms vs previous`}</small>
+                `${delta >= 0 ? "+" : ""}${format(delta)} ms vs ${comparisonMode === "custom" ? "reference" : "previous"}`}</small>
               <em>{trend === "improved" ? "Improved" : trend === "worse" ? "Worse" : "Stable / unavailable"}</em>
             </article>;
           })()}
         </div>}
-        {data.comparison.application_availability &&
-          data.comparison.application_availability.current.targets.length > 0 && <div className="table-wrapper">
-          <h4>Application availability compared with previous period</h4>
+        {comparison.application_availability && comparedTargets.length > 0 && <div className="table-wrapper">
+          <h4>Application availability</h4>
           <table>
-            <thead><tr><th>Target</th><th>Current</th><th>Previous</th><th>Delta</th></tr></thead>
-            <tbody>{data.comparison.application_availability.current.targets.map(target => {
-              const previous = data.comparison?.application_availability?.previous.targets.find(
+            <thead><tr><th>Target</th><th>Selected</th><th>Reference</th><th>Delta</th></tr></thead>
+            <tbody>{comparedTargets.map(target => {
+              const selected = comparison.application_availability?.current.targets.find(
                 item => item.identity === target.identity,
               );
-              const currentValue = target.availability_percent;
+              const previous = comparison.application_availability?.previous.targets.find(
+                item => item.identity === target.identity,
+              );
+              const currentValue = selected?.availability_percent ?? null;
               const previousValue = previous?.availability_percent ?? null;
               const delta = currentValue !== null && previousValue !== null
                 ? currentValue - previousValue : null;
@@ -307,20 +392,24 @@ export default function HistoryPanel({ currentInterface }: { currentInterface?: 
         </div>}
         <div className="history-comparison-grid">
           {comparisonMetrics.map(item => {
-            const current = data.comparison?.current.metrics[item.key]?.avg;
-            const previous = data.comparison?.previous.metrics[item.key]?.avg;
+            const current = comparison.current.metrics[item.key]?.avg;
+            const previous = comparison.previous.metrics[item.key]?.avg;
             const delta = current != null && previous != null ? current - previous : null;
             const trend = delta == null || Math.abs(delta) < 0.005 ? "flat" :
               ((item.higherIsBetter && delta > 0) || (!item.higherIsBetter && delta < 0) ? "improved" : "worse");
             return <article key={item.key} className={`history-comparison-card trend-${trend}`}>
               <span>{item.label}</span>
               <strong>{format(current)} {item.unit}</strong>
-              <small>{delta == null ? "No comparable readings" : `${delta >= 0 ? "+" : ""}${format(delta)} ${item.unit} vs previous`}</small>
+              <small>Reference: {format(previous)} {item.unit} · readings
+                {" "}{comparison.current.metrics[item.key]?.count ?? 0}/
+                {comparison.previous.metrics[item.key]?.count ?? 0}</small>
+              <small>{delta == null ? "No comparable readings" : `${delta >= 0 ? "+" : ""}${format(delta)} ${item.unit} vs ${comparisonMode === "custom" ? "reference" : "previous"}`}</small>
               <em>{trend === "improved" ? "Improved" : trend === "worse" ? "Worse" : "Stable / unavailable"}</em>
             </article>;
           })}
         </div>
-      </section>}
+        </>}
+      </section>
       {data.total_samples === 0 && <div className="empty-state">
         No samples for this interface and period.
       </div>}

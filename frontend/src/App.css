@@ -678,6 +678,12 @@ tbody tr:hover {
 .recommendation-info { border-left-color: #175cd3; }
 .history-comparison { margin: 18px 0; padding: 16px; border: 1px solid #d0d5dd; border-radius: 10px; background: #f9fafb; }
 .history-comparison h3 { margin: 0 0 6px; }
+.history-comparison-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.history-comparison-controls label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.history-comparison-controls select, .history-comparison-controls input, .history-comparison-controls button {
+  padding: 8px; border: 1px solid #d0d5dd; border-radius: 6px; font: inherit;
+}
+.history-comparison-controls button { color: white; background: #175cd3; cursor: pointer; }
 .history-comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .history-comparison-card { display: flex; flex-direction: column; gap: 5px; padding: 12px; border-left: 4px solid #98a2b3; border-radius: 6px; background: #fff; }
 .history-comparison-card strong { font-size: 18px; }

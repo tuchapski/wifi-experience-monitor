@@ -262,9 +262,10 @@ export function getHistoryInterfaces(): Promise<string[]> {
 
 export function getHistoryWindow(
   interfaceName: string, start: string, end: string, signal?: AbortSignal,
+  includeComparison = true,
 ): Promise<HistoryWindow> {
   const query = new URLSearchParams({ interface: interfaceName, start, end, max_points: "600" });
-  query.set("compare", "true");
+  query.set("compare", String(includeComparison));
   return request<HistoryWindow>(`/history/window?${query}`, { signal });
 }
 
