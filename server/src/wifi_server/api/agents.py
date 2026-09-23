@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from wifi_server.config import ServerSettings
 from wifi_server.dependencies import get_session, get_settings
 from wifi_server.schemas import (
+    AgentCurrentStateRequest,
+    AgentCurrentStateResponse,
     AgentEnrollmentRequest,
     AgentEnrollmentResponse,
     AgentHeartbeatRequest,
@@ -16,8 +18,10 @@ from wifi_server.services.agents import (
     authenticate_agent,
     enroll_agent,
     get_agent,
+    get_current_state,
     list_agents,
     process_heartbeat,
+    update_current_state,
 )
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
@@ -68,6 +72,26 @@ def agents(
     settings: Annotated[ServerSettings, Depends(get_settings)],
 ) -> list[AgentResponse]:
     return list_agents(session, settings)
+
+
+@router.put("/{agent_id}/state", response_model=AgentCurrentStateResponse)
+def publish_state(
+    agent_id: str,
+    payload: AgentCurrentStateRequest,
+    session: Annotated[Session, Depends(get_session)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> AgentCurrentStateResponse:
+    token = _bearer_token(authorization)
+    agent = authenticate_agent(session, agent_id, token)
+    return update_current_state(session, agent, payload)
+
+
+@router.get("/{agent_id}/state", response_model=AgentCurrentStateResponse)
+def current_state(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> AgentCurrentStateResponse:
+    return get_current_state(session, agent_id)
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

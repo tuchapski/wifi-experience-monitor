@@ -65,3 +65,42 @@ class AgentResponse(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     capabilities: list[AgentCapabilityResponse] = Field(default_factory=list)
+
+
+class WifiCurrentStatePayload(BaseModel):
+    model_config = {"extra": "allow"}
+
+    connected: bool | None = None
+    interface: str | None = None
+    ssid: str | None = None
+    bssid: str | None = None
+    frequency_mhz: int | None = None
+    channel: int | None = None
+    channel_width_mhz: int | None = None
+    rssi_dbm: float | None = None
+    snr_db: float | None = None
+    tx_rate_mbps: float | None = None
+    rx_rate_mbps: float | None = None
+
+
+class NetworkCurrentStatePayload(BaseModel):
+    model_config = {"extra": "allow"}
+
+    ipv4_address: str | None = None
+    prefix_length: int | None = None
+    gateway: str | None = None
+    gateway_latency_ms: float | None = None
+    dns_latency_ms: float | None = None
+    internet_latency_ms: float | None = None
+
+
+class AgentCurrentStateRequest(BaseModel):
+    observed_at: datetime
+    wifi: WifiCurrentStatePayload = Field(default_factory=WifiCurrentStatePayload)
+    network: NetworkCurrentStatePayload = Field(default_factory=NetworkCurrentStatePayload)
+    collector_errors: list[str] = Field(default_factory=list)
+
+
+class AgentCurrentStateResponse(AgentCurrentStateRequest):
+    agent_id: str
+    updated_at: datetime

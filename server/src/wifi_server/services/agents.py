@@ -7,9 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
-from wifi_server.db.models import Agent, AgentCapability, AgentCredential, AgentSession
+from wifi_server.db.models import (
+    Agent,
+    AgentCapability,
+    AgentCredential,
+    AgentCurrentState,
+    AgentSession,
+)
 from wifi_server.schemas import (
     AgentCapabilityResponse,
+    AgentCurrentStateRequest,
+    AgentCurrentStateResponse,
     AgentEnrollmentRequest,
     AgentEnrollmentResponse,
     AgentHeartbeatRequest,
@@ -220,4 +228,80 @@ def _agent_response(
             )
             for capability in capabilities
         ],
+    )
+
+
+def update_current_state(
+    session: Session,
+    agent: Agent,
+    request: AgentCurrentStateRequest,
+) -> AgentCurrentStateResponse:
+    current = session.get(AgentCurrentState, agent.id)
+    if current is not None and request.observed_at <= current.observed_at:
+        return _current_state_response(current)
+
+    now = datetime.now(UTC)
+    raw_state = request.model_dump(
+        mode="json",
+        exclude={"observed_at"},
+        exclude_none=True,
+    )
+    wifi = request.wifi
+    network = request.network
+
+    if current is None:
+        current = AgentCurrentState(
+            agent_id=agent.id,
+            observed_at=request.observed_at,
+            raw_state=raw_state,
+            updated_at=now,
+        )
+        session.add(current)
+
+    current.observed_at = request.observed_at
+    current.wifi_connected = wifi.connected
+    current.interface = wifi.interface
+    current.ssid = wifi.ssid
+    current.bssid = wifi.bssid
+    current.frequency_mhz = wifi.frequency_mhz
+    current.channel = wifi.channel
+    current.channel_width_mhz = wifi.channel_width_mhz
+    current.rssi_dbm = wifi.rssi_dbm
+    current.snr_db = wifi.snr_db
+    current.tx_rate_mbps = wifi.tx_rate_mbps
+    current.rx_rate_mbps = wifi.rx_rate_mbps
+    current.gateway_latency_ms = network.gateway_latency_ms
+    current.dns_latency_ms = network.dns_latency_ms
+    current.internet_latency_ms = network.internet_latency_ms
+    current.raw_state = raw_state
+    current.updated_at = now
+
+    session.commit()
+    return _current_state_response(current)
+
+
+def get_current_state(
+    session: Session,
+    agent_id: str,
+) -> AgentCurrentStateResponse:
+    if session.get(Agent, agent_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+    current = session.get(AgentCurrentState, agent_id)
+    if current is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Current state is not available for this agent",
+        )
+    return _current_state_response(current)
+
+
+def _current_state_response(current: AgentCurrentState) -> AgentCurrentStateResponse:
+    raw_state = current.raw_state or {}
+    return AgentCurrentStateResponse(
+        agent_id=current.agent_id,
+        observed_at=current.observed_at,
+        updated_at=current.updated_at,
+        wifi=raw_state.get("wifi", {}),
+        network=raw_state.get("network", {}),
+        collector_errors=raw_state.get("collector_errors", []),
     )
