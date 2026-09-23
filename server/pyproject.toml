@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wifi-experience-server"
+version = "0.1.0"
+description = "Central server for Wi-Fi Experience Monitor agents"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.13",
+    "fastapi[standard]>=0.100",
+    "psycopg[binary]>=3.2",
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.13",
+    "mypy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

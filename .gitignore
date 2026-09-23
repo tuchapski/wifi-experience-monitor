@@ -49,3 +49,7 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Local recording artifact storage
+storage/recordings/*
+!storage/recordings/.gitkeep
