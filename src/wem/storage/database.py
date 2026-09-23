@@ -30,5 +30,9 @@ class Database:
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
 
+        from wem.profiles.service import ProfileService
+
+        ProfileService(self).ensure_default()
+
     def session(self) -> Session:
         return self.session_factory()

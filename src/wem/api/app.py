@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Annotated, NoReturn
 
 from fastapi import (
     FastAPI,
@@ -11,19 +12,32 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from wem.collectors.interfaces import (
     WirelessInterfaceDiscovery,
 )
+from wem.profiles.defaults import default_profile_config
+from wem.profiles.models import TestProfileConfig
+from wem.profiles.service import (
+    ActiveProfileDisabledError,
+    DuplicateProfileNameError,
+    ProfileDisabledError,
+    ProfileNotFoundError,
+    ProfileService,
+    ProfileVersionNotFoundError,
+)
 from wem.reports.html import render_html_report
 from wem.runtime.controller import SensorController
 from wem.storage.database import Database
+from wem.storage.episodes import EpisodeRepository
 from wem.storage.history import HistoryRepository
 from wem.storage.incidents import IncidentRepository
 from wem.storage.models import (
     IncidentRecord,
     SnapshotRecord,
+    TestProfileRecord,
+    TestProfileVersionRecord,
 )
 from wem.storage.repository import SnapshotRepository
 
@@ -36,6 +50,30 @@ class SensorConfigRequest(BaseModel):
         ge=1.0,
         le=3600.0,
     )
+
+
+ProfileName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+]
+
+
+class ProfileCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: ProfileName
+    description: str | None = Field(default=None, max_length=2000)
+    enabled: bool = True
+    configuration: TestProfileConfig = Field(default_factory=default_profile_config)
+
+
+class ProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: ProfileName | None = None
+    description: str | None = Field(default=None, max_length=2000)
+    enabled: bool | None = None
+    configuration: TestProfileConfig | None = None
 
 
 def _record_to_summary(
@@ -89,6 +127,64 @@ def _incident_timestamp(value: datetime) -> str:
     return value.isoformat()
 
 
+def _profile_timestamp(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
+
+
+def _profile_payload(
+    profile: TestProfileRecord,
+    version: TestProfileVersionRecord,
+    *,
+    include_configuration: bool = True,
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "id": profile.id,
+        "name": profile.name,
+        "description": profile.description,
+        "enabled": profile.enabled,
+        "active": profile.active_version_id == version.id,
+        "version": version.version,
+        "version_id": version.id,
+        "created_at": _profile_timestamp(profile.created_at),
+        "updated_at": _profile_timestamp(profile.updated_at),
+        "version_created_at": _profile_timestamp(version.created_at),
+    }
+    if include_configuration:
+        result["configuration"] = ProfileService.configuration(version).model_dump(mode="json")
+    return result
+
+
+def _version_payload(
+    profile: TestProfileRecord,
+    version: TestProfileVersionRecord,
+) -> dict[str, object]:
+    return {
+        "id": version.id,
+        "profile_id": profile.id,
+        "version": version.version,
+        "active": profile.active_version_id == version.id,
+        "created_at": _profile_timestamp(version.created_at),
+        "configuration": ProfileService.configuration(version).model_dump(mode="json"),
+    }
+
+
+def _raise_profile_http_error(exc: Exception) -> NoReturn:
+    if isinstance(exc, (ProfileNotFoundError, ProfileVersionNotFoundError)):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(
+        exc,
+        (
+            DuplicateProfileNameError,
+            ProfileDisabledError,
+            ActiveProfileDisabledError,
+        ),
+    ):
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    raise exc
+
+
 def create_app(
     database_path: str = "data/wem.db",
 ) -> FastAPI:
@@ -99,6 +195,10 @@ def create_app(
     snapshot_repository = SnapshotRepository(database)
 
     incident_repository = IncidentRepository(database)
+
+    episode_repository = EpisodeRepository(database)
+
+    profile_service = ProfileService(database)
 
     sensor_controller = SensorController(database_path=database_path)
 
@@ -151,6 +251,99 @@ def create_app(
     def wireless_interfaces() -> list[dict[str, str | None]]:
         return interface_discovery.discover_dicts()
 
+    @app.get("/profiles")
+    def profiles() -> list[dict[str, object]]:
+        return [
+            _profile_payload(profile, version, include_configuration=False)
+            for profile, version in profile_service.list_profiles()
+        ]
+
+    @app.post("/profiles", status_code=201)
+    def create_profile(request: ProfileCreateRequest) -> dict[str, object]:
+        try:
+            profile, version = profile_service.create(
+                name=request.name,
+                description=request.description,
+                enabled=request.enabled,
+                config=request.configuration,
+            )
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _profile_payload(profile, version)
+
+    @app.get("/profiles/active")
+    def active_profile() -> dict[str, object]:
+        try:
+            profile, version = profile_service.active()
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _profile_payload(profile, version)
+
+    @app.get("/profiles/{profile_id}")
+    def profile(profile_id: int) -> dict[str, object]:
+        try:
+            record, version = profile_service.get(profile_id)
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _profile_payload(record, version)
+
+    @app.put("/profiles/{profile_id}")
+    def update_profile(
+        profile_id: int,
+        request: ProfileUpdateRequest,
+    ) -> dict[str, object]:
+        try:
+            current, current_version = profile_service.get(profile_id)
+            configuration = (
+                request.configuration
+                if request.configuration is not None
+                else profile_service.configuration(current_version)
+            )
+            description = (
+                request.description
+                if "description" in request.model_fields_set
+                else current.description
+            )
+            record, version = profile_service.update(
+                profile_id,
+                name=request.name if request.name is not None else current.name,
+                description=description,
+                enabled=request.enabled if request.enabled is not None else current.enabled,
+                config=configuration,
+            )
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _profile_payload(record, version)
+
+    @app.post("/profiles/{profile_id}/activate")
+    def activate_profile(profile_id: int) -> dict[str, object]:
+        try:
+            record, version = profile_service.activate(profile_id)
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _profile_payload(record, version)
+
+    @app.get("/profiles/{profile_id}/versions")
+    def profile_versions(profile_id: int) -> list[dict[str, object]]:
+        try:
+            record, _ = profile_service.get(profile_id)
+            versions = profile_service.versions(profile_id)
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return [_version_payload(record, version) for version in versions]
+
+    @app.get("/profiles/{profile_id}/versions/{version_number}")
+    def profile_version(
+        profile_id: int,
+        version_number: int,
+    ) -> dict[str, object]:
+        try:
+            record, _ = profile_service.get(profile_id)
+            version = profile_service.version(profile_id, version_number)
+        except Exception as exc:
+            _raise_profile_http_error(exc)
+        return _version_payload(record, version)
+
     @app.get("/config")
     def get_config() -> dict[str, object]:
         status = sensor_controller.status()
@@ -186,7 +379,7 @@ def create_app(
 
         return {
             "interface": (request.interface),
-            "interval_seconds": (request.interval_seconds),
+            "interval_seconds": (sensor_controller.status()["interval_seconds"]),
         }
 
     @app.post("/sensor/start")
@@ -256,20 +449,47 @@ def create_app(
         interface: str = Query(min_length=1, max_length=64),
     ) -> HTMLResponse:
         try:
-            window = HistoryRepository(database).window(interface, start, end, max_points=600)
+            window = HistoryRepository(database).window(
+                interface,
+                start,
+                end,
+                max_points=600,
+                include_comparison=True,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-        start_utc = start.astimezone(UTC).replace(tzinfo=None)
-        end_utc = end.astimezone(UTC).replace(tzinfo=None)
+        start_aware = start.astimezone(UTC)
+        end_aware = end.astimezone(UTC)
+        start_utc = start_aware.replace(tzinfo=None)
+        end_utc = end_aware.replace(tzinfo=None)
         incidents = [
             _incident_to_dict(record)
             for record in incident_repository.history(limit=1000)
             if record.opened_at < end_utc
             and (record.resolved_at is None or record.resolved_at >= start_utc)
         ]
+        episodes = []
+        episode_items = episode_repository.history(limit=200).get("episodes")
+        if isinstance(episode_items, list):
+            for item in episode_items:
+                if not isinstance(item, dict):
+                    continue
+                started_at = item.get("started_at")
+                if not isinstance(started_at, str):
+                    continue
+                episode_start = datetime.fromisoformat(started_at)
+                ended_at = item.get("ended_at")
+                episode_end = (
+                    datetime.fromisoformat(ended_at) if isinstance(ended_at, str) else None
+                )
+                if episode_start < end_aware and (
+                    episode_end is None or episode_end >= start_aware
+                ):
+                    episodes.append(item)
+
         return HTMLResponse(
-            content=render_html_report(window, incidents),
+            content=render_html_report(window, incidents, episodes),
             headers={"Content-Disposition": 'inline; filename="wifi-experience-report.html"'},
         )
 
@@ -302,6 +522,12 @@ def create_app(
         records = incident_repository.history(limit=limit)
 
         return [_incident_to_dict(record) for record in records]
+
+    @app.get("/episodes/history")
+    def experience_episode_history(
+        limit: int = Query(default=50, ge=1, le=200),
+    ) -> dict[str, object]:
+        return episode_repository.history(limit=limit)
 
     @app.delete("/incidents/history")
     def clear_incident_history() -> dict[str, int]:

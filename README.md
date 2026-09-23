@@ -65,6 +65,195 @@ The backend rechecks that the interface is available before starting. Stop ends
 collection; each new Start creates a new runtime and resets metric deltas.
 Historical samples remain stored but are not displayed as a current session.
 
+## Versioned test profiles
+
+On database initialization, the backend creates and activates `Default v1` when
+no profile exists. Its targets, five-second cadence and diagnostic thresholds
+match the behavior used before profiles were introduced. Re-running the
+initialization is idempotent and does not replace existing profiles.
+
+Profile configuration is validated and stored as immutable JSON versions in
+SQLite. Updating a profile creates a new version; updating the active profile
+also activates that new version. Activating another enabled profile atomically
+deactivates the previous one. An active profile must be replaced before it can
+be disabled.
+
+The backend exposes `GET/POST /profiles`, `GET/PUT /profiles/{id}`,
+`GET /profiles/active`, `POST /profiles/{id}/activate` and version-history
+endpoints below `/profiles/{id}/versions`.
+
+Each monitoring start pins the then-active immutable profile version in a
+persistent session. Wi-Fi sampling follows the profile cadence, while enabled
+synthetic tests run independently at their configured intervals. Cached results
+remain visible with `fresh: false`, `observed_at` and `age_seconds`, but do not
+advance incident confirmation or recovery counters. Profile changes made during
+a running session apply only after monitoring is restarted.
+
+An enabled synthetic-test interval must be equal to or an integer multiple of
+the Wi-Fi sampling interval. This keeps snapshot timing deterministic while
+allowing cadences such as 5, 10, 30 and 60 seconds. `/sensor/status` reports the
+session, profile and exact profile-version identifiers used by the runtime.
+
+The dashboard **Settings** tab manages these profiles without editing JSON by
+hand. It supports creating profiles, saving immutable revisions, activating an
+enabled profile and inspecting every stored version. When monitoring is already
+running, the page makes clear that changes apply only after the sensor is
+stopped and started again.
+
+## NetworkManager event timing
+
+Connection-cycle timing uses NetworkManager device `StateChanged` signals from
+the system D-Bus when `gdbus` is available. The sensor observes those signals
+read-only; it does not change NetworkManager configuration. Activation start,
+the boundary where layer-2 activation has completed, and the boundary where IP
+configuration has completed can therefore use event timestamps instead of the
+next periodic sample.
+
+These timestamps describe NetworkManager phase transitions, not the exact time
+of an 802.11 management frame. Authentication/authorization reported by `iw`,
+gateway reachability, DNS and final network readiness remain sample-based when
+no stage-specific event exists. The dashboard exposes the timing source for each
+stage and the D-Bus monitor status. If D-Bus monitoring is unavailable or exits,
+the existing sampling tracker continues to operate and records the reason.
+
+The IPv4 stage intentionally does not claim that DHCP was used. NetworkManager's
+IP configuration phase also covers static addressing; the UI therefore labels
+that stage **IPv4 address**.
+
+## Connection-cycle SLO
+
+Each test profile also defines a rolling connection-cycle SLO. Only unique cycles
+with a measured network-ready duration enter the window; pre-existing sessions,
+in-progress cycles and unknown durations never become zero-valued samples. The
+default policy evaluates P95 after at least five measured cycles in a 20-cycle
+window, warning at 8000 ms and becoming critical at 15000 ms.
+
+The incident domain advances only when a new measurable cycle arrives. Repeated
+snapshots of the same cycle therefore cannot satisfy incident confirmation or
+recovery counters. Threshold changes remain pinned to the profile version selected
+when monitoring starts.
+
+The connection-cycle SLO also evaluates Association, Authentication, IPv4 address,
+Gateway and DNS milestone P95 values independently. These values are elapsed time
+from the observed connection start to each milestone, not isolated protocol-stage
+durations. This distinction is important because NetworkManager D-Bus timestamps and
+sample-derived observations can use different timing sources. Each milestone keeps
+its own rolling sample set and stable incident code, so fresh Association evidence
+cannot resolve a DNS-stage incident. The existing end-to-end P95 remains the Network
+Ready SLO.
+
+## Adaptive same-SSID baseline
+
+The sensor can compare fresh measurements with its own recent history for the same
+interface and SSID. The reference model uses the median and median absolute deviation
+(MAD), so isolated historical spikes have less influence than they would with a mean
+and standard deviation. Metric-specific scale floors prevent a zero or near-zero MAD
+from turning negligible changes into anomalies.
+
+RSSI, TX retries, gateway/Internet latency, DNS, HTTPS and connection-cycle P95 are
+evaluated independently when they have enough reference samples. Cached synthetic-test
+results are not relearned as new measurements, and connection-cycle P95 enters the
+baseline only when a new measurable cycle updates that rolling statistic. Missing or
+insufficient history remains explicitly unavailable rather than being treated as zero.
+
+Adaptive findings complement the absolute thresholds in the active profile; they do
+not replace them. Warning/critical deviation multipliers, lookback and sample limits are
+versioned with the profile. Baseline incidents use stable per-metric codes and only
+advance confirmation or recovery when that specific metric has fresh evidence.
+
+## Synthetic service SLA/SLO
+
+Gateway, Internet, DNS and HTTPS tests also feed a profile-versioned rolling SLO.
+Only fresh test executions enter the window. Availability uses definitive `passed`
+and `failed` outcomes; sensor-side collection `error` results are tracked separately
+and are not silently converted into service outages. Cached results never advance the
+window or incident confirmation.
+
+Latency P95 uses successful measurements. Gateway and Internet additionally evaluate
+packet-loss P95. The default policy uses a 60-execution window and waits for 20
+definitive samples before evaluating a dimension. Availability, tail-latency and
+packet-loss thresholds remain independent from the existing single-sample diagnostic
+limits.
+
+History and HTML reports summarize fresh executions for the selected period with
+availability, failure/error counts and latency/loss percentiles. Those historical
+figures are observational; rolling incident compliance remains tied to the immutable
+profile version selected when monitoring starts.
+
+## Executive HTML report
+
+The HTML report v2 adds an executive layer above the existing technical evidence. It
+summarizes overlapping incident intervals, derived experience episodes and their
+correlated domains, then compares the selected period with the immediately preceding
+window of equal duration. Core RF/network percentiles, connection-ready P95 and
+synthetic-service availability are shown with current, previous and delta values.
+
+Comparison deltas are descriptive only; they are not automatically labeled as better
+or worse. Diagnostic interpretation continues to come from explicit thresholds, SLOs,
+incidents and deterministic correlation. Incident and episode records are currently
+sensor-database scoped rather than keyed by interface, which is disclosed in the
+report when a database may contain history from more than one interface.
+
+## HTTP transaction breakdown
+
+HTTP/HTTPS probes use one `curl` transaction and retain milestone timings for DNS
+completion, TCP connection, TLS completion, first response byte (TTFB) and total
+transaction time. Milestones are cumulative from the transaction start; TLS remains
+unavailable for plain HTTP. Transport/application failures remain target failures,
+while missing `curl` or a collector-side execution timeout is recorded as a
+measurement error rather than silently treated as application downtime.
+
+These HTTP probes use the host route and therefore do not prove that traffic traversed
+the selected Wi-Fi interface.
+
+## Application availability and outage accounting
+
+History windows derive per-target application availability from fresh definitive probe
+executions. Availability is execution-based: passed / (passed + failed). Collection
+errors, skipped or disabled probes and cached results are excluded from the denominator
+so sensor uncertainty is not silently converted into service downtime.
+
+An observed outage starts with the first fresh failed probe and remains open until a
+later fresh passed probe is observed. Measurement errors do not close an outage. For
+an outage still open at the end of the selected history window, observed duration is
+bounded by that window end and recovery remains explicitly unobserved. These durations
+are sampling-bounded observations rather than exact packet-level outage timestamps.
+Targets are keyed by name, type, destination and port so a profile change that reuses a
+name for a different destination does not merge unrelated availability histories.
+
+## Evidence correlation
+
+The correlation engine combines existing diagnostic findings instead of inventing a
+new measurement source. Current findings, rolling service SLOs, adaptive-baseline
+deviations and connection-cycle stage SLOs are treated as independent evidence
+classes and mapped to Wi-Fi, local-network, DNS, Internet or application domains.
+Healthy upstream observations may add isolation evidence, for example a reachable
+gateway supporting an Internet-path hypothesis or successful DNS/Internet checks
+supporting isolation toward the HTTPS application target.
+
+Support is qualitative and deterministic: `strong` requires converging evidence
+classes or a critical current failure with isolation evidence; `moderate` requires a
+critical signal, repeated evidence, or a current signal with isolation; otherwise the
+hypothesis remains `weak`. If multiple domains share the highest support level the
+result is explicitly `ambiguous` and no primary domain is selected. Sensor collection
+gaps are retained as limitations, and the assessment never claims a proven root cause.
+The correlation result is stored in snapshot JSON and does not create duplicate
+incidents; objective findings and SLO violations remain the incident sources.
+
+## Experience episodes
+
+The incident view also derives higher-level experience episodes without adding a
+second persistence model. Incident intervals that overlap, or whose gap is at most
+120 seconds, are grouped into one operational episode. The original incidents remain
+the immutable evidence and are still shown individually.
+
+Stored warning/critical snapshots inside each episode are inspected for correlation
+results. A primary episode domain is assigned only when all correlated snapshots in
+that episode agree on the same domain. If multiple correlated domains occur, the
+episode is marked `mixed`; if no correlated snapshot exists, correlation remains
+`unavailable`. Clearing ended incident history therefore also removes the derived
+ended episodes, while active intervals remain visible.
+
 ## Environment-change events
 
 Each comparable sample is checked for radio and association changes. The sensor
