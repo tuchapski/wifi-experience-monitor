@@ -104,3 +104,39 @@ class AgentCurrentStateRequest(BaseModel):
 class AgentCurrentStateResponse(AgentCurrentStateRequest):
     agent_id: str
     updated_at: datetime
+
+
+class TelemetryItemPayload(BaseModel):
+    observed_at: datetime
+    metric: str = Field(min_length=1, max_length=128)
+    value: float
+    min_value: float | None = None
+    max_value: float | None = None
+    sample_count: int = Field(default=1, ge=1)
+    unit: str | None = Field(default=None, max_length=32)
+    labels: dict[str, Any] = Field(default_factory=dict)
+
+
+class TelemetryBatchRequest(BaseModel):
+    batch_id: str = Field(min_length=1, max_length=64)
+    sequence: int = Field(ge=1)
+    items: list[TelemetryItemPayload] = Field(min_length=1)
+
+
+class TelemetryBatchResponse(BaseModel):
+    batch_id: str
+    sequence: int
+    status: str
+    items_received: int
+
+
+class TelemetryPointResponse(BaseModel):
+    observed_at: datetime
+    metric: str
+    value: float
+    min_value: float | None
+    max_value: float | None
+    sample_count: int
+    unit: str | None
+    labels: dict[str, Any]
+    received_at: datetime

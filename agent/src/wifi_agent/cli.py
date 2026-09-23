@@ -1,7 +1,8 @@
 import argparse
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 
@@ -9,17 +10,28 @@ from wifi_agent.api import AgentApiClient
 from wifi_agent.capabilities import discover_capabilities
 from wifi_agent.collectors import resolve_interface
 from wifi_agent.config import AgentSettings
-from wifi_agent.runtime import CurrentStateRuntime
-from wifi_agent.storage import AgentIdentity, AgentIdentityStore
+from wifi_agent.processors import CurrentStateSnapshot, TelemetryAggregator
+from wifi_agent.runtime import CurrentStateRuntime, TelemetrySyncEngine
+from wifi_agent.storage import AgentIdentity, AgentIdentityStore, TelemetrySpool
 from wifi_agent.system_info import collect_system_info
 
 LOGGER = logging.getLogger("wifi_agent")
 
 
+def _database_path(settings: AgentSettings) -> Path:
+    return settings.data_dir / "agent.db"
+
+
 def _store(settings: AgentSettings) -> AgentIdentityStore:
-    store = AgentIdentityStore(settings.data_dir / "agent.db")
+    store = AgentIdentityStore(_database_path(settings))
     store.initialize()
     return store
+
+
+def _telemetry_spool(settings: AgentSettings) -> TelemetrySpool:
+    spool = TelemetrySpool(_database_path(settings))
+    spool.initialize()
+    return spool
 
 
 def _enroll(
@@ -47,7 +59,11 @@ def _selected_interface(settings: AgentSettings) -> str | None:
     return resolve_interface(settings.interface)
 
 
-def _print_status(settings: AgentSettings, store: AgentIdentityStore) -> None:
+def _print_status(
+    settings: AgentSettings,
+    store: AgentIdentityStore,
+    spool: TelemetrySpool,
+) -> None:
     identity = store.load()
     capabilities = discover_capabilities()
     interface = _selected_interface(settings)
@@ -57,6 +73,7 @@ def _print_status(settings: AgentSettings, store: AgentIdentityStore) -> None:
     print(f"Server: {settings.server_url}")
     print(f"Agent ID: {identity.agent_id if identity else 'not enrolled'}")
     print(f"Wi-Fi interface: {interface or 'not detected'}")
+    print(f"Pending telemetry batches: {spool.pending_count()}")
     print("Capabilities:")
     for capability in capabilities:
         print(f"  - {capability.name}")
@@ -73,12 +90,12 @@ def _heartbeat(settings: AgentSettings, identity: AgentIdentity) -> None:
     )
 
 
-def _publish_state(
+def _publish_snapshot(
     settings: AgentSettings,
     identity: AgentIdentity,
     runtime: CurrentStateRuntime,
+    snapshot: CurrentStateSnapshot,
 ) -> None:
-    snapshot = runtime.collect()
     AgentApiClient(settings).publish_state(identity, snapshot)
     LOGGER.info(
         "current state published agent_id=%s interface=%s ssid=%s rssi=%s errors=%d",
@@ -88,6 +105,14 @@ def _publish_state(
         snapshot.wifi.get("rssi_dbm"),
         len(snapshot.collector_errors),
     )
+
+
+def _publish_state(
+    settings: AgentSettings,
+    identity: AgentIdentity,
+    runtime: CurrentStateRuntime,
+) -> None:
+    _publish_snapshot(settings, identity, runtime, runtime.collect())
 
 
 def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
@@ -101,11 +126,24 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     interface = _selected_interface(settings)
     runtime = CurrentStateRuntime(interface) if interface else None
     if runtime is None:
-        LOGGER.warning("no wireless interface detected; current-state publication is disabled")
+        LOGGER.warning(
+            "no wireless interface detected; state and telemetry collection are disabled"
+        )
+
+    spool = _telemetry_spool(settings)
+    cutoff = datetime.now(UTC) - timedelta(hours=settings.telemetry_retention_hours)
+    pruned = spool.prune_before(cutoff)
+    if pruned:
+        LOGGER.info("pruned %d expired local telemetry batches", pruned)
+
+    aggregator = TelemetryAggregator(settings.telemetry_window_seconds)
+    sync_engine = TelemetrySyncEngine(settings, identity, spool)
 
     LOGGER.info("agent started agent_id=%s server=%s", identity.agent_id, settings.server_url)
     next_heartbeat = 0.0
+    next_collection = 0.0
     next_state = 0.0
+    next_sync = 0.0
 
     while True:
         now = time.monotonic()
@@ -116,15 +154,38 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
                 LOGGER.warning("heartbeat failed: %s", exc)
             next_heartbeat = now + settings.heartbeat_interval_seconds
 
-        if runtime is not None and now >= next_state:
-            try:
-                _publish_state(settings, identity, runtime)
-            except (httpx.HTTPError, OSError) as exc:
-                LOGGER.warning("current-state publication failed: %s", exc)
-            next_state = now + settings.state_interval_seconds
+        if runtime is not None and now >= next_collection:
+            cycle = runtime.collect_cycle()
+            aggregator.consume(cycle.observations)
 
-        next_due = min(next_heartbeat, next_state if runtime is not None else next_heartbeat)
-        time.sleep(max(0.1, min(1.0, next_due - time.monotonic())))
+            if now >= next_state:
+                try:
+                    _publish_snapshot(settings, identity, runtime, cycle.snapshot)
+                except (httpx.HTTPError, OSError) as exc:
+                    LOGGER.warning("current-state publication failed: %s", exc)
+                next_state = now + settings.state_interval_seconds
+
+            points = aggregator.flush_if_due(cycle.snapshot.observed_at)
+            batch = spool.enqueue(points, cycle.snapshot.observed_at)
+            if batch is not None:
+                LOGGER.info(
+                    "telemetry batch queued batch_id=%s sequence=%d items=%d",
+                    batch.batch_id,
+                    batch.sequence,
+                    len(batch.items),
+                )
+            next_collection = now + settings.telemetry_sample_interval_seconds
+
+        if now >= next_sync:
+            synced = sync_engine.sync_pending()
+            if synced:
+                LOGGER.info("telemetry batches synchronized count=%d", synced)
+            next_sync = now + settings.telemetry_sync_interval_seconds
+
+        due = [next_heartbeat, next_sync]
+        if runtime is not None:
+            due.extend([next_collection, next_state])
+        time.sleep(max(0.1, min(1.0, min(due) - time.monotonic())))
 
 
 def _validated_identity(settings: AgentSettings, store: AgentIdentityStore) -> AgentIdentity:
@@ -146,13 +207,14 @@ def main() -> None:
     enroll_parser.add_argument("--force", action="store_true")
     subparsers.add_parser("heartbeat", help="Send one heartbeat")
     subparsers.add_parser("state", help="Collect and publish one current-state snapshot")
-    subparsers.add_parser("run", help="Run heartbeat and current-state loops")
+    subparsers.add_parser("run", help="Run heartbeat, state and telemetry loops")
     subparsers.add_parser("status", help="Show local agent identity and capabilities")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     settings = AgentSettings.from_environment()
     store = _store(settings)
+    spool = _telemetry_spool(settings)
 
     if args.command == "enroll":
         identity = _enroll(settings, store, force=args.force)
@@ -160,7 +222,7 @@ def main() -> None:
         return
 
     if args.command == "status":
-        _print_status(settings, store)
+        _print_status(settings, store, spool)
         return
 
     if args.command == "run":

@@ -1,6 +1,7 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
@@ -13,12 +14,17 @@ from wifi_server.schemas import (
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
     AgentResponse,
+    TelemetryBatchRequest,
+    TelemetryBatchResponse,
+    TelemetryPointResponse,
 )
 from wifi_server.services.agents import (
     authenticate_agent,
     enroll_agent,
     get_agent,
+    get_agent_telemetry,
     get_current_state,
+    ingest_telemetry_batch,
     list_agents,
     process_heartbeat,
     update_current_state,
@@ -92,6 +98,37 @@ def current_state(
     session: Annotated[Session, Depends(get_session)],
 ) -> AgentCurrentStateResponse:
     return get_current_state(session, agent_id)
+
+
+@router.post(
+    "/{agent_id}/telemetry/batches",
+    response_model=TelemetryBatchResponse,
+)
+def publish_telemetry_batch(
+    agent_id: str,
+    payload: TelemetryBatchRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> TelemetryBatchResponse:
+    token = _bearer_token(authorization)
+    agent = authenticate_agent(session, agent_id, token)
+    return ingest_telemetry_batch(session, settings, agent, payload)
+
+
+@router.get(
+    "/{agent_id}/telemetry",
+    response_model=list[TelemetryPointResponse],
+)
+def telemetry(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    metric: Annotated[str | None, Query(max_length=128)] = None,
+    hours: Annotated[float, Query(gt=0, le=24)] = 1,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 5000,
+) -> list[TelemetryPointResponse]:
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    return get_agent_telemetry(session, agent_id, metric, since, limit)
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

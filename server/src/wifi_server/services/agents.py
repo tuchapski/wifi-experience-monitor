@@ -3,7 +3,7 @@ from hmac import compare_digest
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
@@ -13,6 +13,8 @@ from wifi_server.db.models import (
     AgentCredential,
     AgentCurrentState,
     AgentSession,
+    AgentTelemetry,
+    AgentTelemetryBatch,
 )
 from wifi_server.schemas import (
     AgentCapabilityResponse,
@@ -23,6 +25,9 @@ from wifi_server.schemas import (
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
     AgentResponse,
+    TelemetryBatchRequest,
+    TelemetryBatchResponse,
+    TelemetryPointResponse,
 )
 from wifi_server.security import hash_agent_token, issue_agent_token
 
@@ -305,3 +310,111 @@ def _current_state_response(current: AgentCurrentState) -> AgentCurrentStateResp
         network=raw_state.get("network", {}),
         collector_errors=raw_state.get("collector_errors", []),
     )
+
+
+def ingest_telemetry_batch(
+    session: Session,
+    settings: ServerSettings,
+    agent: Agent,
+    request: TelemetryBatchRequest,
+) -> TelemetryBatchResponse:
+    existing = session.scalar(
+        select(AgentTelemetryBatch).where(
+            AgentTelemetryBatch.agent_id == agent.id,
+            AgentTelemetryBatch.batch_id == request.batch_id,
+        )
+    )
+    if existing is not None:
+        return TelemetryBatchResponse(
+            batch_id=existing.batch_id,
+            sequence=existing.sequence,
+            status="already_accepted",
+            items_received=existing.item_count,
+        )
+
+    sequence_owner = session.scalar(
+        select(AgentTelemetryBatch).where(
+            AgentTelemetryBatch.agent_id == agent.id,
+            AgentTelemetryBatch.sequence == request.sequence,
+        )
+    )
+    if sequence_owner is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Telemetry sequence already belongs to another batch",
+        )
+
+    now = datetime.now(UTC)
+    session.add(
+        AgentTelemetryBatch(
+            agent_id=agent.id,
+            batch_id=request.batch_id,
+            sequence=request.sequence,
+            item_count=len(request.items),
+            received_at=now,
+        )
+    )
+    for item in request.items:
+        session.add(
+            AgentTelemetry(
+                agent_id=agent.id,
+                observed_at=item.observed_at,
+                metric=item.metric,
+                value=item.value,
+                min_value=item.min_value,
+                max_value=item.max_value,
+                sample_count=item.sample_count,
+                unit=item.unit,
+                labels=item.labels,
+                received_at=now,
+            )
+        )
+
+    cutoff = now - timedelta(hours=settings.telemetry_retention_hours)
+    session.execute(delete(AgentTelemetry).where(AgentTelemetry.observed_at < cutoff))
+    session.execute(delete(AgentTelemetryBatch).where(AgentTelemetryBatch.received_at < cutoff))
+    session.commit()
+
+    return TelemetryBatchResponse(
+        batch_id=request.batch_id,
+        sequence=request.sequence,
+        status="accepted",
+        items_received=len(request.items),
+    )
+
+
+def get_agent_telemetry(
+    session: Session,
+    agent_id: str,
+    metric: str | None,
+    since: datetime,
+    limit: int,
+) -> list[TelemetryPointResponse]:
+    if session.get(Agent, agent_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    query = select(AgentTelemetry).where(
+        AgentTelemetry.agent_id == agent_id,
+        AgentTelemetry.observed_at >= since,
+    )
+    if metric:
+        query = query.where(AgentTelemetry.metric == metric)
+    records = list(
+        session.scalars(query.order_by(AgentTelemetry.observed_at.desc()).limit(limit)).all()
+    )
+    records.reverse()
+
+    return [
+        TelemetryPointResponse(
+            observed_at=record.observed_at,
+            metric=record.metric,
+            value=record.value,
+            min_value=record.min_value,
+            max_value=record.max_value,
+            sample_count=record.sample_count,
+            unit=record.unit,
+            labels=record.labels,
+            received_at=record.received_at,
+        )
+        for record in records
+    ]

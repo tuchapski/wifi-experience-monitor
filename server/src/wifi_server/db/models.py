@@ -123,6 +123,25 @@ class AgentTelemetry(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AgentTelemetryBatch(Base):
+    __tablename__ = "agent_telemetry_batches"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "batch_id", name="uq_agent_telemetry_batch"),
+        UniqueConstraint("agent_id", "sequence", name="uq_agent_telemetry_sequence"),
+        Index("ix_agent_telemetry_batches_agent_received", "agent_id", "received_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    agent_id: Mapped[str] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    batch_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    item_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class AgentEvent(Base):
     __tablename__ = "agent_events"
     __table_args__ = (Index("ix_agent_events_agent_observed", "agent_id", "observed_at"),)
