@@ -12,6 +12,29 @@ import type { ExperienceEpisode, HistoryWindow, IncidentRecord } from "./types";
 
 import "./HistoricalTimeline.css";
 
+type HistoryView = "wifi" | "latency" | "loss" | "retries" | "events";
+
+const VIEWS: Array<{ id: HistoryView; label: string; description: string; unit: string }> = [
+  { id: "wifi", label: "Wi-Fi signal", description: "Signal strength at the connected client", unit: "RSSI (dBm)" },
+  { id: "latency", label: "Response times", description: "Gateway, Internet, DNS and HTTPS response", unit: "Latency (ms)" },
+  { id: "loss", label: "Packet loss", description: "Gateway and external ICMP loss", unit: "Loss (%)" },
+  { id: "retries", label: "TX retries", description: "Client retransmissions per 100 TX packets", unit: "Retries / 100 TX" },
+  { id: "events", label: "Events", description: "Changes, cycles, incidents and outages", unit: "" },
+];
+
+interface SavedRange { start: string; end: string; interfaceName: string; durationMs: number }
+
+function relayoutRange(update: Record<string, unknown>): [string, string] | null | undefined {
+  if (update["xaxis.autorange"] === true) return null;
+  const fullRange = update["xaxis.range"];
+  const first = Array.isArray(fullRange) ? fullRange[0] : update["xaxis.range[0]"];
+  const last = Array.isArray(fullRange) ? fullRange[1] : update["xaxis.range[1]"];
+  if (typeof first !== "string" || typeof last !== "string" ||
+    !Number.isFinite(Date.parse(first)) || !Number.isFinite(Date.parse(last)) ||
+    Date.parse(first) >= Date.parse(last)) return undefined;
+  return [first, last];
+}
+
 
 function date(value: string): string {
   return new Date(value).toLocaleString();
@@ -38,11 +61,23 @@ export default function HistoricalTimeline({
   eventNotice: string | null;
 }) {
   const [hiddenEvents, setHiddenEvents] = useState<EventKind[]>([]);
+  const [view, setView] = useState<HistoryView>("wifi");
+  const [showChangeMarkers, setShowChangeMarkers] = useState(false);
+  const [savedRange, setSavedRange] = useState<SavedRange | null>(null);
+  const [resetRevision, setResetRevision] = useState(0);
   const series = buildTimelineSeries(data);
   const overview = historicalOverview(data);
   const events = buildTimelineEvents(data, incidents, episodes);
   const visibleEvents = events.filter((event) => !hiddenEvents.includes(event.kind));
   const rangeDurationMs = Math.max(1, Date.parse(data.end) - Date.parse(data.start));
+  const activeView: HistoryView = data.total_samples === 0 ? "events" : view;
+  const viewDefinition = VIEWS.find((item) => item.id === activeView)!;
+  const hasMatchingRange = savedRange?.interfaceName === data.interface &&
+    savedRange.durationMs === rangeDurationMs &&
+    Date.parse(savedRange.start) < Date.parse(data.end) &&
+    Date.parse(savedRange.end) > Date.parse(data.start);
+  const displayRange: [string, string] = hasMatchingRange
+    ? [savedRange.start, savedRange.end] : [data.start, data.end];
 
   function toggleEvent(kind: EventKind) {
     setHiddenEvents((hidden) => hidden.includes(kind)
@@ -63,14 +98,13 @@ export default function HistoricalTimeline({
     ].filter(Boolean).join("<br>");
   }
 
-  const metricTraces: Data[] = series.map((item) => ({
+  const metricTraces: Data[] = series.filter((item) => item.row === activeView).map((item) => ({
     type: "scatter",
     mode: "lines",
     name: item.label,
     legendgroup: item.row,
     x: item.x,
     y: item.y,
-    yaxis: item.axis,
     connectgaps: false,
     line: {
       color: item.color,
@@ -80,7 +114,7 @@ export default function HistoricalTimeline({
     hovertemplate: "%{text}<extra></extra>",
   }));
 
-  const eventTraces: Data[] = EVENT_LANES.flatMap((lane) => {
+  const eventTraces: Data[] = activeView === "events" ? EVENT_LANES.flatMap((lane) => {
     const items = visibleEvents.filter((event) => event.kind === lane.kind);
     const spans = items.filter((event) => event.end !== null);
     const points = items.filter((event) => event.end === null);
@@ -90,7 +124,7 @@ export default function HistoricalTimeline({
       x: spans.flatMap((event) => [event.start, event.end!, null]),
       y: spans.flatMap(() => [lane.lane, lane.lane, null]),
       text: spans.flatMap((event) => [tooltip(event), tooltip(event), ""]),
-      yaxis: "y5", connectgaps: false,
+      connectgaps: false,
       line: { color: lane.color, width: 8 },
       marker: { color: lane.color, size: 7, symbol: lane.symbol },
       hovertemplate: "%{text}<extra></extra>",
@@ -100,14 +134,13 @@ export default function HistoricalTimeline({
       x: points.map((event) => event.start),
       y: points.map(() => lane.lane),
       text: points.map(tooltip),
-      yaxis: "y5",
       marker: { color: lane.color, size: 11, symbol: lane.symbol },
       hovertemplate: "%{text}<extra></extra>",
     });
     return traces;
-  });
+  }) : [];
 
-  const eventShapes: NonNullable<Layout["shapes"]> = visibleEvents
+  const eventShapes: NonNullable<Layout["shapes"]> = activeView !== "events" && showChangeMarkers ? visibleEvents
     .filter((event) => event.kind === "environment" || event.kind === "roam")
     .map((event) => ({
       type: "line",
@@ -116,82 +149,53 @@ export default function HistoricalTimeline({
       x0: event.start,
       x1: event.start,
       y0: 0,
-      y1: 0.82,
+      y1: 1,
       line: {
         color: EVENT_LANES.find((lane) => lane.kind === event.kind)!.color,
         width: 1,
         dash: "dot",
       },
-    }));
+    })) : [];
 
   const layout: Partial<Layout> = {
     autosize: true,
-    height: 950,
+    height: activeView === "events" ? 470 : 430,
     margin: {
-      l: 135,
+      l: activeView === "events" ? 140 : 75,
       r: 24,
-      t: 58,
-      b: 78,
+      t: activeView === "events" ? 30 : 65,
+      b: 65,
     },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "#ffffff",
-    hovermode: "x unified",
+    hovermode: activeView === "events" ? "closest" : "x unified",
     dragmode: "zoom",
-    showlegend: true,
+    showlegend: activeView !== "events" && metricTraces.length > 1,
     legend: {
       orientation: "h",
       x: 0,
-      y: 1.08,
+      y: 1.1,
       xanchor: "left",
       yanchor: "bottom",
     },
-    uirevision: `${data.interface}-${rangeDurationMs}-${data.bucket_seconds}`,
+    uirevision: `${data.interface}-${activeView}-${resetRevision}-${data.end}`,
     shapes: eventShapes,
     xaxis: {
       type: "date",
-      anchor: "y4",
-      range: [data.start, data.end],
+      range: displayRange,
       showgrid: false,
       zeroline: false,
-      rangeslider: {
-        visible: true,
-        thickness: 0.07,
-      },
+      rangeslider: { visible: false },
     },
     yaxis: {
-      domain: [0.65, 0.8],
-      title: { text: "RSSI (dBm)" },
+      title: activeView === "events" ? undefined : { text: viewDefinition.unit },
+      range: activeView === "events" ? [-0.5, 5.5] : undefined,
+      tickvals: activeView === "events" ? EVENT_LANES.map((lane) => lane.lane) : undefined,
+      ticktext: activeView === "events" ? EVENT_LANES.map((lane) => lane.label) : undefined,
       gridcolor: "#eaecf0",
       zeroline: false,
-    },
-    yaxis2: {
-      domain: [0.42, 0.62],
-      title: { text: "Latency (ms)" },
-      gridcolor: "#eaecf0",
-      zeroline: false,
-    },
-    yaxis3: {
-      domain: [0.23, 0.39],
-      title: { text: "Loss (%)" },
-      gridcolor: "#eaecf0",
-      zeroline: false,
-      rangemode: "tozero",
-    },
-    yaxis4: {
-      domain: [0.05, 0.2],
-      title: { text: "Retries / 100 TX" },
-      gridcolor: "#eaecf0",
-      zeroline: false,
-      rangemode: "tozero",
-    },
-    yaxis5: {
-      domain: [0.83, 1],
-      range: [-0.5, 5.5],
-      tickvals: EVENT_LANES.map((lane) => lane.lane),
-      ticktext: EVENT_LANES.map((lane) => lane.label),
-      gridcolor: "#eaecf0",
-      zeroline: false,
-      fixedrange: true,
+      fixedrange: activeView === "events",
+      rangemode: activeView === "loss" || activeView === "retries" ? "tozero" : undefined,
     },
   };
 
@@ -205,11 +209,12 @@ export default function HistoricalTimeline({
     <section className="history-timeline" aria-labelledby="history-timeline-title">
       <div className="history-timeline-heading">
         <div>
-          <span>Shared time axis</span>
-          <h3 id="history-timeline-title">Experience timeline</h3>
+          <span>Historical explorer</span>
+          <h3 id="history-timeline-title">Measurements and events</h3>
         </div>
         <p>
-          Events and measurements use the same time axis. Zoom and pan apply to all rows together.
+          Choose one view to inspect it clearly. Each view uses the selected period and keeps
+          your time zoom when you switch views.
         </p>
       </div>
 
@@ -236,38 +241,66 @@ export default function HistoricalTimeline({
         </article>
       </div>
 
-      <div className="history-event-filters" role="group" aria-label="Historical event filters">
-        {EVENT_LANES.map((lane) => <label key={lane.kind}>
-          <input type="checkbox" checked={!hiddenEvents.includes(lane.kind)}
-            onChange={() => toggleEvent(lane.kind)} />
-          <span className="history-event-swatch" style={{ backgroundColor: lane.color }} />
-          {lane.label} <small>({events.filter((event) => event.kind === lane.kind).length})</small>
-        </label>)}
+      <div className="history-view-nav" role="group" aria-label="History chart view">
+        {VIEWS.map((item) => <button key={item.id} type="button"
+          className={activeView === item.id ? "history-view-active" : ""}
+          disabled={data.total_samples === 0 && item.id !== "events"}
+          aria-pressed={activeView === item.id}
+          onClick={() => setView(item.id)}>{item.label}
+          {item.id === "events" && <small>{events.length}</small>}
+        </button>)}
       </div>
 
-      {eventNotice && <p className="history-event-notice" role="status">{eventNotice}</p>}
-      <p className="metric-note">
-        Incident and episode records are sensor-wide and cannot be attributed to this interface alone.
-        Connection cycles come from the selected interface. Application outages are recorded in its
-        history window, but service probes may use the host route. Bars are clipped to
-        the selected period; a bar reaching its edge does not prove the event started or ended there.
-      </p>
+      <div className="history-view-heading">
+        <div><h4>{viewDefinition.label}</h4><p>{viewDefinition.description}</p></div>
+        <button type="button" onClick={() => {
+          setSavedRange(null);
+          setResetRevision((value) => value + 1);
+        }}>Reset zoom</button>
+      </div>
+
+      {activeView === "events" ? <>
+        <div className="history-event-filters" role="group" aria-label="Historical event filters">
+          {EVENT_LANES.map((lane) => <label key={lane.kind}>
+            <input type="checkbox" checked={!hiddenEvents.includes(lane.kind)}
+              onChange={() => toggleEvent(lane.kind)} />
+            <span className="history-event-swatch" style={{ backgroundColor: lane.color }} />
+            {lane.label} <small>({events.filter((event) => event.kind === lane.kind).length})</small>
+          </label>)}
+        </div>
+        {eventNotice && <p className="history-event-notice" role="status">{eventNotice}</p>}
+      </> : <label className="history-marker-toggle">
+        <input type="checkbox" checked={showChangeMarkers}
+          onChange={(event) => setShowChangeMarkers(event.target.checked)} />
+        Mark Wi-Fi environment changes on this graph
+      </label>}
 
       <div className="history-plot-wrapper">
         <Plot
+          key={`${activeView}-${resetRevision}`}
           data={[...metricTraces, ...eventTraces]}
           layout={layout}
           config={config}
-          style={{ width: "100%", minHeight: "950px" }}
+          onRelayout={(update: Record<string, unknown>) => {
+            const range = relayoutRange(update);
+            if (range === undefined) return;
+            setSavedRange(range === null ? null : {
+              start: range[0], end: range[1], interfaceName: data.interface, durationMs: rangeDurationMs,
+            });
+          }}
+          style={{ width: "100%", height: activeView === "events" ? "470px" : "430px" }}
           useResizeHandler
         />
       </div>
 
-      <p className="metric-note">
-        Dashed vertical markers represent stored Wi-Fi environment changes. Lines are bucket averages;
-        hover details retain min/max and P50/P95/P99. Missing readings remain null and Plotly does
-        not connect across those gaps. DNS/HTTPS are host-routed observations.
-      </p>
+      {activeView === "events" ? <p className="metric-note">
+        Incident and episode records are sensor-wide and cannot be attributed to this interface alone.
+        Connection cycles come from the selected interface. Application outages belong to its history
+        window, but service probes may use the host route. Bars are clipped to the selected period.
+      </p> : <p className="metric-note">
+        Lines show bucket averages; hover retains min/max and P50/P95/P99. Missing readings remain gaps.
+        DNS/HTTPS use the host route. Enable change markers to compare Wi-Fi changes with these readings.
+      </p>}
 
       {data.events.length > 0 && (
         <details className="history-event-disclosure">
