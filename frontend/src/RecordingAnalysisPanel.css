@@ -71,7 +71,7 @@
 
 .recording-analysis-summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   background: #edf1f5;
   border-bottom: 1px solid #edf1f5;
@@ -128,6 +128,128 @@
 
 .recording-analysis-meta code {
   color: #425b78;
+}
+
+.recording-correlation {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.recording-correlation-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px;
+}
+
+.recording-correlation-heading h3 {
+  margin: 3px 0 4px;
+  color: #2b3e56;
+  font-size: 15px;
+}
+
+.recording-correlation-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: #718095;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recording-correlation-heading small {
+  color: #8390a1;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.recording-window-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.recording-window {
+  padding: 14px 15px;
+  border: 1px solid #e1e7ef;
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.recording-window.window-warning {
+  border-left-color: #d49627;
+}
+
+.recording-window.window-critical {
+  border-left-color: #bd433c;
+}
+
+.recording-window-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recording-window-top > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recording-window-top span {
+  color: #7a8798;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.recording-window-top strong {
+  color: #2f435b;
+  font-size: 13px;
+}
+
+.recording-window-top small {
+  color: #8793a2;
+  font-size: 10px;
+}
+
+.recording-window-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.recording-window-domains span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #edf3f8;
+  color: #536a84;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.recording-window dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 13px 0 0;
+}
+
+.recording-window dt {
+  color: #8692a2;
+  font-size: 9px;
+}
+
+.recording-window dd {
+  margin: 3px 0 0;
+  color: #3d526b;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .recording-findings {
@@ -218,9 +340,19 @@
   margin-top: 4px;
 }
 
+@media (max-width: 1400px) {
+  .recording-analysis-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1200px) {
   .recording-analysis-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recording-window-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -238,6 +370,16 @@
   .recording-analysis-heading {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .recording-correlation-heading,
+  .recording-window-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recording-window dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .recording-analysis-summary {

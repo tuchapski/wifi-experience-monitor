@@ -143,6 +143,20 @@ export interface AnalysisSignalWindow {
   threshold_dbm: number;
 }
 
+export interface AnalysisDegradedWindow {
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  sample_count: number;
+  severity: "critical" | "warning";
+  domains: string[];
+  evidence: string[];
+  minimum_rssi_dbm: number | null;
+  maximum_retries_per_100_packets: number | null;
+  maximum_tx_failed_percent: number | null;
+  maximum_channel_utilization_percent: number | null;
+}
+
 export interface RecordingAnalysisSummary {
   status: "critical" | "warning" | "observed" | "clear" | "limited";
   evidence_status: "complete" | "partial";
@@ -152,6 +166,7 @@ export interface RecordingAnalysisSummary {
     state: boolean;
     counter_quality?: boolean;
     rf_utilization?: boolean;
+    temporal_correlation?: boolean;
   };
   finding_counts: {
     critical: number;
@@ -168,6 +183,12 @@ export interface RecordingAnalysisSummary {
   channel_rx_percent?: AnalysisMetricStats | null;
   channel_tx_percent?: AnalysisMetricStats | null;
   survey_intervals?: number;
+  degraded_windows?: AnalysisDegradedWindow[];
+  temporal_correlation?: {
+    evaluable_samples: number;
+    correlated_samples: number;
+    window_count: number;
+  };
   low_signal_windows: AnalysisSignalWindow[];
   very_low_signal_windows: AnalysisSignalWindow[];
   state_changes: {

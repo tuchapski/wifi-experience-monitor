@@ -26,6 +26,14 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }
 
+function formatClock(value: string): string {
+  return new Date(value).toLocaleTimeString();
+}
+
+function metricOrDash(value: number | null, suffix: string): string {
+  return value == null ? "—" : `${value.toFixed(1)}${suffix}`;
+}
+
 export default function RecordingAnalysisPanel({
   recording,
 }: {
@@ -135,6 +143,10 @@ export default function RecordingAnalysisPanel({
               <span>TX failures P90</span>
               <strong>{formatPercent(analysis.summary.tx_failed_percent?.p90)}</strong>
             </article>
+            <article>
+              <span>Degraded windows</span>
+              <strong>{analysis.summary.degraded_windows?.length ?? 0}</strong>
+            </article>
           </div>
 
           <div className="recording-analysis-meta">
@@ -145,6 +157,62 @@ export default function RecordingAnalysisPanel({
               {analysis.source_events_count.toLocaleString()} events
             </span>
           </div>
+
+          {(analysis.summary.degraded_windows?.length ?? 0) > 0 && (
+            <div className="recording-correlation">
+              <div className="recording-correlation-heading">
+                <div>
+                  <span className="agent-eyebrow">Temporal correlation</span>
+                  <h3>Correlated degraded windows</h3>
+                  <p>
+                    Consecutive samples where at least two Wi-Fi evidence domains
+                    crossed their configured thresholds at the same time.
+                  </p>
+                </div>
+                <small>
+                  {analysis.summary.temporal_correlation?.correlated_samples ?? 0}{" "}
+                  correlated samples
+                </small>
+              </div>
+              <div className="recording-window-list">
+                {analysis.summary.degraded_windows?.map((window, index) => (
+                  <article
+                    key={`${window.started_at}-${index}`}
+                    className={`recording-window window-${window.severity}`}
+                  >
+                    <div className="recording-window-top">
+                      <div>
+                        <span>{window.severity}</span>
+                        <strong>
+                          {formatClock(window.started_at)} →{" "}
+                          {formatClock(window.ended_at)}
+                        </strong>
+                      </div>
+                      <small>
+                        {window.duration_seconds.toFixed(1)}s ·{" "}
+                        {window.sample_count} samples
+                      </small>
+                    </div>
+                    <div className="recording-window-domains">
+                      {window.domains.map((domain) => (
+                        <span key={domain}>{domain}</span>
+                      ))}
+                    </div>
+                    <dl>
+                      <dt>RSSI min</dt>
+                      <dd>{metricOrDash(window.minimum_rssi_dbm, " dBm")}</dd>
+                      <dt>Retries max</dt>
+                      <dd>{metricOrDash(window.maximum_retries_per_100_packets, "/100")}</dd>
+                      <dt>TX fail max</dt>
+                      <dd>{metricOrDash(window.maximum_tx_failed_percent, "%")}</dd>
+                      <dt>Channel util max</dt>
+                      <dd>{metricOrDash(window.maximum_channel_utilization_percent, "%")}</dd>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
 
           {analysis.findings.length === 0 ? (
             <div className="recording-analysis-clear">
