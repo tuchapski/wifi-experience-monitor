@@ -122,3 +122,72 @@ export interface RecordingEvent {
   data: Record<string, unknown>;
   received_at: string;
 }
+
+export interface AnalysisMetricStats {
+  samples: number;
+  min: number;
+  average: number;
+  max: number;
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
+export interface AnalysisSignalWindow {
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  sample_count: number;
+  minimum_dbm: number;
+  average_dbm: number;
+  threshold_dbm: number;
+}
+
+export interface RecordingAnalysisSummary {
+  status: "critical" | "warning" | "observed" | "clear" | "limited";
+  evidence_status: "complete" | "partial";
+  evidence_groups: {
+    signal: boolean;
+    link_rate: boolean;
+    state: boolean;
+  };
+  finding_counts: {
+    critical: number;
+    warning: number;
+    info: number;
+  };
+  rssi: AnalysisMetricStats | null;
+  tx_rate_mbps: AnalysisMetricStats | null;
+  rx_rate_mbps: AnalysisMetricStats | null;
+  low_signal_windows: AnalysisSignalWindow[];
+  very_low_signal_windows: AnalysisSignalWindow[];
+  state_changes: {
+    total: number;
+    bssid: number;
+    channel: number;
+    disconnects: number;
+  };
+  limitations: string[];
+}
+
+export interface RecordingAnalysisFinding {
+  code: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  message: string;
+  next_action: string;
+  evidence: Record<string, unknown>;
+}
+
+export interface RecordingAnalysis {
+  id: string;
+  recording_id: string;
+  engine_version: string;
+  status: string;
+  source_metrics_count: number;
+  source_events_count: number;
+  summary: RecordingAnalysisSummary;
+  findings: RecordingAnalysisFinding[];
+  policy: Record<string, unknown>;
+  created_at: string;
+}

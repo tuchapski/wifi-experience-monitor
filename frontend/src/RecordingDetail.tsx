@@ -12,6 +12,7 @@ import type {
   RecordingEvent,
   RecordingMetricPoint,
 } from "./agentTypes";
+import RecordingAnalysisPanel from "./RecordingAnalysisPanel";
 import "./RecordingDetail.css";
 
 const RECORDING_METRICS = [
@@ -268,6 +269,8 @@ export default function RecordingDetail({
           </span>
         </section>
       )}
+
+      <RecordingAnalysisPanel recording={recording} />
 
       <section className="agent-panel recording-detail-data">
         <div className="recording-detail-section-heading">

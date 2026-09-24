@@ -3,6 +3,7 @@ import type {
   AgentSummary,
   DiagnosticRecording,
   RecordingEvent,
+  RecordingAnalysis,
   RecordingMetricPoint,
   StartRecordingInput,
   TelemetryPoint,
@@ -168,5 +169,22 @@ export function getRecordingEvents(
   });
   return request<RecordingEvent[]>(
     `/recordings/${encodeURIComponent(recordingId)}/events?${params.toString()}`,
+  );
+}
+
+export function getLatestRecordingAnalysis(
+  recordingId: string,
+): Promise<RecordingAnalysis | null> {
+  return requestOptional<RecordingAnalysis>(
+    `/recordings/${encodeURIComponent(recordingId)}/analysis/latest`,
+  );
+}
+
+export function runRecordingAnalysis(
+  recordingId: string,
+): Promise<RecordingAnalysis> {
+  return mutationRequest<RecordingAnalysis>(
+    `/recordings/${encodeURIComponent(recordingId)}/analysis`,
+    "POST",
   );
 }
