@@ -150,6 +150,7 @@ export interface RecordingAnalysisSummary {
     signal: boolean;
     link_rate: boolean;
     state: boolean;
+    counter_quality?: boolean;
   };
   finding_counts: {
     critical: number;
@@ -159,6 +160,9 @@ export interface RecordingAnalysisSummary {
   rssi: AnalysisMetricStats | null;
   tx_rate_mbps: AnalysisMetricStats | null;
   rx_rate_mbps: AnalysisMetricStats | null;
+  tx_retries_per_100_packets?: AnalysisMetricStats | null;
+  tx_failed_percent?: AnalysisMetricStats | null;
+  counter_intervals?: number;
   low_signal_windows: AnalysisSignalWindow[];
   very_low_signal_windows: AnalysisSignalWindow[];
   state_changes: {

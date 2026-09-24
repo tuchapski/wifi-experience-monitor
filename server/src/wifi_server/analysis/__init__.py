@@ -1,9 +1,8 @@
 """Deterministic analysis engines for immutable diagnostic recordings."""
 
 from wifi_server.analysis.recording import (
-    ENGINE_VERSION,
     RecordingAnalysisResult,
-    analyze_recording,
 )
+from wifi_server.analysis.recording_v2 import ENGINE_VERSION, analyze_recording
 
 __all__ = ["ENGINE_VERSION", "RecordingAnalysisResult", "analyze_recording"]

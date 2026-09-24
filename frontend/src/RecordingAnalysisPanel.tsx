@@ -14,6 +14,14 @@ function formatDbm(value: number | undefined): string {
   return value == null ? "—" : `${value.toFixed(1)} dBm`;
 }
 
+function formatPercent(value: number | undefined): string {
+  return value == null ? "—" : `${value.toFixed(1)}%`;
+}
+
+function formatPer100(value: number | undefined): string {
+  return value == null ? "—" : `${value.toFixed(1)}/100`;
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }
@@ -116,12 +124,12 @@ export default function RecordingAnalysisPanel({
               <strong>{formatDbm(analysis.summary.rssi?.average)}</strong>
             </article>
             <article>
-              <span>Low-signal windows</span>
-              <strong>{analysis.summary.low_signal_windows.length}</strong>
+              <span>Retries P90</span>
+              <strong>{formatPer100(analysis.summary.tx_retries_per_100_packets?.p90)}</strong>
             </article>
             <article>
-              <span>State changes</span>
-              <strong>{analysis.summary.state_changes.total}</strong>
+              <span>TX failures P90</span>
+              <strong>{formatPercent(analysis.summary.tx_failed_percent?.p90)}</strong>
             </article>
           </div>
 
@@ -136,9 +144,9 @@ export default function RecordingAnalysisPanel({
 
           {analysis.findings.length === 0 ? (
             <div className="recording-analysis-clear">
-              <strong>No V1 findings were triggered.</strong>
+              <strong>No findings were triggered by this engine version.</strong>
               <span>
-                This means the available evidence did not cross the configured V1
+                This means the available evidence did not cross the configured
                 heuristics; it is not proof that the WLAN is fault-free.
               </span>
             </div>

@@ -8,6 +8,7 @@ import httpx
 from wifi_agent.config import AgentSettings
 from wifi_agent.core import Observation, ObservationKind
 from wifi_agent.recording.client import RecordingApiClient
+from wifi_agent.recording.counters import CounterDeltaProcessor
 from wifi_agent.recording.store import RecordingStore
 from wifi_agent.storage import AgentIdentity
 
@@ -28,6 +29,7 @@ class RecordingController:
         self.store = RecordingStore(database_path)
         self.store.initialize()
         self._last_state: dict[str, Any] = {}
+        self._counter_delta = CounterDeltaProcessor()
 
     def heartbeat_payload(self) -> dict[str, Any]:
         active = self.store.active()
@@ -74,6 +76,7 @@ class RecordingController:
         events: list[dict[str, Any]] = []
         observed_at = datetime.now(UTC)
 
+        observations = [*observations, *self._counter_delta.consume(observations)]
         for observation in observations:
             observed_at = max(observed_at, observation.observed_at)
             if observation.kind is ObservationKind.GAUGE:
@@ -186,6 +189,7 @@ class RecordingController:
         started_at = datetime.now(UTC)
         recording = self.store.start(recording_id, started_at)
         self._last_state.clear()
+        self._counter_delta.reset()
         self.client.acknowledge_command(
             self.identity,
             command_id,
