@@ -5,6 +5,7 @@ import {
   runRecordingAnalysis,
 } from "./agentApi";
 import type {
+  AnalysisDegradedWindow,
   DiagnosticRecording,
   RecordingAnalysis,
 } from "./agentTypes";
@@ -36,8 +37,14 @@ function metricOrDash(value: number | null, suffix: string): string {
 
 export default function RecordingAnalysisPanel({
   recording,
+  selectedWindow,
+  onSelectWindow,
+  onWindowsChange,
 }: {
   recording: DiagnosticRecording;
+  selectedWindow: AnalysisDegradedWindow | null;
+  onSelectWindow: (window: AnalysisDegradedWindow) => void;
+  onWindowsChange: (windows: AnalysisDegradedWindow[]) => void;
 }) {
   const [analysis, setAnalysis] = useState<RecordingAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +60,7 @@ export default function RecordingAnalysisPanel({
         const result = await getLatestRecordingAnalysis(recording.id);
         if (active) {
           setAnalysis(result);
+          onWindowsChange(result?.summary.degraded_windows ?? []);
           setError(null);
           setLoading(false);
         }
@@ -67,14 +75,16 @@ export default function RecordingAnalysisPanel({
     return () => {
       active = false;
     };
-  }, [recording.id]);
+  }, [onWindowsChange, recording.id]);
 
   async function handleRun(): Promise<void> {
     if (!canAnalyze || running) return;
     setRunning(true);
     setError(null);
     try {
-      setAnalysis(await runRecordingAnalysis(recording.id));
+      const result = await runRecordingAnalysis(recording.id);
+      setAnalysis(result);
+      onWindowsChange(result.summary.degraded_windows ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to run analysis");
     } finally {
@@ -176,9 +186,18 @@ export default function RecordingAnalysisPanel({
               </div>
               <div className="recording-window-list">
                 {analysis.summary.degraded_windows?.map((window, index) => (
-                  <article
+                  <button
+                    type="button"
                     key={`${window.started_at}-${index}`}
-                    className={`recording-window window-${window.severity}`}
+                    className={[
+                      "recording-window",
+                      `window-${window.severity}`,
+                      selectedWindow?.started_at === window.started_at
+                        && selectedWindow?.ended_at === window.ended_at
+                        ? "is-selected"
+                        : "",
+                    ].join(" ")}
+                    onClick={() => onSelectWindow(window)}
                   >
                     <div className="recording-window-top">
                       <div>
@@ -208,7 +227,7 @@ export default function RecordingAnalysisPanel({
                       <dt>Channel util max</dt>
                       <dd>{metricOrDash(window.maximum_channel_utilization_percent, "%")}</dd>
                     </dl>
-                  </article>
+                  </button>
                 ))}
               </div>
             </div>

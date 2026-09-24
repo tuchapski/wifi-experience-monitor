@@ -144,6 +144,56 @@
   text-align: right;
 }
 
+.recording-detail-focus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 18px 0;
+  padding: 12px 14px;
+  border: 1px solid #d7e1ed;
+  border-radius: 10px;
+  background: #f7fafe;
+}
+
+.recording-detail-focus > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 12px;
+}
+
+.recording-detail-focus span {
+  color: #708097;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.recording-detail-focus strong {
+  color: #2e455f;
+  font-size: 12px;
+}
+
+.recording-detail-focus small {
+  color: #7d899a;
+  font-size: 10px;
+}
+
+.recording-detail-focus button {
+  padding: 6px 9px;
+  border: 1px solid #ccd7e4;
+  border-radius: 7px;
+  background: #fff;
+  color: #536a84;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .recording-detail-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -197,6 +247,33 @@
   margin-top: 8px;
 }
 
+.recording-detail-window-band {
+  pointer-events: none;
+  opacity: 0.1;
+}
+
+.recording-detail-window-band.band-warning {
+  fill: #d49627;
+}
+
+.recording-detail-window-band.band-critical {
+  fill: #bd433c;
+}
+
+.recording-detail-window-band.is-selected {
+  opacity: 0.28;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.recording-detail-window-band.band-warning.is-selected {
+  color: #b27816;
+}
+
+.recording-detail-window-band.band-critical.is-selected {
+  color: #9e312b;
+}
+
 .recording-detail-gridline {
   stroke: #e8edf3;
   stroke-width: 1;
@@ -208,6 +285,15 @@
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.recording-detail-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -2px;
+  color: #98a2b1;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
 }
 
 .recording-detail-chart-stats {
@@ -359,6 +445,11 @@
 
   .recording-detail-chart-grid {
     padding: 12px;
+  }
+
+  .recording-detail-focus {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .recording-event {

@@ -175,6 +175,14 @@
   border-left-width: 4px;
   border-radius: 10px;
   background: #fbfcfe;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .recording-window.window-warning {
@@ -183,6 +191,21 @@
 
 .recording-window.window-critical {
   border-left-color: #bd433c;
+}
+
+.recording-window:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(32, 52, 78, 0.08);
+}
+
+.recording-window.is-selected {
+  border-color: #7da1c9;
+  box-shadow: 0 0 0 3px rgba(52, 105, 164, 0.11);
+}
+
+.recording-window:focus-visible {
+  outline: 3px solid rgba(52, 105, 164, 0.2);
+  outline-offset: 2px;
 }
 
 .recording-window-top {

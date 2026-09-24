@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   getAgent,
@@ -7,6 +7,7 @@ import {
   getRecordingMetrics,
 } from "./agentApi";
 import type {
+  AnalysisDegradedWindow,
   AgentSummary,
   DiagnosticRecording,
   RecordingEvent,
@@ -56,6 +57,15 @@ function formatNumber(value: number, unit: string): string {
   return `${rendered} ${unit}`;
 }
 
+function formatClock(value: string): string {
+  return new Date(value).toLocaleTimeString();
+}
+
+interface TimelineBounds {
+  start: number;
+  end: number;
+}
+
 function renderStateValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -81,14 +91,20 @@ function RawMetricChart({
   label,
   unit,
   points,
+  timeline,
+  degradedWindows,
+  selectedWindow,
 }: {
   label: string;
   unit: string;
   points: RecordingMetricPoint[];
+  timeline: TimelineBounds | null;
+  degradedWindows: AnalysisDegradedWindow[];
+  selectedWindow: AnalysisDegradedWindow | null;
 }) {
   const sampled = useMemo(() => downsample(points), [points]);
 
-  if (sampled.length === 0) {
+  if (sampled.length === 0 || timeline === null) {
     return (
       <article className="recording-detail-chart">
         <div className="recording-detail-chart-heading">
@@ -109,14 +125,19 @@ function RawMetricChart({
   }
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   const valueSpan = maximum - minimum;
-  const firstTime = Date.parse(sampled[0].observed_at);
-  const lastTime = Date.parse(sampled[sampled.length - 1].observed_at);
-  const timeSpan = Math.max(1, lastTime - firstTime);
+  const timeSpan = Math.max(1, timeline.end - timeline.start);
+  const xForTime = (time: number) => {
+    const clamped = Math.min(timeline.end, Math.max(timeline.start, time));
+    return 16 + ((clamped - timeline.start) / timeSpan) * 688;
+  };
   const x = (point: RecordingMetricPoint) =>
-    16 + ((Date.parse(point.observed_at) - firstTime) / timeSpan) * 688;
+    xForTime(Date.parse(point.observed_at));
   const y = (value: number) => 154 - ((value - minimum) / valueSpan) * 126;
   const polyline = sampled.map((point) => `${x(point)},${y(point.value)}`).join(" ");
   const latest = sampled[sampled.length - 1];
+  const selectedKey = selectedWindow
+    ? `${selectedWindow.started_at}:${selectedWindow.ended_at}`
+    : null;
 
   return (
     <article className="recording-detail-chart">
@@ -128,11 +149,36 @@ function RawMetricChart({
         <small>{points.length.toLocaleString()} raw samples</small>
       </div>
       <svg viewBox="0 0 720 174" role="img" aria-label={`${label} raw recording chart`}>
+        {degradedWindows.map((window) => {
+          const startX = xForTime(Date.parse(window.started_at));
+          const endX = xForTime(Date.parse(window.ended_at));
+          const key = `${window.started_at}:${window.ended_at}`;
+          const selected = key === selectedKey;
+          return (
+            <rect
+              key={key}
+              x={startX}
+              y="28"
+              width={Math.max(1.5, endX - startX)}
+              height="126"
+              className={[
+                "recording-detail-window-band",
+                `band-${window.severity}`,
+                selected ? "is-selected" : "",
+              ].join(" ")}
+              aria-hidden="true"
+            />
+          );
+        })}
         <line x1="16" x2="704" y1="28" y2="28" className="recording-detail-gridline" />
         <line x1="16" x2="704" y1="91" y2="91" className="recording-detail-gridline" />
         <line x1="16" x2="704" y1="154" y2="154" className="recording-detail-gridline" />
         <polyline points={polyline} className="recording-detail-line" />
       </svg>
+      <div className="recording-detail-chart-axis">
+        <span>{new Date(timeline.start).toLocaleTimeString()}</span>
+        <span>{new Date(timeline.end).toLocaleTimeString()}</span>
+      </div>
       <div className="recording-detail-chart-stats">
         <span>Min <strong>{formatNumber(Math.min(...values), unit)}</strong></span>
         <span>Avg <strong>{formatNumber(average, unit)}</strong></span>
@@ -167,11 +213,65 @@ export default function RecordingDetail({
   const [events, setEvents] = useState<RecordingEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [degradedWindows, setDegradedWindows] = useState<AnalysisDegradedWindow[]>([]);
+  const [selectedWindow, setSelectedWindow] =
+    useState<AnalysisDegradedWindow | null>(null);
 
   const shouldPoll = recording === null
     || ACTIVE_STATUSES.has(recording.status)
     || recording.sync_status === "pending"
     || recording.sync_status === "syncing";
+
+  const timeline = useMemo<TimelineBounds | null>(() => {
+    const pointTimes = Object.values(series)
+      .flat()
+      .map((point) => Date.parse(point.observed_at))
+      .filter(Number.isFinite);
+    const recordingStart = recording?.started_at
+      ? Date.parse(recording.started_at)
+      : Number.NaN;
+    const recordingEnd = recording?.ended_at
+      ? Date.parse(recording.ended_at)
+      : Number.NaN;
+    const start = Number.isFinite(recordingStart)
+      ? recordingStart
+      : pointTimes.length > 0
+        ? Math.min(...pointTimes)
+        : Number.NaN;
+    const end = Number.isFinite(recordingEnd)
+      ? recordingEnd
+      : pointTimes.length > 0
+        ? Math.max(...pointTimes)
+        : Number.NaN;
+    if (!Number.isFinite(start) || !Number.isFinite(end)) {
+      return null;
+    }
+    return { start, end: end > start ? end : start + 1 };
+  }, [recording?.ended_at, recording?.started_at, series]);
+
+  const handleWindowsChange = useCallback((windows: AnalysisDegradedWindow[]) => {
+    setDegradedWindows(windows);
+    setSelectedWindow((current) => {
+      if (current === null) return null;
+      return windows.some(
+        (window) =>
+          window.started_at === current.started_at
+          && window.ended_at === current.ended_at,
+      )
+        ? current
+        : null;
+    });
+  }, []);
+
+  const handleSelectWindow = useCallback((selected: AnalysisDegradedWindow) => {
+    setSelectedWindow(selected);
+    window.requestAnimationFrame(() => {
+      document.getElementById("recording-raw-metrics")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -275,9 +375,17 @@ export default function RecordingDetail({
         </section>
       )}
 
-      <RecordingAnalysisPanel recording={recording} />
+      <RecordingAnalysisPanel
+        recording={recording}
+        selectedWindow={selectedWindow}
+        onSelectWindow={handleSelectWindow}
+        onWindowsChange={handleWindowsChange}
+      />
 
-      <section className="agent-panel recording-detail-data">
+      <section
+        id="recording-raw-metrics"
+        className="agent-panel recording-detail-data"
+      >
         <div className="recording-detail-section-heading">
           <div>
             <span className="agent-eyebrow">Raw metrics</span>
@@ -286,6 +394,27 @@ export default function RecordingDetail({
           </div>
           <small>Charts downsample only for rendering; Server data remains raw.</small>
         </div>
+        {selectedWindow && (
+          <div className="recording-detail-focus">
+            <div>
+              <span>Focused degraded window</span>
+              <strong>
+                {formatClock(selectedWindow.started_at)} →{" "}
+                {formatClock(selectedWindow.ended_at)}
+              </strong>
+              <small>
+                {selectedWindow.duration_seconds.toFixed(1)}s ·{" "}
+                {selectedWindow.domains.join(" + ")}
+              </small>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedWindow(null)}
+            >
+              Clear focus
+            </button>
+          </div>
+        )}
         <div className="recording-detail-chart-grid">
           {RECORDING_METRICS.map((metric) => (
             <RawMetricChart
@@ -293,6 +422,9 @@ export default function RecordingDetail({
               label={metric.label}
               unit={metric.unit}
               points={series[metric.key] ?? []}
+              timeline={timeline}
+              degradedWindows={degradedWindows}
+              selectedWindow={selectedWindow}
             />
           ))}
         </div>
