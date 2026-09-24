@@ -151,6 +151,7 @@ export interface RecordingAnalysisSummary {
     link_rate: boolean;
     state: boolean;
     counter_quality?: boolean;
+    rf_utilization?: boolean;
   };
   finding_counts: {
     critical: number;
@@ -163,6 +164,10 @@ export interface RecordingAnalysisSummary {
   tx_retries_per_100_packets?: AnalysisMetricStats | null;
   tx_failed_percent?: AnalysisMetricStats | null;
   counter_intervals?: number;
+  channel_utilization_percent?: AnalysisMetricStats | null;
+  channel_rx_percent?: AnalysisMetricStats | null;
+  channel_tx_percent?: AnalysisMetricStats | null;
+  survey_intervals?: number;
   low_signal_windows: AnalysisSignalWindow[];
   very_low_signal_windows: AnalysisSignalWindow[];
   state_changes: {

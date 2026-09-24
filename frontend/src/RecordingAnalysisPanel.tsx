@@ -104,7 +104,7 @@ export default function RecordingAnalysisPanel({
       ) : analysis === null ? (
         <div className="recording-analysis-empty">
           <strong>No analysis has been run for this recording.</strong>
-          <span>Run the deterministic V1 engine to generate findings.</span>
+          <span>Run the current deterministic engine to generate findings.</span>
         </div>
       ) : (
         <>
@@ -126,6 +126,10 @@ export default function RecordingAnalysisPanel({
             <article>
               <span>Retries P90</span>
               <strong>{formatPer100(analysis.summary.tx_retries_per_100_packets?.p90)}</strong>
+            </article>
+            <article>
+              <span>Channel util P90</span>
+              <strong>{formatPercent(analysis.summary.channel_utilization_percent?.p90)}</strong>
             </article>
             <article>
               <span>TX failures P90</span>

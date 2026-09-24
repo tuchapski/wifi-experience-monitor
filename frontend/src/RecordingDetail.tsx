@@ -24,6 +24,9 @@ const RECORDING_METRICS = [
   { key: "wifi.rx_rate_mbps", label: "RX rate", unit: "Mbps" },
   { key: "wifi.tx_retries_per_100_packets", label: "TX retries", unit: "/100 packets" },
   { key: "wifi.tx_failed_percent", label: "TX failures", unit: "%" },
+  { key: "wifi.channel_utilization_percent", label: "Channel utilization", unit: "%" },
+  { key: "wifi.channel_rx_percent", label: "Channel RX airtime", unit: "%" },
+  { key: "wifi.channel_tx_percent", label: "Channel TX airtime", unit: "%" },
 ] as const;
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);

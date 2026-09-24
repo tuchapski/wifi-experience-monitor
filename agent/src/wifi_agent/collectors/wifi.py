@@ -182,16 +182,30 @@ class WifiStateCollector:
             in_use = re.search(r"^\s*frequency:\s+(\d+)\s+MHz\s+\[in use\]", block, re.MULTILINE)
             if not in_use or int(in_use.group(1)) != frequency:
                 continue
+
+            for metric, pattern in (
+                ("wifi.survey_active_ms", r"^\s*channel active time:\s+(\d+)\s+ms\s*$"),
+                ("wifi.survey_busy_ms", r"^\s*channel busy time:\s+(\d+)\s+ms\s*$"),
+                ("wifi.survey_rx_ms", r"^\s*channel receive time:\s+(\d+)\s+ms\s*$"),
+                ("wifi.survey_tx_ms", r"^\s*channel transmit time:\s+(\d+)\s+ms\s*$"),
+            ):
+                match = re.search(pattern, block, re.MULTILINE)
+                if match:
+                    values[metric] = (
+                        ObservationKind.GAUGE,
+                        int(match.group(1)),
+                        "ms",
+                    )
+
             noise = re.search(r"^\s*noise:\s+(-?\d+)\s+dBm\s*$", block, re.MULTILINE)
-            if not noise:
-                return
-            noise_dbm = int(noise.group(1))
-            values["wifi.noise_dbm"] = (ObservationKind.GAUGE, noise_dbm, "dBm")
-            rssi_entry = values.get("wifi.rssi_dbm")
-            if rssi_entry is not None and isinstance(rssi_entry[1], (int, float)):
-                values["wifi.snr_db"] = (
-                    ObservationKind.GAUGE,
-                    float(rssi_entry[1]) - noise_dbm,
-                    "dB",
-                )
+            if noise:
+                noise_dbm = int(noise.group(1))
+                values["wifi.noise_dbm"] = (ObservationKind.GAUGE, noise_dbm, "dBm")
+                rssi_entry = values.get("wifi.rssi_dbm")
+                if rssi_entry is not None and isinstance(rssi_entry[1], (int, float)):
+                    values["wifi.snr_db"] = (
+                        ObservationKind.GAUGE,
+                        float(rssi_entry[1]) - noise_dbm,
+                        "dB",
+                    )
             return

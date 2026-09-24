@@ -260,7 +260,7 @@ def analyze_recording(
                 "info",
                 "Access point changed",
                 f"{len(bssid_changes)} BSSID change(s) were observed during the recording.",
-                "Verify whether the changes represent expected roaming and"
+                "Verify whether the changes represent expected roaming and "
                 "compare signal before/after.",
                 {
                     "count": len(bssid_changes),

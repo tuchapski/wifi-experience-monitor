@@ -10,6 +10,7 @@ from wifi_agent.core import Observation, ObservationKind
 from wifi_agent.recording.client import RecordingApiClient
 from wifi_agent.recording.counters import CounterDeltaProcessor
 from wifi_agent.recording.store import RecordingStore
+from wifi_agent.recording.survey import SurveyDeltaProcessor
 from wifi_agent.storage import AgentIdentity
 
 LOGGER = logging.getLogger("wifi_agent.recording")
@@ -30,6 +31,7 @@ class RecordingController:
         self.store.initialize()
         self._last_state: dict[str, Any] = {}
         self._counter_delta = CounterDeltaProcessor()
+        self._survey_delta = SurveyDeltaProcessor()
 
     def heartbeat_payload(self) -> dict[str, Any]:
         active = self.store.active()
@@ -76,7 +78,11 @@ class RecordingController:
         events: list[dict[str, Any]] = []
         observed_at = datetime.now(UTC)
 
-        observations = [*observations, *self._counter_delta.consume(observations)]
+        derived = [
+            *self._counter_delta.consume(observations),
+            *self._survey_delta.consume(observations),
+        ]
+        observations = [*observations, *derived]
         for observation in observations:
             observed_at = max(observed_at, observation.observed_at)
             if observation.kind is ObservationKind.GAUGE:
@@ -190,6 +196,7 @@ class RecordingController:
         recording = self.store.start(recording_id, started_at)
         self._last_state.clear()
         self._counter_delta.reset()
+        self._survey_delta.reset()
         self.client.acknowledge_command(
             self.identity,
             command_id,
