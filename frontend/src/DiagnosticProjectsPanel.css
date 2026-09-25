@@ -12,6 +12,51 @@
   line-height: 1.5;
 }
 
+.diagnostic-projects .agent-panel-heading {
+  gap: 16px;
+}
+
+.diagnostic-project-new {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #245f9f;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostic-project-new:focus-visible {
+  outline: 3px solid #93b9e5;
+  outline-offset: 2px;
+}
+
+.diagnostic-project-create {
+  padding-top: 17px;
+  border-bottom: 1px solid #edf1f5;
+  background: #f9fbfe;
+}
+
+.diagnostic-project-create h3,
+.diagnostic-project-create p {
+  margin: 0;
+}
+
+.diagnostic-project-create h3 {
+  color: #2b3e56;
+  font-size: 15px;
+}
+
+.diagnostic-project-create p {
+  margin-top: 4px;
+  color: #758194;
+  font-size: 12px;
+}
+
 .diagnostic-project-form {
   display: grid;
   gap: 14px;
@@ -121,7 +166,6 @@
 
 .diagnostic-project-history {
   padding: 16px 22px 22px;
-  border-top: 1px solid #edf1f5;
 }
 
 .diagnostic-project-history h3 {
@@ -180,6 +224,11 @@
 }
 
 @media (max-width: 760px) {
+  .diagnostic-projects .agent-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .diagnostic-project-fields {
     grid-template-columns: minmax(0, 1fr);
   }

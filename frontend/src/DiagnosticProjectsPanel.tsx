@@ -23,6 +23,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   async function refresh(): Promise<void> {
     try {
@@ -87,6 +88,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
       setSite("");
       setLocation("");
       setAgentIds([]);
+      setShowCreate(false);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create project");
@@ -130,55 +132,69 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
       <div className="agent-panel-heading">
         <div>
           <span className="agent-eyebrow">Projects</span>
-          <h2 id="projects-title">Group collections from multiple Agents</h2>
-          <p>Choose a purpose, capture duration and the Agents that will collect evidence.</p>
+          <h2 id="projects-title">Diagnostic projects</h2>
+          <p>Group repeatable collections from one or more Agents under a shared objective.</p>
         </div>
+        <button type="button" className="diagnostic-project-new"
+          aria-expanded={showCreate}
+          onClick={() => setShowCreate((current) => !current)}>
+          {showCreate ? "Close form" : "New project"}
+        </button>
       </div>
 
-      <form className="diagnostic-project-form" onSubmit={(event) => void handleCreate(event)}>
-        <div className="diagnostic-project-fields">
-          <label>Project name
-            <input required maxLength={128} value={name} onChange={(event) => setName(event.target.value)} disabled={busy !== null} placeholder="Office Wi-Fi baseline" />
-          </label>
-          <label>Maximum duration
-            <select value={duration} onChange={(event) => setDuration(Number(event.target.value))} disabled={busy !== null}>
-              {DURATIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
-            </select>
-          </label>
-          <label>Site (optional)
-            <input maxLength={255} value={site} onChange={(event) => setSite(event.target.value)} disabled={busy !== null} />
-          </label>
-          <label>Location (optional)
-            <input maxLength={255} value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy !== null} />
-          </label>
-        </div>
-        <label>Objective or observed symptoms (optional)
-          <textarea maxLength={2000} rows={2} value={objective} onChange={(event) => setObjective(event.target.value)} disabled={busy !== null} />
-        </label>
-        <fieldset disabled={busy !== null || agents.length === 0}>
-          <legend>Collection Agents (choose one or more)</legend>
-          <div className="diagnostic-project-agent-list">
-            {agents.map((agent) => (
-              <label key={agent.id}>
-                <input type="checkbox" checked={agentIds.includes(agent.id)} onChange={() => toggleAgent(agent.id)} />
-                {agent.name} <small>({agent.status})</small>
-              </label>
-            ))}
-            {agents.length === 0 && <span>No Agents available.</span>}
+      {showCreate && (
+        <form className="diagnostic-project-form diagnostic-project-create"
+          onSubmit={(event) => void handleCreate(event)}>
+          <div>
+            <h3>Create a project</h3>
+            <p>Set up the collection once, then start a run from the project list below.</p>
           </div>
-        </fieldset>
-        <div className="diagnostic-project-actions">
-          <small>Capture profile: Wi-Fi deep dive. Collection begins when each Agent accepts its command.</small>
-          <button type="submit" disabled={!name.trim() || agentIds.length === 0 || busy !== null}>
-            {busy === "create" ? "Creating…" : "Create project"}
-          </button>
-        </div>
-      </form>
+          <div className="diagnostic-project-fields">
+            <label>Project name
+              <input required maxLength={128} value={name} onChange={(event) => setName(event.target.value)} disabled={busy !== null} placeholder="Office Wi-Fi baseline" />
+            </label>
+            <label>Maximum duration
+              <select value={duration} onChange={(event) => setDuration(Number(event.target.value))} disabled={busy !== null}>
+                {DURATIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
+              </select>
+            </label>
+            <label>Site (optional)
+              <input maxLength={255} value={site} onChange={(event) => setSite(event.target.value)} disabled={busy !== null} />
+            </label>
+            <label>Location (optional)
+              <input maxLength={255} value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy !== null} />
+            </label>
+          </div>
+          <label>Objective or observed symptoms (optional)
+            <textarea maxLength={2000} rows={2} value={objective} onChange={(event) => setObjective(event.target.value)} disabled={busy !== null} />
+          </label>
+          <fieldset disabled={busy !== null || agents.length === 0}>
+            <legend>Collection Agents (choose one or more)</legend>
+            <div className="diagnostic-project-agent-list">
+              {agents.map((agent) => (
+                <label key={agent.id}>
+                  <input type="checkbox" checked={agentIds.includes(agent.id)} onChange={() => toggleAgent(agent.id)} />
+                  {agent.name} <small>({agent.status})</small>
+                </label>
+              ))}
+              {agents.length === 0 && <span>No Agents available.</span>}
+            </div>
+          </fieldset>
+          <div className="diagnostic-project-actions">
+            <small>Capture profile: Wi-Fi deep dive. Collection begins when each Agent accepts its command.</small>
+            <button type="submit" disabled={!name.trim() || agentIds.length === 0 || busy !== null}>
+              {busy === "create" ? "Creating…" : "Create project"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {error && <div className="recording-error" role="alert">{error}</div>}
       <div className="diagnostic-project-history">
-        <h3>Projects</h3>
-        {loading ? <p>Loading projects…</p> : projects.length === 0 ? <p>No projects yet.</p> : (
+        <h3>Your projects</h3>
+        {loading ? <p>Loading projects…</p> : projects.length === 0 ? (
+          <p>No projects yet. Create one to organize and run a collection.</p>
+        ) : (
           projects.map((project) => {
             const allOnline = project.agent_ids.every((id) =>
               agents.find((agent) => agent.id === id)?.status === "online");
@@ -194,7 +210,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
                     <small>Agents: {project.agent_ids.map(agentName).join(", ")}</small>
                   </div>
                   <button type="button" disabled={!allOnline || activeRun || busy !== null} onClick={() => void handleStart(project.id)}>
-                    {busy === project.id ? "Queuing…" : "Start collection"}
+                    {busy === project.id ? "Queuing…" : "Start project run"}
                   </button>
                 </div>
                 {!allOnline && <p className="diagnostic-project-help">All selected Agents must be online before starting a run.</p>}

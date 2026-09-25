@@ -317,7 +317,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
       <div className="recording-history-heading">
         <div>
           <h3>Recording history</h3>
-          <p>Raw captures are retained independently from rolling telemetry.</p>
+          <p>All recordings from this Agent, including project runs.</p>
         </div>
         <span>{recordings.length} total</span>
       </div>
