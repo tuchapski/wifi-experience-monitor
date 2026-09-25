@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from wifi_server.db.models import DiagnosticRecording
 from wifi_server.db.recording_models import RecordingMetric
 from wifi_server.recording_schemas import (
+    DiagnosticFinding,
     DiagnosticMetricComparison,
     DiagnosticMetricStatistics,
     DiagnosticWindowComparison,
@@ -55,6 +56,77 @@ def _period_statistics(
     return _statistics(list(session.execute(statement)))
 
 
+# Minimum change in the mean required before a metric becomes a diagnostic finding.
+# Direction indicates which movement represents deterioration for that metric.
+_FINDING_RULES: dict[str, tuple[float, str]] = {
+    "wifi.rssi_dbm": (5.0, "decrease"),
+    "wifi.signal_avg_dbm": (5.0, "decrease"),
+    "wifi.snr_db": (5.0, "decrease"),
+    "wifi.tx_rate_mbps": (20.0, "decrease"),
+    "wifi.rx_rate_mbps": (20.0, "decrease"),
+    "wifi.tx_retries_per_100": (5.0, "increase"),
+    "wifi.tx_failed_pct": (2.0, "increase"),
+    "wifi.channel_utilization_pct": (15.0, "increase"),
+    "wifi.airtime_rx_pct": (15.0, "increase"),
+    "wifi.airtime_tx_pct": (15.0, "increase"),
+    "wifi.noise_dbm": (5.0, "increase"),
+}
+
+
+def _recovery_state(
+    baseline: float,
+    during: float,
+    after: float | None,
+    threshold: float,
+) -> str:
+    if after is None:
+        return "unknown"
+    if abs(after - baseline) < threshold:
+        return "recovered"
+    during_distance = abs(during - baseline)
+    after_distance = abs(after - baseline)
+    if after_distance < during_distance:
+        return "partial"
+    return "not_recovered"
+
+
+def _finding_for_comparison(comparison: DiagnosticMetricComparison) -> DiagnosticFinding | None:
+    rule = _FINDING_RULES.get(comparison.metric)
+    baseline = comparison.before.average
+    during = comparison.during.average
+    if rule is None or baseline is None or during is None:
+        return None
+
+    threshold, deteriorating_direction = rule
+    delta = during - baseline
+    deteriorated = (
+        delta <= -threshold if deteriorating_direction == "decrease" else delta >= threshold
+    )
+    if not deteriorated:
+        return None
+
+    return DiagnosticFinding(
+        metric=comparison.metric,
+        direction="decreased" if delta < 0 else "increased",
+        baseline=baseline,
+        during=during,
+        delta=delta,
+        after=comparison.after.average,
+        recovery=_recovery_state(
+            baseline,
+            during,
+            comparison.after.average,
+            threshold,
+        ),
+    )
+
+
+def _findings(comparisons: list[DiagnosticMetricComparison]) -> list[DiagnosticFinding]:
+    return [
+        finding for comparison in comparisons if (finding := _finding_for_comparison(comparison))
+    ]
+
+
 def compare_diagnostic_window(
     session: Session,
     recording_id: str,
@@ -82,19 +154,21 @@ def compare_diagnostic_window(
     after = _period_statistics(session, recording_id, metrics, window_end, after_end)
 
     empty = DiagnosticMetricStatistics(sample_count=0)
+    comparisons = [
+        DiagnosticMetricComparison(
+            metric=metric,
+            before=before.get(metric, empty),
+            during=during.get(metric, empty),
+            after=after.get(metric, empty),
+        )
+        for metric in metrics
+    ]
     return DiagnosticWindowComparison(
         window_start=window_start,
         window_end=window_end,
         context_seconds=context_seconds,
         before_start=before_start,
         after_end=after_end,
-        metrics=[
-            DiagnosticMetricComparison(
-                metric=metric,
-                before=before.get(metric, empty),
-                during=during.get(metric, empty),
-                after=after.get(metric, empty),
-            )
-            for metric in metrics
-        ],
+        metrics=comparisons,
+        findings=_findings(comparisons),
     )

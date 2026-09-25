@@ -54,3 +54,68 @@ def test_comparison_clamps_after_period_to_completed_recording() -> None:
     assert result.after_end == end
     assert result.metrics[0].after.sample_count == 0
     assert result.metrics[0].after.minimum is None
+
+
+def test_findings_detect_meaningful_deterioration_and_recovery() -> None:
+    session = Mock(spec=Session)
+    start = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
+    session.get.return_value = Mock(started_at=start, ended_at=start + timedelta(minutes=10))
+    session.execute.side_effect = [
+        iter([("wifi.rssi_dbm", 5, -54.0, -52.0, -50.0)]),
+        iter([("wifi.rssi_dbm", 5, -73.0, -70.0, -67.0)]),
+        iter([("wifi.rssi_dbm", 5, -55.0, -53.0, -51.0)]),
+    ]
+
+    result = compare_diagnostic_window(
+        session,
+        "rec_test",
+        ["wifi.rssi_dbm"],
+        start + timedelta(seconds=60),
+        start + timedelta(seconds=90),
+        30,
+    )
+
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert finding.metric == "wifi.rssi_dbm"
+    assert finding.direction == "decreased"
+    assert finding.baseline == -52.0
+    assert finding.during == -70.0
+    assert finding.delta == -18.0
+    assert finding.after == -53.0
+    assert finding.recovery == "recovered"
+
+
+def test_findings_ignore_noise_and_preserve_unknown_recovery() -> None:
+    session = Mock(spec=Session)
+    start = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
+    session.get.return_value = Mock(started_at=start, ended_at=None)
+    session.execute.side_effect = [
+        iter(
+            [
+                ("wifi.rssi_dbm", 5, -55.0, -52.0, -50.0),
+                ("wifi.tx_retries_per_100", 5, 1.0, 2.0, 3.0),
+            ]
+        ),
+        iter(
+            [
+                ("wifi.rssi_dbm", 5, -57.0, -55.0, -53.0),
+                ("wifi.tx_retries_per_100", 5, 8.0, 10.0, 12.0),
+            ]
+        ),
+        iter([]),
+    ]
+
+    result = compare_diagnostic_window(
+        session,
+        "rec_test",
+        ["wifi.rssi_dbm", "wifi.tx_retries_per_100"],
+        start + timedelta(seconds=60),
+        start + timedelta(seconds=90),
+        30,
+    )
+
+    assert [finding.metric for finding in result.findings] == ["wifi.tx_retries_per_100"]
+    assert result.findings[0].direction == "increased"
+    assert result.findings[0].delta == 8.0
+    assert result.findings[0].recovery == "unknown"

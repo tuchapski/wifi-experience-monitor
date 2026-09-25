@@ -143,6 +143,16 @@ class DiagnosticMetricComparison(BaseModel):
     after: DiagnosticMetricStatistics
 
 
+class DiagnosticFinding(BaseModel):
+    metric: str
+    direction: str
+    baseline: float
+    during: float
+    delta: float
+    after: float | None = None
+    recovery: str
+
+
 class DiagnosticWindowComparison(BaseModel):
     window_start: datetime
     window_end: datetime
@@ -150,3 +160,4 @@ class DiagnosticWindowComparison(BaseModel):
     before_start: datetime
     after_end: datetime
     metrics: list[DiagnosticMetricComparison]
+    findings: list[DiagnosticFinding] = Field(default_factory=list)
