@@ -19,6 +19,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
   const [site, setSite] = useState("");
   const [location, setLocation] = useState("");
   const [agentIds, setAgentIds] = useState<string[]>([]);
+  const [agentLocations, setAgentLocations] = useState<Record<string, string>>({});
   const [duration, setDuration] = useState(60);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -80,6 +81,9 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
         site: site.trim() || null,
         location: location.trim() || null,
         agent_ids: agentIds,
+        agent_locations: Object.fromEntries(agentIds
+          .filter((id) => agentLocations[id]?.trim())
+          .map((id) => [id, agentLocations[id].trim()])),
         profile_id: "wifi-deep-dive",
         max_duration_minutes: duration,
       });
@@ -88,6 +92,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
       setSite("");
       setLocation("");
       setAgentIds([]);
+      setAgentLocations({});
       setShowCreate(false);
       await refresh();
     } catch (err) {
@@ -161,7 +166,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
             <label>Site (optional)
               <input maxLength={255} value={site} onChange={(event) => setSite(event.target.value)} disabled={busy !== null} />
             </label>
-            <label>Location (optional)
+            <label>Default location (optional)
               <input maxLength={255} value={location} onChange={(event) => setLocation(event.target.value)} disabled={busy !== null} />
             </label>
           </div>
@@ -170,12 +175,23 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
           </label>
           <fieldset disabled={busy !== null || agents.length === 0}>
             <legend>Collection Agents (choose one or more)</legend>
+            <p>Give each Agent a position. Blank positions use the default location above.</p>
             <div className="diagnostic-project-agent-list">
               {agents.map((agent) => (
-                <label key={agent.id}>
-                  <input type="checkbox" checked={agentIds.includes(agent.id)} onChange={() => toggleAgent(agent.id)} />
-                  {agent.name} <small>({agent.status})</small>
-                </label>
+                <div className="diagnostic-project-agent-row" key={agent.id}>
+                  <label>
+                    <input type="checkbox" checked={agentIds.includes(agent.id)} onChange={() => toggleAgent(agent.id)} />
+                    {agent.name} <small>({agent.status})</small>
+                  </label>
+                  {agentIds.includes(agent.id) && (
+                    <label>Position for {agent.name} (optional)
+                      <input maxLength={255} value={agentLocations[agent.id] ?? ""}
+                        onChange={(event) => setAgentLocations((current) => ({
+                          ...current, [agent.id]: event.target.value,
+                        }))} placeholder="e.g. Meeting room · west side" />
+                    </label>
+                  )}
+                </div>
               ))}
               {agents.length === 0 && <span>No Agents available.</span>}
             </div>
@@ -207,7 +223,8 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
                     <strong>{project.name}</strong>
                     <p>{project.objective ?? "No objective provided"}</p>
                     <small>{[project.site, project.location].filter(Boolean).join(" · ") || "No location"} · {project.max_duration_minutes} min · {project.profile_id}</small>
-                    <small>Agents: {project.agent_ids.map(agentName).join(", ")}</small>
+                    <small>Agents: {project.agent_ids.map((id) =>
+                      [agentName(id), project.agent_locations[id]].filter(Boolean).join(" · ")).join(", ")}</small>
                   </div>
                   <button type="button" disabled={!allOnline || activeRun || busy !== null} onClick={() => void handleStart(project.id)}>
                     {busy === project.id ? "Queuing…" : "Start project run"}

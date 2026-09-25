@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CreateProjectRequest(BaseModel):
@@ -13,6 +13,7 @@ class CreateProjectRequest(BaseModel):
     profile_id: str = Field(default="wifi-deep-dive", min_length=1, max_length=64)
     max_duration_minutes: int = Field(default=60, ge=1, le=1440)
     agent_ids: list[str] = Field(min_length=1, max_length=20)
+    agent_locations: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod
@@ -36,6 +37,21 @@ class CreateProjectRequest(BaseModel):
             raise ValueError("Select unique Agent IDs")
         return value
 
+    @field_validator("agent_locations")
+    @classmethod
+    def normalize_agent_locations(cls, value: dict[str, str]) -> dict[str, str]:
+        if any(len(location) > 255 for location in value.values()):
+            raise ValueError("Agent locations cannot exceed 255 characters")
+        return {
+            agent_id: location.strip() for agent_id, location in value.items() if location.strip()
+        }
+
+    @model_validator(mode="after")
+    def validate_location_members(self) -> "CreateProjectRequest":
+        if set(self.agent_locations) - set(self.agent_ids):
+            raise ValueError("Agent locations must refer to selected Agents")
+        return self
+
 
 class ProjectFindingResponse(BaseModel):
     code: str
@@ -54,6 +70,7 @@ class ProjectAnalysisSummary(BaseModel):
 class ProjectRecordingResponse(BaseModel):
     agent_id: str
     recording_id: str | None
+    location: str | None
     status: str | None
     sync_status: str | None
     analysis: ProjectAnalysisSummary | None = None
@@ -75,5 +92,6 @@ class ProjectResponse(BaseModel):
     profile_id: str
     max_duration_minutes: int
     agent_ids: list[str]
+    agent_locations: dict[str, str | None]
     created_at: datetime
     runs: list[ProjectRunResponse]

@@ -72,6 +72,13 @@
   font-weight: 700;
 }
 
+.project-run-position {
+  display: block;
+  margin-top: 6px;
+  color: #657184;
+  font-size: 11px;
+}
+
 .project-run-analysis,
 .project-run-waiting {
   margin: 12px 0;

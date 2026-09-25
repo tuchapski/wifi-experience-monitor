@@ -11,7 +11,7 @@ from wifi_server.db.models import Agent
 from wifi_server.db.project_models import DiagnosticProject, ProjectAgent, ProjectRunRecording
 from wifi_server.project_schemas import CreateProjectRequest
 from wifi_server.recording_schemas import StartRecordingRequest
-from wifi_server.services.projects import start_project_run
+from wifi_server.services.projects import create_project, start_project_run
 from wifi_server.services.recordings import create_recording
 
 
@@ -61,9 +61,36 @@ def test_project_requires_unique_agent_ids_and_nonblank_name() -> None:
         {"name": "Project", "agent_ids": ["agt_1", "agt_1"]},
         {"name": "  ", "agent_ids": ["agt_1"]},
         {"name": "Project", "agent_ids": []},
+        {"name": "Project", "agent_ids": ["agt_1"], "agent_locations": {"agt_2": "Lobby"}},
+        {"name": "Project", "agent_ids": ["agt_1"], "agent_locations": {"agt_1": "x" * 256}},
     ):
         with pytest.raises(ValidationError):
             CreateProjectRequest.model_validate(payload)
+
+
+def test_project_persists_selected_agent_positions() -> None:
+    session = Mock(spec=Session)
+    session.get.return_value = _agent("agt_1")
+    request = CreateProjectRequest(
+        name="Office",
+        location="Floor 3",
+        agent_ids=["agt_1", "agt_2"],
+        agent_locations={"agt_1": " West lounge ", "agt_2": " "},
+    )
+
+    with patch("wifi_server.services.projects._project_response"):
+        create_project(session, request)
+
+    members = [
+        call.args[0]
+        for call in session.add.call_args_list
+        if isinstance(call.args[0], ProjectAgent)
+    ]
+    assert {member.agent_id: member.location for member in members} == {
+        "agt_1": "West lounge",
+        "agt_2": None,
+    }
+    session.commit.assert_called_once()
 
 
 def test_recording_can_be_queued_without_individual_commit() -> None:
@@ -90,10 +117,21 @@ def test_run_queues_one_recording_per_agent_and_commits_once() -> None:
             return project
         if model is Agent:
             return agents[key]
-        return Mock(status="created", sync_status="pending")
+        return Mock(
+            status="created",
+            sync_status="pending",
+            location="West lounge" if key == "rec_agt_1" else "Floor 3",
+        )
 
     session.get.side_effect = get_record
-    members = [ProjectAgent(project_id="prj_test", agent_id=agent_id) for agent_id in agents]
+    members = [
+        ProjectAgent(
+            project_id="prj_test",
+            agent_id=agent_id,
+            location="West lounge" if agent_id == "agt_1" else None,
+        )
+        for agent_id in agents
+    ]
     linked = [
         ProjectRunRecording(run_id="run_test", agent_id=agent_id, recording_id=f"rec_{agent_id}")
         for agent_id in agents
@@ -115,6 +153,11 @@ def test_run_queues_one_recording_per_agent_and_commits_once() -> None:
     ]
     assert {item.recording_id for item in links} == {"rec_agt_1", "rec_agt_2"}
     assert all(call.args[2].max_duration_minutes == 30 for call in queue.call_args_list)
+    assert [call.args[2].location for call in queue.call_args_list] == ["West lounge", "Floor 3"]
+    assert {item.agent_id: item.location for item in result.recordings} == {
+        "agt_1": "West lounge",
+        "agt_2": "Floor 3",
+    }
     session.commit.assert_called_once()
 
 

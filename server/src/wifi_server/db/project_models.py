@@ -30,6 +30,7 @@ class ProjectAgent(Base):
     agent_id: Mapped[str] = mapped_column(
         ForeignKey("agents.id", ondelete="RESTRICT"), primary_key=True
     )
+    location: Mapped[str | None] = mapped_column(String(255))
 
 
 class ProjectRun(Base):

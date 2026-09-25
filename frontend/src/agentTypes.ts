@@ -109,6 +109,7 @@ export interface CreateDiagnosticProjectInput {
   profile_id: string;
   max_duration_minutes: number;
   agent_ids: string[];
+  agent_locations: Record<string, string>;
 }
 
 export interface ProjectAnalysisSummary {
@@ -122,6 +123,7 @@ export interface ProjectAnalysisSummary {
 export interface DiagnosticProjectRecording {
   agent_id: string;
   recording_id: string | null;
+  location: string | null;
   status: string | null;
   sync_status: string | null;
   analysis: ProjectAnalysisSummary | null;
@@ -143,6 +145,7 @@ export interface DiagnosticProject {
   profile_id: string;
   max_duration_minutes: number;
   agent_ids: string[];
+  agent_locations: Record<string, string | null>;
   created_at: string;
   runs: DiagnosticProjectRun[];
 }

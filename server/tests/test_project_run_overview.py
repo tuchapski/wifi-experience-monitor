@@ -36,7 +36,11 @@ def test_latest_analysis_is_shown_only_for_its_agent() -> None:
     ]
     session.scalars.return_value.all.side_effect = [members, [_analysis()]]
     session.get.side_effect = lambda model, key: Mock(
-        status="completed", sync_status="complete", metrics_count=10, events_count=2
+        status="completed",
+        sync_status="complete",
+        metrics_count=10,
+        events_count=2,
+        location="West lounge" if key == "rec_agt_1" else "Floor 3",
     )
 
     result = _run_response(session, run)
@@ -47,6 +51,8 @@ def test_latest_analysis_is_shown_only_for_its_agent() -> None:
     assert first.analysis.evidence_status == "partial"
     assert [finding.code for finding in first.analysis.top_findings] == ["CRITICAL", "WARNING"]
     assert second.analysis is None
+    assert first.location == "West lounge"
+    assert second.location == "Floor 3"
 
 
 def test_active_or_resynchronizing_recordings_do_not_show_stale_analysis() -> None:
@@ -55,7 +61,7 @@ def test_active_or_resynchronizing_recordings_do_not_show_stale_analysis() -> No
         run = ProjectRun(id="run_test", project_id="prj_test", started_at=datetime.now(UTC))
         member = ProjectRunRecording(run_id="run_test", agent_id="agt_1", recording_id="rec_agt_1")
         session.scalars.return_value.all.return_value = [member]
-        session.get.return_value = Mock(status=status, sync_status=sync_status)
+        session.get.return_value = Mock(status=status, sync_status=sync_status, location=None)
 
         result = _run_response(session, run)
 
@@ -69,7 +75,11 @@ def test_analysis_with_different_metric_count_is_excluded() -> None:
     member = ProjectRunRecording(run_id="run_test", agent_id="agt_1", recording_id="rec_agt_1")
     session.scalars.return_value.all.side_effect = [[member], [_analysis()]]
     session.get.return_value = Mock(
-        status="completed", sync_status="complete", metrics_count=11, events_count=2
+        status="completed",
+        sync_status="complete",
+        metrics_count=11,
+        events_count=2,
+        location=None,
     )
 
     result = _run_response(session, run)

@@ -50,7 +50,13 @@ def create_project(session: Session, request: CreateProjectRequest) -> ProjectRe
     session.add(project)
     session.flush()
     for agent_id in request.agent_ids:
-        session.add(ProjectAgent(project_id=project.id, agent_id=agent_id))
+        session.add(
+            ProjectAgent(
+                project_id=project.id,
+                agent_id=agent_id,
+                location=request.agent_locations.get(agent_id),
+            )
+        )
     session.commit()
     return _project_response(session, project)
 
@@ -78,7 +84,7 @@ def start_project_run(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project has no Agents")
 
     now = datetime.now(UTC)
-    agents: list[Agent] = []
+    agents: list[tuple[Agent, ProjectAgent]] = []
     for member in members:
         agent = session.get(Agent, member.agent_id)
         if (
@@ -90,13 +96,13 @@ def start_project_run(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Agent {member.agent_id} is offline or unavailable",
             )
-        agents.append(agent)
+        agents.append((agent, member))
 
     run = ProjectRun(id=f"run_{uuid4().hex}", project_id=project.id, started_at=now)
     try:
         session.add(run)
         session.flush()
-        for agent in agents:
+        for agent, member in agents:
             recording = create_recording(
                 session,
                 agent.id,
@@ -104,7 +110,7 @@ def start_project_run(
                     name=f"{project.name} / {agent.name}"[:255],
                     description=project.objective,
                     site=project.site,
-                    location=project.location,
+                    location=member.location or project.location,
                     profile_id=project.profile_id,
                     max_duration_minutes=project.max_duration_minutes,
                 ),
@@ -141,6 +147,9 @@ def _project_response(session: Session, project: DiagnosticProject) -> ProjectRe
         profile_id=project.profile_id,
         max_duration_minutes=project.max_duration_minutes,
         agent_ids=[member.agent_id for member in members],
+        agent_locations={
+            member.agent_id: member.location or project.location for member in members
+        },
         created_at=project.created_at,
         runs=[_run_response(session, run) for run in runs],
     )
@@ -198,6 +207,7 @@ def _run_response(session: Session, run: ProjectRun) -> ProjectRunResponse:
             ProjectRecordingResponse(
                 agent_id=member.agent_id,
                 recording_id=member.recording_id,
+                location=recording.location if recording else None,
                 status=recording.status if recording else None,
                 sync_status=recording.sync_status if recording else None,
                 analysis=_analysis_summary(analysis) if current_analysis else None,
