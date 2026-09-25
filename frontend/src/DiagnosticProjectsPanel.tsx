@@ -133,7 +133,7 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
         <div>
           <span className="agent-eyebrow">Projects</span>
           <h2 id="projects-title">Diagnostic projects</h2>
-          <p>Group repeatable collections from one or more Agents under a shared objective.</p>
+          <p>Group collections from one or more Agents. Analysis starts after each recording finishes syncing.</p>
         </div>
         <button type="button" className="diagnostic-project-new"
           aria-expanded={showCreate}
@@ -223,7 +223,10 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
                         <li key={item.agent_id}>
                           <span>{agentName(item.agent_id)}: {item.status ?? "Recording removed"} · {item.sync_status ?? "—"}</span>
                           {item.recording_id && item.status && (
-                            <a href={diagnosticsRecordingHash(item.agent_id, item.recording_id)}>View recording</a>
+                            <a href={diagnosticsRecordingHash(item.agent_id, item.recording_id)}>
+                              {item.status === "completed" && item.sync_status === "complete"
+                                ? "View analysis" : "View recording"}
+                            </a>
                           )}
                           {item.recording_id && item.status === "recording" && (
                             <button type="button" className="diagnostic-project-stop" disabled={busy !== null}

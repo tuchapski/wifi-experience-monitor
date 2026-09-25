@@ -1,11 +1,12 @@
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from wifi_server.db.models import DiagnosticRecording
 from wifi_server.db.recording_models import AgentCommand
-from wifi_server.dependencies import get_session
+from wifi_server.dependencies import get_database, get_session
 from wifi_server.recording_schemas import (
     AgentCommandAckRequest,
     RecordingBatchRequest,
@@ -18,6 +19,7 @@ from wifi_server.recording_schemas import (
     StartRecordingRequest,
 )
 from wifi_server.services.agents import authenticate_agent
+from wifi_server.services.analyses import ensure_recording_analysis
 from wifi_server.services.recordings import (
     acknowledge_command,
     create_recording,
@@ -31,6 +33,15 @@ from wifi_server.services.recordings import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["recordings"])
+logger = logging.getLogger(__name__)
+
+
+def _analyze_completed_recording(recording_id: str) -> None:
+    try:
+        with get_database().session() as session:
+            ensure_recording_analysis(session, recording_id)
+    except Exception:
+        logger.exception("Automatic analysis failed for recording %s", recording_id)
 
 
 def _bearer_token(authorization: str | None) -> str:
@@ -153,6 +164,7 @@ def recording_batch(
 def recording_manifest(
     recording_id: str,
     payload: RecordingManifestRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_session)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> RecordingManifestResponse:
@@ -161,4 +173,7 @@ def recording_manifest(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
     token = _bearer_token(authorization)
     authenticate_agent(session, recording.agent_id, token)
-    return finalize_manifest(session, recording, payload)
+    result = finalize_manifest(session, recording, payload)
+    if result.sync_status == "complete":
+        background_tasks.add_task(_analyze_completed_recording, recording_id)
+    return result

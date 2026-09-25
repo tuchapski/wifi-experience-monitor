@@ -141,6 +141,9 @@ export interface DiagnosticProject {
 export interface DiagnosticRecording {
   id: string;
   agent_id: string;
+  project_id: string | null;
+  project_name: string | null;
+  project_run_id: string | null;
   name: string;
   description: string | null;
   site: string | null;

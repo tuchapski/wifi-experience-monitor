@@ -575,9 +575,10 @@ With two completed, synchronized recordings for the same Agent, choose a before
 and after recording in Recording history. The panel loads their latest analyses
 and shows RSSI average, TX retries P90, TX failures P90 and channel utilization
 P90 alongside the numeric change (after minus before). Run an analysis from
-each recording's detail page if one is missing. Missing measurements show a
-dash; the panel also shows evidence and collection continuity, and flags
-differences in analysis engine, collection profile, site, location and duration.
+each recording's detail page if an older recording has no analysis. Missing
+measurements show a dash; the panel also shows evidence and collection
+continuity, and flags differences in analysis engine, collection profile, site,
+location and duration.
 Numeric changes require the same analysis engine version on both recordings.
 The comparison describes observations and does not attribute their cause.
 
@@ -596,6 +597,15 @@ The project groups per-Agent analyses; it does not yet calculate a cross-Agent
 assessment. The capture profile is currently `wifi-deep-dive`. Individual
 recordings remain available through the Agent picker in Diagnostics.
 
+Projects and individual collections now have separate histories in Diagnostics.
+The individual history excludes recordings started by project runs; the project
+shows each member's recording and links directly to its analysis. Once the
+Server receives a completed, fully synchronized manifest, it generates the
+analysis automatically in the background. Incomplete collections remain visible
+without analysis. Older recordings can still be analyzed manually from their
+detail page. Rerunning an analysis manually remains available when an updated
+engine is deployed.
+
 Apply the Server schema migration before starting this version:
 `cd server && alembic upgrade head`. The Agent needs no schema change.
 
@@ -603,7 +613,7 @@ Apply the Server schema migration before starting this version:
 
 The frontend now has separate Agents and Diagnostics sections. Agents shows live
 Wi-Fi state, recent telemetry, capabilities and Agent management. Diagnostics
-lets you choose an Agent and start, stop, review, compare and analyze its
-recordings. Recording detail links previously opened under `#agents/...` still
+separates project runs from direct Agent recordings. Recording detail links
+previously opened under `#agents/...` still
 resolve in Diagnostics. This navigation update does not change stored recordings
 or require a database migration.

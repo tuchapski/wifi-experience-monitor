@@ -58,6 +58,7 @@ export default function RecordingAnalysisPanel({
   const [error, setError] = useState<string | null>(null);
   const canAnalyze = recording.status === "completed"
     && recording.sync_status === "complete";
+  const waitingForAutomaticAnalysis = canAnalyze && analysis === null;
 
   useEffect(() => {
     let active = true;
@@ -78,10 +79,13 @@ export default function RecordingAnalysisPanel({
       }
     }
     void load();
+    const timer = waitingForAutomaticAnalysis
+      ? window.setInterval(() => void load(), 5000) : null;
     return () => {
       active = false;
+      if (timer !== null) window.clearInterval(timer);
     };
-  }, [onWindowsChange, recording.id]);
+  }, [onWindowsChange, recording.id, waitingForAutomaticAnalysis]);
 
   async function handleRun(): Promise<void> {
     if (!canAnalyze || running) return;
@@ -127,8 +131,8 @@ export default function RecordingAnalysisPanel({
         <div className="recording-analysis-empty">Loading latest analysis…</div>
       ) : analysis === null ? (
         <div className="recording-analysis-empty">
-          <strong>No analysis has been run for this recording.</strong>
-          <span>Run the current deterministic engine to generate findings.</span>
+          <strong>Waiting for automatic analysis.</strong>
+          <span>If this is an older recording, use Run analysis to generate findings.</span>
         </div>
       ) : (
         <>

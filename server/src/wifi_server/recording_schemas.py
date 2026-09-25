@@ -23,6 +23,9 @@ class StartRecordingRequest(BaseModel):
 class RecordingResponse(BaseModel):
     id: str
     agent_id: str
+    project_id: str | None = None
+    project_name: str | None = None
+    project_run_id: str | None = None
     name: str
     description: str | None
     site: str | None

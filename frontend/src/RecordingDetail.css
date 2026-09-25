@@ -104,6 +104,19 @@
   overflow-wrap: anywhere;
 }
 
+.recording-detail-context a {
+  display: inline-block;
+  margin-top: 5px;
+  color: #245f9f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recording-detail-context a:hover {
+  text-decoration: underline;
+}
+
 .recording-detail-context .recording-detail-notes {
   flex-basis: 100%;
 }

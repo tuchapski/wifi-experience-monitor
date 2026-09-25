@@ -17,9 +17,9 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const [lastAgentId, setLastAgentId] = useState<string | null>(agentId);
 
   useEffect(() => {
+    setView(agentId ? "individual" : "projects");
     if (agentId) {
       setLastAgentId(agentId);
-      setView("individual");
     }
   }, [agentId]);
 
@@ -110,7 +110,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                 }}
                 disabled={loading || agents.length === 0}
               >
-                <option value="">Choose an Agent</option>
+                {!agentId && <option value="">Choose an Agent</option>}
                 {agentId && !selected && <option value={agentId}>Agent unavailable</option>}
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>

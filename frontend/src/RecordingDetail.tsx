@@ -335,13 +335,18 @@ export default function RecordingDetail({
 
   return (
     <>
-      <button type="button" className="agent-back" onClick={() => backToDiagnostics(agentId)}>
-        ← Diagnostics · {agent?.name ?? "Agent"}
+      <button type="button" className="agent-back" onClick={() => {
+        if (recording.project_id) window.location.hash = "#diagnostics";
+        else backToDiagnostics(agentId);
+      }}>
+        ← {recording.project_id ? "Projects" : `Diagnostics · ${agent?.name ?? "Agent"}`}
       </button>
 
       <section className="recording-detail-heading">
         <div>
-          <span className="agent-eyebrow">Diagnostic recording</span>
+          <span className="agent-eyebrow">
+            {recording.project_id ? "Project recording" : "Individual recording"}
+          </span>
           <h1>{recording.name}</h1>
           <p>
             High-resolution observations captured by {agent?.name ?? recording.agent_id}.
@@ -359,8 +364,15 @@ export default function RecordingDetail({
 
       {error && <div className="agent-error" role="alert">{error}</div>}
 
-      {(recording.site || recording.location || recording.description) && (
+      {(recording.project_id || recording.site || recording.location || recording.description) && (
         <section className="recording-detail-context" aria-label="Recording context">
+          {recording.project_id && (
+            <div>
+              <span>Project</span>
+              <strong>{recording.project_name ?? recording.project_id}</strong>
+              <a href="#diagnostics">View project runs</a>
+            </div>
+          )}
           {recording.site && <div><span>Site</span><strong>{recording.site}</strong></div>}
           {recording.location && (
             <div><span>Location</span><strong>{recording.location}</strong></div>

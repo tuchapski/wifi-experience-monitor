@@ -214,6 +214,18 @@
   font-size: 12px;
 }
 
+.recording-ready a {
+  flex: 0 0 auto;
+  color: #245f9f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recording-ready a:hover {
+  text-decoration: underline;
+}
+
 .recording-ready-dot {
   width: 9px;
   height: 9px;

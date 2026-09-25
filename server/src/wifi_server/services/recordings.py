@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from wifi_server.db.models import Agent, DiagnosticRecording
+from wifi_server.db.project_models import DiagnosticProject, ProjectRun, ProjectRunRecording
 from wifi_server.db.recording_models import (
     AgentCommand,
     RecordingBatch,
@@ -114,16 +115,24 @@ def request_stop_recording(session: Session, recording_id: str) -> RecordingResp
 def list_recordings(session: Session, agent_id: str) -> list[RecordingResponse]:
     if session.get(Agent, agent_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
-    recordings = session.scalars(
-        select(DiagnosticRecording)
+    recordings = session.execute(
+        _recordings_with_projects()
         .where(DiagnosticRecording.agent_id == agent_id)
         .order_by(DiagnosticRecording.created_at.desc())
     ).all()
-    return [_response(recording) for recording in recordings]
+    return [
+        _response(recording, project_id, project_name, project_run_id)
+        for recording, project_id, project_name, project_run_id in recordings
+    ]
 
 
 def get_recording(session: Session, recording_id: str) -> RecordingResponse:
-    return _response(_get_recording(session, recording_id))
+    row = session.execute(
+        _recordings_with_projects().where(DiagnosticRecording.id == recording_id)
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
+    return _response(*row)
 
 
 def get_recording_metrics(
@@ -386,10 +395,32 @@ def _get_recording(session: Session, recording_id: str) -> DiagnosticRecording:
     return recording
 
 
-def _response(recording: DiagnosticRecording) -> RecordingResponse:
+def _recordings_with_projects():
+    return (
+        select(
+            DiagnosticRecording,
+            ProjectRun.project_id,
+            DiagnosticProject.name,
+            ProjectRunRecording.run_id,
+        )
+        .outerjoin(ProjectRunRecording, ProjectRunRecording.recording_id == DiagnosticRecording.id)
+        .outerjoin(ProjectRun, ProjectRun.id == ProjectRunRecording.run_id)
+        .outerjoin(DiagnosticProject, DiagnosticProject.id == ProjectRun.project_id)
+    )
+
+
+def _response(
+    recording: DiagnosticRecording,
+    project_id: str | None = None,
+    project_name: str | None = None,
+    project_run_id: str | None = None,
+) -> RecordingResponse:
     return RecordingResponse(
         id=recording.id,
         agent_id=recording.agent_id,
+        project_id=project_id,
+        project_name=project_name,
+        project_run_id=project_run_id,
         name=recording.name,
         description=recording.description,
         site=recording.site,

@@ -73,8 +73,17 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  const individualRecordings = useMemo(
+    () => recordings.filter((recording) => !recording.project_run_id),
+    [recordings],
+  );
   const activeRecording = useMemo(
-    () => recordings.find((recording) => ACTIVE_STATUSES.has(recording.status)) ?? null,
+    () => individualRecordings.find((recording) => ACTIVE_STATUSES.has(recording.status)) ?? null,
+    [individualRecordings],
+  );
+  const activeProjectRecording = useMemo(
+    () => recordings.find((recording) =>
+      recording.project_run_id && ACTIVE_STATUSES.has(recording.status)) ?? null,
     [recordings],
   );
 
@@ -125,7 +134,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
 
   async function handleStart(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (activeRecording || agent.status !== "online" || action) return;
+    if (activeRecording || activeProjectRecording || agent.status !== "online" || action) return;
 
     setAction("start");
     setError(null);
@@ -177,7 +186,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
             Preserve raw Wi-Fi observations and state changes for deeper analysis.
           </p>
         </div>
-        {!activeRecording && (
+        {!activeRecording && !activeProjectRecording && (
           <form className="recording-start-form" onSubmit={(event) => void handleStart(event)}>
             <div className="recording-start-fields">
               <input
@@ -243,7 +252,15 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
 
       {error && <div className="recording-error" role="alert">{error}</div>}
 
-      {activeRecording ? (
+      {activeProjectRecording ? (
+        <div className="recording-ready">
+          <div>
+            <strong>This Agent is collecting for a project</strong>
+            <span>Review or stop the run in Projects before starting an individual collection.</span>
+          </div>
+          <a href="#diagnostics">View projects</a>
+        </div>
+      ) : activeRecording ? (
         <div className="recording-active">
           <div className="recording-live-mark" aria-hidden="true"><i /></div>
           <div className="recording-active-main">
@@ -316,16 +333,16 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
 
       <div className="recording-history-heading">
         <div>
-          <h3>Recording history</h3>
-          <p>All recordings from this Agent, including project runs.</p>
+          <h3>Individual recording history</h3>
+          <p>Recordings started directly with this Agent. Project runs appear under Projects.</p>
         </div>
-        <span>{recordings.length} total</span>
+        <span>{individualRecordings.length} total</span>
       </div>
 
       {loading ? (
         <div className="recording-empty">Loading recordings…</div>
-      ) : recordings.length === 0 ? (
-        <div className="recording-empty">No diagnostic recordings yet.</div>
+      ) : individualRecordings.length === 0 ? (
+        <div className="recording-empty">No individual recordings yet.</div>
       ) : (
         <div className="recording-table-wrap">
           <table className="recording-table">
@@ -338,10 +355,11 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                 <th>Duration</th>
                 <th>Metrics</th>
                 <th>Events</th>
+                <th>Analysis</th>
               </tr>
             </thead>
             <tbody>
-              {recordings.map((recording) => (
+              {individualRecordings.map((recording) => (
                 <tr key={recording.id}>
                   <td>
                     <button
@@ -372,13 +390,21 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                   <td>{formatDuration(recording.started_at, recording.ended_at, now)}</td>
                   <td>{recording.metrics_count.toLocaleString()}</td>
                   <td>{recording.events_count.toLocaleString()}</td>
+                  <td>
+                    {recording.status === "completed" && recording.sync_status === "complete" && (
+                      <button type="button" className="recording-name-link"
+                        onClick={() => navigateToRecording(agent.id, recording.id)}>
+                        View analysis
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      <RecordingComparisonPanel key={agent.id} agentId={agent.id} recordings={recordings} />
+      <RecordingComparisonPanel key={agent.id} agentId={agent.id} recordings={individualRecordings} />
     </section>
   );
 }

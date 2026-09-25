@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from wifi_server.analysis import ENGINE_VERSION, analyze_recording
@@ -77,6 +77,29 @@ def run_recording_analysis(
     session.add(analysis)
     session.commit()
     return _response(analysis)
+
+
+def ensure_recording_analysis(session: Session, recording_id: str) -> None:
+    """Create the current analysis once after a complete manifest is accepted."""
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:recording_id))"),
+        {"recording_id": recording_id},
+    )
+    recording = session.get(DiagnosticRecording, recording_id)
+    if recording is None or recording.status != "completed" or recording.sync_status != "complete":
+        return
+
+    existing = session.scalar(
+        select(RecordingAnalysis.id).where(
+            RecordingAnalysis.recording_id == recording_id,
+            RecordingAnalysis.engine_version == ENGINE_VERSION,
+            RecordingAnalysis.status == "complete",
+            RecordingAnalysis.source_metrics_count == recording.metrics_count,
+            RecordingAnalysis.source_events_count == recording.events_count,
+        )
+    )
+    if existing is None:
+        run_recording_analysis(session, recording_id)
 
 
 def get_latest_recording_analysis(
