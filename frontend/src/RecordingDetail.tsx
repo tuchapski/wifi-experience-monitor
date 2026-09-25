@@ -5,6 +5,7 @@ import {
   getRecording,
   getRecordingEvents,
   getRecordingMetrics,
+  recordingReportUrl,
 } from "./agentApi";
 import type {
   AnalysisDegradedWindow,
@@ -359,6 +360,11 @@ export default function RecordingDetail({
           <span className={`recording-detail-sync sync-${recording.sync_status}`}>
             {recording.sync_status}
           </span>
+          {!ACTIVE_STATUSES.has(recording.status) && (
+            <a className="recording-report-link" href={recordingReportUrl(recording.id)} download>
+              Download HTML report
+            </a>
+          )}
         </div>
       </section>
 

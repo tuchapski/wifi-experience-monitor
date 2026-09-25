@@ -1,3 +1,4 @@
+import { recordingReportUrl } from "./agentApi";
 import type { DiagnosticProjectRecording, DiagnosticProjectRun } from "./agentTypes";
 import { diagnosticsRecordingHash } from "./diagnosticRoutes";
 import "./ProjectRunOverview.css";
@@ -104,6 +105,10 @@ export default function ProjectRunOverview({
                   <a href={diagnosticsRecordingHash(item.agent_id, item.recording_id)}>
                     {analysis ? "Open analysis" : "View recording"}
                   </a>
+                )}
+                {item.recording_id && item.status
+                  && !ACTIVE_STATUSES.has(item.status) && (
+                    <a href={recordingReportUrl(item.recording_id)} download>HTML report</a>
                 )}
                 {item.recording_id && item.status === "recording" && (
                   <button type="button" className="diagnostic-project-stop" disabled={busy !== null}

@@ -612,6 +612,19 @@ and two highest-severity findings. A missing analysis remains visibly pending;
 different engine versions are called out. The run does not calculate a combined
 project verdict or attribute a shared root cause to multiple Agents.
 
+## Standalone recording report
+
+Download a self-contained HTML report from a completed recording's detail page,
+the individual recording history, or its project run. The Server generates the
+report from stored recording context and the latest analysis. It includes the
+Agent, site and location, collection counts, assessment, summary metrics,
+findings, evidence limitations, and observed disconnection intervals. When the
+dataset is incomplete or the analysis no longer matches its counts, the report
+shows collection metadata without presenting stale findings. Each file describes
+one Agent's observations; reports do not combine evidence from project members.
+The endpoint is `GET /api/v1/recordings/{recording_id}/report/html`. No database
+migration is required.
+
 Apply the Server schema migration before starting this version:
 `cd server && alembic upgrade head`. The Agent needs no schema change.
 

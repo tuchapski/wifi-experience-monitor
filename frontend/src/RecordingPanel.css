@@ -366,6 +366,17 @@
   text-decoration: underline;
 }
 
+.recording-report-download {
+  color: #245f9f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recording-report-download:hover {
+  text-decoration: underline;
+}
+
 .recording-name-link,
 .recording-table td:first-child small {
   display: block;

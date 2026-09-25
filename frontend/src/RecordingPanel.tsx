@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
   getAgentRecordings,
+  recordingReportUrl,
   startAgentRecording,
   stopRecording,
 } from "./agentApi";
@@ -356,6 +357,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                 <th>Metrics</th>
                 <th>Events</th>
                 <th>Analysis</th>
+                <th>Report</th>
               </tr>
             </thead>
             <tbody>
@@ -396,6 +398,14 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                         onClick={() => navigateToRecording(agent.id, recording.id)}>
                         View analysis
                       </button>
+                    )}
+                  </td>
+                  <td>
+                    {!ACTIVE_STATUSES.has(recording.status) && (
+                      <a className="recording-report-download"
+                        href={recordingReportUrl(recording.id)} download>
+                        HTML report
+                      </a>
                     )}
                   </td>
                 </tr>

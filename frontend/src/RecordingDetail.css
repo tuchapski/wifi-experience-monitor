@@ -19,7 +19,23 @@
 
 .recording-detail-badges {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 7px;
+}
+
+.recording-report-link {
+  padding: 7px 10px;
+  border: 1px solid #cbdced;
+  border-radius: 8px;
+  color: #245f9f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.recording-report-link:hover {
+  background: #edf3fb;
 }
 
 .recording-detail-status,

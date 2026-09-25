@@ -174,6 +174,10 @@ export function getRecording(
   );
 }
 
+export function recordingReportUrl(recordingId: string): string {
+  return `${API_ROOT}/recordings/${encodeURIComponent(recordingId)}/report/html`;
+}
+
 export function getRecordingMetrics(
   recordingId: string,
   metric: string,
