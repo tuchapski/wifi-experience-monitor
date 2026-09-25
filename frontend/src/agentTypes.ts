@@ -176,6 +176,15 @@ export interface DiagnosticRecording {
   updated_at: string;
 }
 
+export interface RecordingMetricOverview {
+  metric: string;
+  sample_count: number;
+  minimum: number | null;
+  average: number | null;
+  maximum: number | null;
+  points: { observed_at: string; value: number }[];
+}
+
 export interface StartRecordingInput {
   name: string;
   description: string | null;

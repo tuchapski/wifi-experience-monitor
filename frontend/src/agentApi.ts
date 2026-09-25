@@ -8,6 +8,7 @@ import type {
   RecordingEvent,
   RecordingAnalysis,
   RecordingMetricPoint,
+  RecordingMetricOverview,
   StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
@@ -189,6 +190,17 @@ export function getRecordingMetrics(
   });
   return request<RecordingMetricPoint[]>(
     `/recordings/${encodeURIComponent(recordingId)}/metrics?${params.toString()}`,
+  );
+}
+
+export function getRecordingMetricOverviews(
+  recordingId: string,
+  metrics: string[],
+): Promise<RecordingMetricOverview[]> {
+  const params = new URLSearchParams();
+  for (const metric of metrics) params.append("metric", metric);
+  return request<RecordingMetricOverview[]>(
+    `/recordings/${encodeURIComponent(recordingId)}/metrics/overview?${params.toString()}`,
   );
 }
 

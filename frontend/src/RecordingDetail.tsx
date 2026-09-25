@@ -4,7 +4,7 @@ import {
   getAgent,
   getRecording,
   getRecordingEvents,
-  getRecordingMetrics,
+  getRecordingMetricOverviews,
   recordingReportUrl,
 } from "./agentApi";
 import type {
@@ -12,7 +12,7 @@ import type {
   AgentSummary,
   DiagnosticRecording,
   RecordingEvent,
-  RecordingMetricPoint,
+  RecordingMetricOverview,
 } from "./agentTypes";
 import { diagnosticsAgentHash } from "./diagnosticRoutes";
 import RecordingAnalysisPanel from "./RecordingAnalysisPanel";
@@ -54,7 +54,8 @@ function formatDuration(start: string | null, end: string | null): string {
   return `${remainder}s`;
 }
 
-function formatNumber(value: number, unit: string): string {
+function formatNumber(value: number | null, unit: string): string {
+  if (value === null) return "—";
   const rendered = Number.isInteger(value) ? String(value) : value.toFixed(1);
   return `${rendered} ${unit}`;
 }
@@ -80,33 +81,24 @@ function renderStateValue(value: unknown): string {
   }
 }
 
-function downsample(
-  points: RecordingMetricPoint[],
-  maxPoints = 500,
-): RecordingMetricPoint[] {
-  if (points.length <= maxPoints) return points;
-  const stride = Math.ceil(points.length / maxPoints);
-  return points.filter((_, index) => index % stride === 0 || index === points.length - 1);
-}
-
 function RawMetricChart({
   label,
   unit,
-  points,
+  overview,
   timeline,
   degradedWindows,
   selectedWindow,
 }: {
   label: string;
   unit: string;
-  points: RecordingMetricPoint[];
+  overview: RecordingMetricOverview | undefined;
   timeline: TimelineBounds | null;
   degradedWindows: AnalysisDegradedWindow[];
   selectedWindow: AnalysisDegradedWindow | null;
 }) {
-  const sampled = useMemo(() => downsample(points), [points]);
+  const points = overview?.points ?? [];
 
-  if (sampled.length === 0 || timeline === null) {
+  if (points.length === 0 || timeline === null) {
     return (
       <article className="recording-detail-chart">
         <div className="recording-detail-chart-heading">
@@ -118,25 +110,23 @@ function RawMetricChart({
     );
   }
 
-  const values = sampled.map((point) => point.value);
-  let minimum = Math.min(...values);
-  let maximum = Math.max(...values);
+  let minimum = overview?.minimum ?? Math.min(...points.map((point) => point.value));
+  let maximum = overview?.maximum ?? Math.max(...points.map((point) => point.value));
   if (minimum === maximum) {
     minimum -= 1;
     maximum += 1;
   }
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   const valueSpan = maximum - minimum;
   const timeSpan = Math.max(1, timeline.end - timeline.start);
   const xForTime = (time: number) => {
     const clamped = Math.min(timeline.end, Math.max(timeline.start, time));
     return 16 + ((clamped - timeline.start) / timeSpan) * 688;
   };
-  const x = (point: RecordingMetricPoint) =>
+  const x = (point: { observed_at: string }) =>
     xForTime(Date.parse(point.observed_at));
   const y = (value: number) => 154 - ((value - minimum) / valueSpan) * 126;
-  const polyline = sampled.map((point) => `${x(point)},${y(point.value)}`).join(" ");
-  const latest = sampled[sampled.length - 1];
+  const polyline = points.map((point) => `${x(point)},${y(point.value)}`).join(" ");
+  const latest = points[points.length - 1];
   const selectedKey = selectedWindow
     ? `${selectedWindow.started_at}:${selectedWindow.ended_at}`
     : null;
@@ -148,9 +138,9 @@ function RawMetricChart({
           <span>{label}</span>
           <strong>{formatNumber(latest.value, unit)}</strong>
         </div>
-        <small>{points.length.toLocaleString()} raw samples</small>
+        <small>{(overview?.sample_count ?? 0).toLocaleString()} samples across full recording</small>
       </div>
-      <svg viewBox="0 0 720 174" role="img" aria-label={`${label} raw recording chart`}>
+      <svg viewBox="0 0 720 174" role="img" aria-label={`${label} recording overview chart`}>
         {degradedWindows.map((window) => {
           const startX = xForTime(Date.parse(window.started_at));
           const endX = xForTime(Date.parse(window.ended_at));
@@ -182,9 +172,9 @@ function RawMetricChart({
         <span>{new Date(timeline.end).toLocaleTimeString()}</span>
       </div>
       <div className="recording-detail-chart-stats">
-        <span>Min <strong>{formatNumber(Math.min(...values), unit)}</strong></span>
-        <span>Avg <strong>{formatNumber(average, unit)}</strong></span>
-        <span>Max <strong>{formatNumber(Math.max(...values), unit)}</strong></span>
+        <span>Min <strong>{formatNumber(overview?.minimum ?? null, unit)}</strong></span>
+        <span>Avg <strong>{formatNumber(overview?.average ?? null, unit)}</strong></span>
+        <span>Max <strong>{formatNumber(overview?.maximum ?? null, unit)}</strong></span>
       </div>
     </article>
   );
@@ -211,9 +201,10 @@ export default function RecordingDetail({
 }) {
   const [agent, setAgent] = useState<AgentSummary | null>(null);
   const [recording, setRecording] = useState<DiagnosticRecording | null>(null);
-  const [series, setSeries] = useState<Record<string, RecordingMetricPoint[]>>({});
+  const [series, setSeries] = useState<Record<string, RecordingMetricOverview>>({});
   const [events, setEvents] = useState<RecordingEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [degradedWindows, setDegradedWindows] = useState<AnalysisDegradedWindow[]>([]);
   const [selectedWindow, setSelectedWindow] =
@@ -226,7 +217,7 @@ export default function RecordingDetail({
 
   const timeline = useMemo<TimelineBounds | null>(() => {
     const pointTimes = Object.values(series)
-      .flat()
+      .flatMap((overview) => overview.points)
       .map((point) => Date.parse(point.observed_at))
       .filter(Number.isFinite);
     const recordingStart = recording?.started_at
@@ -280,22 +271,15 @@ export default function RecordingDetail({
 
     async function refresh(): Promise<void> {
       try {
-        const [agentData, recordingData, eventData, metricSeries] = await Promise.all([
+        const [agentData, recordingData, eventData] = await Promise.all([
           getAgent(agentId),
           getRecording(recordingId),
           getRecordingEvents(recordingId),
-          Promise.all(
-            RECORDING_METRICS.map(async ({ key }) => [
-              key,
-              await getRecordingMetrics(recordingId, key),
-            ] as const),
-          ),
         ]);
         if (active) {
           setAgent(agentData);
           setRecording(recordingData);
           setEvents(eventData);
-          setSeries(Object.fromEntries(metricSeries));
           setError(null);
           setLoading(false);
         }
@@ -307,7 +291,22 @@ export default function RecordingDetail({
       }
     }
 
+    async function refreshSeries(): Promise<void> {
+      try {
+        const overviews = await getRecordingMetricOverviews(
+          recordingId, RECORDING_METRICS.map(({ key }) => key),
+        );
+        if (active) {
+          setSeries(Object.fromEntries(overviews.map((item) => [item.metric, item])));
+          setSeriesError(null);
+        }
+      } catch (err) {
+        if (active) setSeriesError(err instanceof Error ? err.message : "Unable to load charts");
+      }
+    }
+
     void refresh();
+    void refreshSeries();
     if (!shouldPoll) {
       return () => {
         active = false;
@@ -315,9 +314,11 @@ export default function RecordingDetail({
     }
 
     const timer = window.setInterval(() => void refresh(), 4000);
+    const chartTimer = window.setInterval(() => void refreshSeries(), 30000);
     return () => {
       active = false;
       window.clearInterval(timer);
+      window.clearInterval(chartTimer);
     };
   }, [agentId, recordingId, shouldPoll]);
 
@@ -368,7 +369,9 @@ export default function RecordingDetail({
         </div>
       </section>
 
-      {error && <div className="agent-error" role="alert">{error}</div>}
+      {(error || seriesError) && (
+        <div className="agent-error" role="alert">{error || seriesError}</div>
+      )}
 
       {(recording.project_id || recording.site || recording.location || recording.description) && (
         <section className="recording-detail-context" aria-label="Recording context">
@@ -423,11 +426,11 @@ export default function RecordingDetail({
       >
         <div className="recording-detail-section-heading">
           <div>
-            <span className="agent-eyebrow">Raw metrics</span>
-            <h2>High-resolution Wi-Fi telemetry</h2>
-            <p>Each point represents an observation captured by the Agent, without rolling-window aggregation.</p>
+            <span className="agent-eyebrow">Metric overview</span>
+            <h2>Wi-Fi telemetry across the full recording</h2>
+            <p>Charts retain interval extremes; statistics use every captured observation.</p>
           </div>
-          <small>Charts downsample only for rendering; Server data remains raw.</small>
+          <small>Original measurements remain available for analysis.</small>
         </div>
         {selectedWindow && (
           <div className="recording-detail-focus">
@@ -456,7 +459,7 @@ export default function RecordingDetail({
               key={metric.key}
               label={metric.label}
               unit={metric.unit}
-              points={series[metric.key] ?? []}
+              overview={series[metric.key]}
               timeline={timeline}
               degradedWindows={degradedWindows}
               selectedWindow={selectedWindow}

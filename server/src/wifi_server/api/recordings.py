@@ -14,12 +14,14 @@ from wifi_server.recording_schemas import (
     RecordingEventResponse,
     RecordingManifestRequest,
     RecordingManifestResponse,
+    RecordingMetricOverview,
     RecordingMetricResponse,
     RecordingResponse,
     StartRecordingRequest,
 )
 from wifi_server.services.agents import authenticate_agent
 from wifi_server.services.analyses import ensure_recording_analysis
+from wifi_server.services.metric_overviews import get_metric_overviews
 from wifi_server.services.recordings import (
     acknowledge_command,
     create_recording,
@@ -89,6 +91,21 @@ def recording(
     session: Annotated[Session, Depends(get_session)],
 ) -> RecordingResponse:
     return get_recording(session, recording_id)
+
+
+@router.get(
+    "/recordings/{recording_id}/metrics/overview",
+    response_model=list[RecordingMetricOverview],
+)
+def recording_metric_overviews(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    metric: Annotated[list[str], Query()],
+    buckets: Annotated[int, Query(ge=20, le=500)] = 300,
+) -> list[RecordingMetricOverview]:
+    if not metric or len(metric) > 20 or any(not item or len(item) > 128 for item in metric):
+        raise HTTPException(status_code=422, detail="Select between 1 and 20 metric names")
+    return get_metric_overviews(session, recording_id, list(dict.fromkeys(metric)), buckets)
 
 
 @router.get(

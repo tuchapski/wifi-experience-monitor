@@ -55,6 +55,20 @@ class RecordingMetricResponse(BaseModel):
     received_at: datetime
 
 
+class RecordingChartPoint(BaseModel):
+    observed_at: datetime
+    value: float
+
+
+class RecordingMetricOverview(BaseModel):
+    metric: str
+    sample_count: int
+    minimum: float | None
+    average: float | None
+    maximum: float | None
+    points: list[RecordingChartPoint]
+
+
 class RecordingEventResponse(BaseModel):
     observed_at: datetime
     event_type: str
