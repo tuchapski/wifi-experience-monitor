@@ -660,3 +660,15 @@ Positions identify coverage areas; analyses and reports remain per Agent.
 
 Run `cd server && alembic upgrade head` before starting the Server to add the
 nullable Agent position field to existing projects.
+
+## Full-session metric charts
+
+Recording detail now loads bounded metric overviews from
+`GET /api/v1/recordings/{recording_id}/metrics/overview` instead of the latest
+50,000 raw samples per metric. The Server scans the entire recording in batches
+and retains the minimum and maximum observation of each time interval, plus
+the first and last observations. Each chart uses at most 602 points per metric
+with the default 300 intervals; sample counts and min/average/max statistics
+use all recorded values. Active chart data refreshes every 30 seconds while
+recording status and events still update every four seconds. Raw metrics and
+analysis inputs remain stored without this reduction. No migration is needed.
