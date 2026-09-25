@@ -180,6 +180,116 @@ function RawMetricChart({
   );
 }
 
+function InvestigationTimeline({
+  timeline,
+  degradedWindows,
+  events,
+  selectedWindow,
+  onSelectWindow,
+}: {
+  timeline: TimelineBounds | null;
+  degradedWindows: AnalysisDegradedWindow[];
+  events: RecordingEvent[];
+  selectedWindow: AnalysisDegradedWindow | null;
+  onSelectWindow: (window: AnalysisDegradedWindow) => void;
+}) {
+  if (timeline === null) return null;
+
+  const duration = Math.max(1, timeline.end - timeline.start);
+  const positionForTime = (value: string) => {
+    const time = Date.parse(value);
+    if (!Number.isFinite(time)) return null;
+    const clamped = Math.min(timeline.end, Math.max(timeline.start, time));
+    return ((clamped - timeline.start) / duration) * 100;
+  };
+  const eventLane = (event: RecordingEvent) => {
+    const metric = renderStateValue(event.data.metric).toLowerCase();
+    if (metric.includes("bssid")) return "bssid";
+    if (metric.includes("channel")) return "channel";
+    return "state";
+  };
+  const lanes = [
+    { key: "degraded", label: "Degraded windows" },
+    { key: "bssid", label: "BSSID changes" },
+    { key: "channel", label: "Channel changes" },
+    { key: "state", label: "Other state" },
+  ] as const;
+  const selectedKey = selectedWindow
+    ? `${selectedWindow.started_at}:${selectedWindow.ended_at}`
+    : null;
+
+  return (
+    <section className="agent-panel recording-investigation">
+      <div className="recording-detail-section-heading">
+        <div>
+          <span className="agent-eyebrow">Investigation timeline</span>
+          <h2>Wi-Fi evidence on one clock</h2>
+          <p>Compare degraded periods with observed state changes across the recording.</p>
+        </div>
+        <small>Temporal proximity is context for investigation, not proof of causality.</small>
+      </div>
+      <div className="recording-investigation-body">
+        <div className="recording-investigation-axis" aria-hidden="true">
+          <span>{new Date(timeline.start).toLocaleTimeString()}</span>
+          <span>{new Date(timeline.end).toLocaleTimeString()}</span>
+        </div>
+        {lanes.map((lane) => (
+          <div className="recording-investigation-row" key={lane.key}>
+            <strong>{lane.label}</strong>
+            <div className="recording-investigation-track">
+              <i className="recording-investigation-baseline" aria-hidden="true" />
+              {lane.key === "degraded" && degradedWindows.map((window) => {
+                const start = positionForTime(window.started_at);
+                const end = positionForTime(window.ended_at);
+                if (start === null || end === null) return null;
+                const key = `${window.started_at}:${window.ended_at}`;
+                return (
+                  <button
+                    type="button"
+                    key={key}
+                    className={[
+                      "recording-investigation-window",
+                      `window-${window.severity}`,
+                      selectedKey === key ? "is-selected" : "",
+                    ].join(" ")}
+                    style={{ left: `${start}%`, width: `${Math.max(0.35, end - start)}%` }}
+                    title={`${window.severity}: ${formatClock(window.started_at)} → ${formatClock(window.ended_at)} · ${window.domains.join(" + ")}`}
+                    aria-label={`Focus ${window.severity} degraded window from ${formatClock(window.started_at)} to ${formatClock(window.ended_at)}`}
+                    onClick={() => onSelectWindow(window)}
+                  />
+                );
+              })}
+              {lane.key !== "degraded" && events.map((event, index) => {
+                if (eventLane(event) !== lane.key) return null;
+                const left = positionForTime(event.observed_at);
+                if (left === null) return null;
+                const detail = eventDescription(event);
+                const description = event.event_type === "state.initial"
+                  ? `${detail.metric}: ${detail.current}`
+                  : `${detail.metric}: ${detail.previous} → ${detail.current}`;
+                return (
+                  <i
+                    key={`${event.observed_at}-${event.event_type}-${index}`}
+                    className={`recording-investigation-marker marker-${lane.key}`}
+                    style={{ left: `${left}%` }}
+                    title={`${formatClock(event.observed_at)} · ${description}`}
+                    aria-label={`${formatClock(event.observed_at)} ${description}`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="recording-investigation-legend">
+          <span><i className="legend-window legend-warning" />Warning degradation</span>
+          <span><i className="legend-window legend-critical" />Critical degradation</span>
+          <span><i className="legend-marker" />Observed state change</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function eventDescription(event: RecordingEvent): {
   metric: string;
   previous: string;
@@ -418,6 +528,14 @@ export default function RecordingDetail({
         selectedWindow={selectedWindow}
         onSelectWindow={handleSelectWindow}
         onWindowsChange={handleWindowsChange}
+      />
+
+      <InvestigationTimeline
+        timeline={timeline}
+        degradedWindows={degradedWindows}
+        events={events}
+        selectedWindow={selectedWindow}
+        onSelectWindow={handleSelectWindow}
       />
 
       <section

@@ -537,3 +537,159 @@
     grid-template-columns: 110px minmax(0, 1fr);
   }
 }
+
+.recording-investigation {
+  margin-bottom: 18px;
+}
+
+.recording-investigation-body {
+  padding: 18px 22px 20px;
+}
+
+.recording-investigation-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 8px 152px;
+  color: #8b97a7;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-investigation-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.recording-investigation-row > strong {
+  color: #5f7085;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.recording-investigation-track {
+  position: relative;
+  height: 24px;
+}
+
+.recording-investigation-baseline {
+  position: absolute;
+  top: 11px;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: #dfe6ee;
+}
+
+.recording-investigation-window {
+  position: absolute;
+  top: 5px;
+  z-index: 1;
+  min-width: 3px;
+  height: 13px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.recording-investigation-window.window-warning {
+  background: #d49627;
+}
+
+.recording-investigation-window.window-critical {
+  background: #bd433c;
+}
+
+.recording-investigation-window:hover,
+.recording-investigation-window.is-selected {
+  opacity: 1;
+}
+
+.recording-investigation-window.is-selected {
+  outline: 2px solid #334b68;
+  outline-offset: 2px;
+}
+
+.recording-investigation-marker {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  width: 3px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: #4d7fb7;
+}
+
+.recording-investigation-marker.marker-bssid {
+  background: #386b9f;
+}
+
+.recording-investigation-marker.marker-channel {
+  background: #6d65a8;
+}
+
+.recording-investigation-marker.marker-state {
+  background: #718096;
+}
+
+.recording-investigation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 12px 0 0 152px;
+  color: #778597;
+  font-size: 10px;
+}
+
+.recording-investigation-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recording-investigation-legend i {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.legend-window {
+  width: 14px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.legend-warning {
+  background: #d49627;
+}
+
+.legend-critical {
+  background: #bd433c;
+}
+
+.legend-marker {
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: #4d7fb7;
+}
+
+@media (max-width: 760px) {
+  .recording-investigation-axis {
+    margin-left: 0;
+  }
+
+  .recording-investigation-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+
+  .recording-investigation-legend {
+    margin-left: 0;
+  }
+}
