@@ -545,3 +545,17 @@ recordings without a deadline retain their original manual-stop behavior.
 
 Apply the Server database migration (`cd server && alembic upgrade head`) before restarting
 the updated Server. The Agent upgrades its local SQLite table automatically.
+
+## Recording disconnection intervals (v7)
+
+The analysis now lists periods between observed Wi-Fi disconnection and
+reconnection state changes. A duration is available only when a connected-to-
+disconnected transition and a reconnect were both recorded and collection was
+continuous throughout that interval. The duration is the time between sampled
+transitions, not the exact time of RF loss or recovery.
+
+If the recording began disconnected, ended before recovery, or a collection gap
+overlaps an interval, that interval shows no duration and explains why. Collector
+errors during an interval also limit it. Previous findings and their severities
+are preserved. Older analyses remain readable; rerun analysis on a synchronized
+recording for the v7 intervals. No database migration is required for v7.

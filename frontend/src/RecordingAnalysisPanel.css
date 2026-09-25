@@ -138,6 +138,56 @@
   border-bottom: 1px solid #edf1f5;
 }
 
+.recording-outages {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.recording-outage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.recording-outage-list article {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.recording-outage-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.recording-outage-top span {
+  color: #815b20;
+  text-transform: capitalize;
+}
+
+.recording-outage-list p,
+.recording-outages-empty {
+  margin: 8px 0 0;
+  color: #617188;
+  font-size: 12px;
+}
+
+.recording-outages-empty {
+  margin: 0 18px 18px;
+}
+
+.recording-outage-list small {
+  display: block;
+  margin-top: 6px;
+  color: #93601c;
+  font-size: 11px;
+}
+
 .recording-continuity > .recording-correlation-heading > strong {
   color: #425b78;
   font-size: 13px;

@@ -214,6 +214,53 @@ export default function RecordingAnalysisPanel({
             </div>
           )}
 
+          {analysis.summary.disconnection_intervals && (
+            <div className="recording-outages">
+              <div className="recording-correlation-heading">
+                <div>
+                  <span className="agent-eyebrow">Association</span>
+                  <h3>Observed disconnection intervals</h3>
+                  <p>
+                    Durations compare sampled disconnect and reconnect times. Missing
+                    boundaries or collection gaps leave the duration unavailable.
+                  </p>
+                </div>
+                <small>
+                  {analysis.summary.disconnection_summary?.bounded ?? 0} bounded ·{" "}
+                  {analysis.summary.disconnection_summary?.limited ?? 0} limited ·{" "}
+                  {analysis.summary.disconnection_summary?.open ?? 0} open
+                </small>
+              </div>
+              {analysis.summary.disconnection_intervals.length === 0 ? (
+                <p className="recording-outages-empty">
+                  No disconnection intervals in the available state changes.
+                </p>
+              ) : (
+                <div className="recording-outage-list">
+                  {analysis.summary.disconnection_intervals.map((interval, index) => (
+                    <article key={`${interval.disconnected_at}-${index}`}>
+                      <div className="recording-outage-top">
+                        <strong>
+                          {formatDate(interval.disconnected_at)} →{" "}
+                          {interval.reconnected_at
+                            ? formatDate(interval.reconnected_at)
+                            : "No observed reconnection"}
+                        </strong>
+                        <span>{interval.status}</span>
+                      </div>
+                      <p>
+                        Sampled interval: {interval.duration_seconds == null
+                          ? "unavailable"
+                          : `${interval.duration_seconds.toFixed(1)}s`}
+                      </p>
+                      {interval.limitations.map((reason) => <small key={reason}>{reason}</small>)}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {(analysis.summary.degraded_windows?.length ?? 0) > 0 && (
             <div className="recording-correlation">
               <div className="recording-correlation-heading">

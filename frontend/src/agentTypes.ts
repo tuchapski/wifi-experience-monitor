@@ -211,6 +211,14 @@ export interface CollectionIntegrity {
   }>;
 }
 
+export interface DisconnectionInterval {
+  disconnected_at: string;
+  reconnected_at: string | null;
+  status: "bounded" | "limited" | "open";
+  duration_seconds: number | null;
+  limitations: string[];
+}
+
 export interface RecordingAnalysisSummary {
   status: "critical" | "warning" | "observed" | "clear" | "limited";
   evidence_status: "complete" | "partial";
@@ -240,6 +248,13 @@ export interface RecordingAnalysisSummary {
   degraded_windows?: AnalysisDegradedWindow[];
   bssid_transitions?: BssidTransitionComparison[];
   collection_integrity?: CollectionIntegrity;
+  disconnection_intervals?: DisconnectionInterval[];
+  disconnection_summary?: {
+    total: number;
+    bounded: number;
+    limited: number;
+    open: number;
+  };
   temporal_correlation?: {
     evaluable_samples: number;
     correlated_samples: number;
