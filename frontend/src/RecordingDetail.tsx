@@ -290,6 +290,141 @@ function InvestigationTimeline({
   );
 }
 
+function DiagnosticEvidencePanel({
+  selectedWindow,
+  events,
+}: {
+  selectedWindow: AnalysisDegradedWindow | null;
+  events: RecordingEvent[];
+}) {
+  if (selectedWindow === null) return null;
+
+  const startedAt = Date.parse(selectedWindow.started_at);
+  const endedAt = Date.parse(selectedWindow.ended_at);
+  const contextPaddingMs = 30_000;
+  const contextualEvents = events.filter((event) => {
+    const observedAt = Date.parse(event.observed_at);
+    return Number.isFinite(observedAt)
+      && observedAt >= startedAt - contextPaddingMs
+      && observedAt <= endedAt + contextPaddingMs;
+  });
+  const metrics = [
+    { label: "Minimum RSSI", value: selectedWindow.minimum_rssi_dbm, unit: "dBm" },
+    {
+      label: "Maximum TX retries",
+      value: selectedWindow.maximum_retries_per_100_packets,
+      unit: "/100 packets",
+    },
+    {
+      label: "Maximum TX failures",
+      value: selectedWindow.maximum_tx_failed_percent,
+      unit: "%",
+    },
+    {
+      label: "Maximum channel utilization",
+      value: selectedWindow.maximum_channel_utilization_percent,
+      unit: "%",
+    },
+  ];
+
+  return (
+    <section className="agent-panel recording-evidence">
+      <div className="recording-detail-section-heading">
+        <div>
+          <span className="agent-eyebrow">Diagnostic evidence</span>
+          <h2>Evidence for the focused degraded window</h2>
+          <p>
+            Observations recorded for the selected interval, with nearby state changes for context.
+          </p>
+        </div>
+        <small>Evidence is descriptive; temporal proximity alone does not establish causality.</small>
+      </div>
+
+      <div className="recording-evidence-window">
+        <div>
+          <span>Focused interval</span>
+          <strong>{formatClock(selectedWindow.started_at)} → {formatClock(selectedWindow.ended_at)}</strong>
+        </div>
+        <div>
+          <span>Severity</span>
+          <strong className={`recording-evidence-severity severity-${selectedWindow.severity}`}>
+            {selectedWindow.severity}
+          </strong>
+        </div>
+        <div>
+          <span>Duration</span>
+          <strong>{selectedWindow.duration_seconds.toFixed(1)}s</strong>
+        </div>
+        <div>
+          <span>Domains</span>
+          <strong>{selectedWindow.domains.join(" + ") || "—"}</strong>
+        </div>
+      </div>
+
+      <div className="recording-evidence-grid">
+        <article>
+          <h3>Window measurements</h3>
+          <dl className="recording-evidence-metrics">
+            {metrics.map((metric) => (
+              <div key={metric.label}>
+                <dt>{metric.label}</dt>
+                <dd>{formatNumber(metric.value, metric.unit)}</dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+
+        <article>
+          <h3>Analysis evidence</h3>
+          {selectedWindow.evidence.length === 0 ? (
+            <p className="recording-evidence-empty">No additional evidence was recorded.</p>
+          ) : (
+            <ul className="recording-evidence-list">
+              {selectedWindow.evidence.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="recording-evidence-events">
+          <div className="recording-evidence-events-heading">
+            <h3>Nearby state changes</h3>
+            <small>30s before → 30s after</small>
+          </div>
+          {contextualEvents.length === 0 ? (
+            <p className="recording-evidence-empty">No state changes were observed near this window.</p>
+          ) : (
+            <div className="recording-evidence-event-list">
+              {contextualEvents.map((event, index) => {
+                const detail = eventDescription(event);
+                const observedAt = Date.parse(event.observed_at);
+                const phase = observedAt < startedAt
+                  ? "before"
+                  : observedAt > endedAt
+                    ? "after"
+                    : "during";
+                return (
+                  <div key={`${event.observed_at}-${event.event_type}-${index}`}>
+                    <time>{formatClock(event.observed_at)}</time>
+                    <span className={`recording-evidence-phase phase-${phase}`}>{phase}</span>
+                    <strong>{detail.metric}</strong>
+                    <span>
+                      {event.event_type === "state.initial"
+                        ? detail.current
+                        : `${detail.previous} → ${detail.current}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function eventDescription(event: RecordingEvent): {
   metric: string;
   previous: string;
@@ -536,6 +671,11 @@ export default function RecordingDetail({
         events={events}
         selectedWindow={selectedWindow}
         onSelectWindow={handleSelectWindow}
+      />
+
+      <DiagnosticEvidencePanel
+        selectedWindow={selectedWindow}
+        events={events}
       />
 
       <section
