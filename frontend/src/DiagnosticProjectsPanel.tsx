@@ -7,7 +7,7 @@ import {
   stopRecording,
 } from "./agentApi";
 import type { AgentSummary, DiagnosticProject } from "./agentTypes";
-import { diagnosticsRecordingHash } from "./diagnosticRoutes";
+import ProjectRunOverview from "./ProjectRunOverview";
 import "./DiagnosticProjectsPanel.css";
 
 const DURATIONS = [15, 30, 60, 120, 240, 480, 1440];
@@ -216,30 +216,8 @@ export default function DiagnosticProjectsPanel({ agents }: { agents: AgentSumma
                 {!allOnline && <p className="diagnostic-project-help">All selected Agents must be online before starting a run.</p>}
                 {activeRun && <p className="diagnostic-project-help">Finish the current recordings before starting this project again.</p>}
                 {project.runs.map((run) => (
-                  <div className="diagnostic-project-run" key={run.id}>
-                    <strong>Run queued {new Date(run.started_at).toLocaleString()}</strong>
-                    <ul>
-                      {run.recordings.map((item) => (
-                        <li key={item.agent_id}>
-                          <span>{agentName(item.agent_id)}: {item.status ?? "Recording removed"} · {item.sync_status ?? "—"}</span>
-                          {item.recording_id && item.status && (
-                            <a href={diagnosticsRecordingHash(item.agent_id, item.recording_id)}>
-                              {item.status === "completed" && item.sync_status === "complete"
-                                ? "View analysis" : "View recording"}
-                            </a>
-                          )}
-                          {item.recording_id && item.status === "recording" && (
-                            <button type="button" className="diagnostic-project-stop" disabled={busy !== null}
-                              onClick={() => {
-                                if (item.recording_id) void handleStop(item.recording_id);
-                              }}>
-                              {busy === item.recording_id ? "Stopping…" : "Stop"}
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ProjectRunOverview key={run.id} run={run} agentName={agentName}
+                    busy={busy} onStop={(recordingId) => void handleStop(recordingId)} />
                 ))}
               </article>
             );

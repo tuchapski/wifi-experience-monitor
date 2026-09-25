@@ -1,0 +1,158 @@
+.diagnostic-project-run {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e7ef;
+}
+
+.project-run-heading,
+.project-run-member-heading,
+.project-run-analysis-meta,
+.project-run-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.project-run-heading h4 {
+  margin: 3px 0 0;
+  color: #2b3e56;
+  font-size: 14px;
+}
+
+.project-run-heading > strong {
+  color: #335573;
+  font-size: 12px;
+}
+
+.diagnostic-project-run progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin: 12px 0;
+  accent-color: #245f9f;
+}
+
+.project-run-context,
+.project-run-caution,
+.project-run-waiting {
+  color: #657184;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.project-run-caution {
+  color: #946315;
+}
+
+.project-run-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.project-run-member {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dfe7f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.project-run-member-heading > strong {
+  color: #20344e;
+  font-size: 13px;
+}
+
+.project-run-member-heading > span {
+  color: #657184;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.project-run-analysis,
+.project-run-waiting {
+  margin: 12px 0;
+}
+
+.project-run-analysis-meta {
+  justify-content: flex-start;
+  color: #62738a;
+  font-size: 11px;
+}
+
+.project-run-assessment,
+.project-run-severity {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf2f8;
+  color: #485b72;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.project-run-assessment.assessment-critical,
+.project-run-severity.severity-critical {
+  background: #feeceb;
+  color: #9a332d;
+}
+
+.project-run-assessment.assessment-warning,
+.project-run-severity.severity-warning,
+.project-run-assessment.assessment-limited {
+  background: #fff4dc;
+  color: #875e10;
+}
+
+.project-run-assessment.assessment-clear {
+  background: #eaf8f0;
+  color: #186b45;
+}
+
+.project-run-analysis ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.project-run-analysis li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: #34475e;
+  font-size: 12px;
+}
+
+.project-run-analysis p {
+  margin: 12px 0 8px;
+  color: #657184;
+  font-size: 12px;
+}
+
+.project-run-analysis small {
+  display: block;
+  margin-top: 4px;
+  color: #7b8899;
+  font-size: 11px;
+}
+
+.project-run-member-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.project-run-member-actions a {
+  color: #245f9f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.project-run-member-actions a:hover {
+  text-decoration: underline;
+}

@@ -111,11 +111,20 @@ export interface CreateDiagnosticProjectInput {
   agent_ids: string[];
 }
 
+export interface ProjectAnalysisSummary {
+  engine_version: string;
+  assessment: string;
+  evidence_status: string;
+  findings_count: number;
+  top_findings: { code: string; severity: string; title: string }[];
+}
+
 export interface DiagnosticProjectRecording {
   agent_id: string;
   recording_id: string | null;
   status: string | null;
   sync_status: string | null;
+  analysis: ProjectAnalysisSummary | null;
 }
 
 export interface DiagnosticProjectRun {

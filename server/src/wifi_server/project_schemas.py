@@ -37,11 +37,26 @@ class CreateProjectRequest(BaseModel):
         return value
 
 
+class ProjectFindingResponse(BaseModel):
+    code: str
+    severity: str
+    title: str
+
+
+class ProjectAnalysisSummary(BaseModel):
+    engine_version: str
+    assessment: str
+    evidence_status: str
+    findings_count: int
+    top_findings: list[ProjectFindingResponse]
+
+
 class ProjectRecordingResponse(BaseModel):
     agent_id: str
     recording_id: str | None
     status: str | None
     sync_status: str | None
+    analysis: ProjectAnalysisSummary | None = None
 
 
 class ProjectRunResponse(BaseModel):

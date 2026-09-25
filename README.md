@@ -606,6 +606,12 @@ without analysis. Older recordings can still be analyzed manually from their
 detail page. Rerunning an analysis manually remains available when an updated
 engine is deployed.
 
+Each project run shows the number of Agents with analyses, collection and sync
+progress, and the latest per-Agent assessment, evidence status, engine version,
+and two highest-severity findings. A missing analysis remains visibly pending;
+different engine versions are called out. The run does not calculate a combined
+project verdict or attribute a shared root cause to multiple Agents.
+
 Apply the Server schema migration before starting this version:
 `cd server && alembic upgrade head`. The Agent needs no schema change.
 

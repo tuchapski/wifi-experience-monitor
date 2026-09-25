@@ -193,32 +193,8 @@
   font-size: 11px;
 }
 
-.diagnostic-project-run {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e1e7ef;
-  color: #536174;
-  font-size: 12px;
-}
-
-.diagnostic-project-run ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-
-.diagnostic-project-run li {
-  margin: 5px 0;
-}
-
-.diagnostic-project-run a {
-  margin-left: 10px;
-  color: #245f9f;
-  font-weight: 700;
-}
-
 .diagnostic-project-run .diagnostic-project-stop {
   min-height: 28px;
-  margin-left: 10px;
   padding: 4px 8px;
   background: #a73b35;
 }

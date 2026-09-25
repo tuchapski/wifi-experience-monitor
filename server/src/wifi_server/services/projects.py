@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
+from wifi_server.db.analysis_models import RecordingAnalysis
 from wifi_server.db.models import Agent, DiagnosticRecording
 from wifi_server.db.project_models import (
     DiagnosticProject,
@@ -17,6 +18,8 @@ from wifi_server.db.project_models import (
 )
 from wifi_server.project_schemas import (
     CreateProjectRequest,
+    ProjectAnalysisSummary,
+    ProjectFindingResponse,
     ProjectRecordingResponse,
     ProjectResponse,
     ProjectRunResponse,
@@ -149,12 +152,47 @@ def _run_response(session: Session, run: ProjectRun) -> ProjectRunResponse:
         .where(ProjectRunRecording.run_id == run.id)
         .order_by(ProjectRunRecording.agent_id)
     ).all()
-    recordings = []
-    for member in members:
-        recording = (
+    member_recordings = [
+        (
+            member,
             session.get(DiagnosticRecording, member.recording_id)
             if member.recording_id is not None
-            else None
+            else None,
+        )
+        for member in members
+    ]
+    recording_ids = [
+        member.recording_id
+        for member, recording in member_recordings
+        if recording is not None
+        and recording.status == "completed"
+        and recording.sync_status == "complete"
+    ]
+    analyses = (
+        session.scalars(
+            select(RecordingAnalysis)
+            .where(RecordingAnalysis.recording_id.in_(recording_ids))
+            .order_by(
+                RecordingAnalysis.recording_id,
+                RecordingAnalysis.created_at.desc(),
+                RecordingAnalysis.id.desc(),
+            )
+            .distinct(RecordingAnalysis.recording_id)
+        ).all()
+        if recording_ids
+        else []
+    )
+    analysis_by_recording = {analysis.recording_id: analysis for analysis in analyses}
+    recordings = []
+    for member, recording in member_recordings:
+        analysis = analysis_by_recording.get(member.recording_id)
+        current_analysis = (
+            analysis is not None
+            and recording is not None
+            and recording.status == "completed"
+            and recording.sync_status == "complete"
+            and analysis.source_metrics_count == recording.metrics_count
+            and analysis.source_events_count == recording.events_count
         )
         recordings.append(
             ProjectRecordingResponse(
@@ -162,6 +200,7 @@ def _run_response(session: Session, run: ProjectRun) -> ProjectRunResponse:
                 recording_id=member.recording_id,
                 status=recording.status if recording else None,
                 sync_status=recording.sync_status if recording else None,
+                analysis=_analysis_summary(analysis) if current_analysis else None,
             )
         )
     return ProjectRunResponse(
@@ -169,4 +208,29 @@ def _run_response(session: Session, run: ProjectRun) -> ProjectRunResponse:
         project_id=run.project_id,
         started_at=run.started_at,
         recordings=recordings,
+    )
+
+
+def _analysis_summary(analysis: RecordingAnalysis) -> ProjectAnalysisSummary | None:
+    if analysis.status != "complete":
+        return None
+    severity_order = {"critical": 0, "warning": 1, "info": 2}
+    findings = [finding for finding in analysis.findings if isinstance(finding, dict)]
+    top_findings = sorted(
+        findings,
+        key=lambda finding: severity_order.get(str(finding.get("severity")), 3),
+    )[:2]
+    return ProjectAnalysisSummary(
+        engine_version=analysis.engine_version,
+        assessment=str(analysis.summary.get("status", "unavailable")),
+        evidence_status=str(analysis.summary.get("evidence_status", "unavailable")),
+        findings_count=len(findings),
+        top_findings=[
+            ProjectFindingResponse(
+                code=str(finding.get("code", "unknown")),
+                severity=str(finding.get("severity", "info")),
+                title=str(finding.get("title", "Untitled finding")),
+            )
+            for finding in top_findings
+        ],
     )
