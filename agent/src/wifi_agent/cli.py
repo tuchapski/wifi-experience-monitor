@@ -131,7 +131,11 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         )
 
     interface = _selected_interface(settings)
-    runtime = CurrentStateRuntime(interface) if interface else None
+    runtime = (
+        CurrentStateRuntime(interface, settings.telemetry_sample_interval_seconds)
+        if interface
+        else None
+    )
     if runtime is None:
         LOGGER.warning(
             "no wireless interface detected; state and telemetry collection are disabled"

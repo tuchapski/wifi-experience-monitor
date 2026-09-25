@@ -43,6 +43,27 @@ export interface WifiCurrentState {
   tx_failed?: number | null;
   rx_packets?: number | null;
   rx_drop_misc?: number | null;
+  tx_retries_per_100_packets?: number | null;
+  tx_failed_percent?: number | null;
+  link_score?: LinkScore | null;
+}
+
+export interface LinkScoreComponent {
+  metric: string;
+  label: string;
+  unit: string;
+  weight_percent: number;
+  reading: number | null;
+  score: number | null;
+}
+
+export interface LinkScore {
+  version: string;
+  value: number | null;
+  status: "measured" | "provisional" | "disconnected" | "unavailable";
+  coverage_percent: number;
+  components: LinkScoreComponent[];
+  limitations: string[];
 }
 
 export interface NetworkCurrentState {
@@ -157,6 +178,24 @@ export interface AnalysisDegradedWindow {
   maximum_channel_utilization_percent: number | null;
 }
 
+export interface BssidMetricComparison {
+  before_samples: number;
+  after_samples: number;
+  before_median: number | null;
+  after_median: number | null;
+  delta: number | null;
+}
+
+export interface BssidTransitionComparison {
+  observed_at: string;
+  previous_bssid: string;
+  current_bssid: string;
+  comparison_seconds: number;
+  status: "comparable" | "limited";
+  limitations: string[];
+  metrics: Record<string, BssidMetricComparison>;
+}
+
 export interface RecordingAnalysisSummary {
   status: "critical" | "warning" | "observed" | "clear" | "limited";
   evidence_status: "complete" | "partial";
@@ -184,6 +223,7 @@ export interface RecordingAnalysisSummary {
   channel_tx_percent?: AnalysisMetricStats | null;
   survey_intervals?: number;
   degraded_windows?: AnalysisDegradedWindow[];
+  bssid_transitions?: BssidTransitionComparison[];
   temporal_correlation?: {
     evaluable_samples: number;
     correlated_samples: number;

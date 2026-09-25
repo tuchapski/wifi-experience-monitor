@@ -81,6 +81,7 @@ class WifiCurrentStatePayload(BaseModel):
     snr_db: float | None = None
     tx_rate_mbps: float | None = None
     rx_rate_mbps: float | None = None
+    link_score: dict[str, Any] | None = None
 
 
 class NetworkCurrentStatePayload(BaseModel):

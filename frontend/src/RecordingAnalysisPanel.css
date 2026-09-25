@@ -134,6 +134,73 @@
   border-bottom: 1px solid #edf1f5;
 }
 
+.recording-bssid-comparison {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.recording-bssid-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.recording-bssid-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.recording-bssid-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #2f435b;
+  font-size: 12px;
+}
+
+.recording-bssid-card header span {
+  color: #78879a;
+  text-transform: capitalize;
+}
+
+.recording-bssid-card p {
+  overflow-wrap: anywhere;
+  color: #66778b;
+  font-size: 11px;
+}
+
+.recording-bssid-card small {
+  display: block;
+  margin-top: 8px;
+  color: #8f5b26;
+  line-height: 1.4;
+}
+
+.recording-bssid-table-wrap {
+  overflow-x: auto;
+}
+
+.recording-bssid-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: right;
+}
+
+.recording-bssid-card th,
+.recording-bssid-card td {
+  padding: 7px 5px;
+  border-bottom: 1px solid #edf1f5;
+  white-space: nowrap;
+}
+
+.recording-bssid-card th:first-child {
+  text-align: left;
+}
+
 .recording-correlation-heading {
   display: flex;
   align-items: flex-end;
@@ -375,6 +442,10 @@
   }
 
   .recording-window-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recording-bssid-list {
     grid-template-columns: minmax(0, 1fr);
   }
 }

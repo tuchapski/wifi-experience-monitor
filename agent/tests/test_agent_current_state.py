@@ -6,6 +6,7 @@ from wifi_agent.collectors.network import NetworkStateCollector
 from wifi_agent.collectors.wifi import WifiStateCollector
 from wifi_agent.core import Observation, ObservationKind
 from wifi_agent.processors import StateProcessor
+from wifi_agent.runtime.current_state import CurrentStateRuntime
 
 IW_INFO = """
 Interface wlp0s20f3
@@ -126,3 +127,45 @@ def test_network_collector_emits_address_and_gateway(mock_run_command) -> None:
     assert values["network.ipv4_address"] == "192.168.15.13"
     assert values["network.prefix_length"] == 24
     assert values["network.gateway"] == "192.168.15.1"
+
+
+def test_current_snapshot_uses_fresh_counter_deltas_without_duplicating_recording() -> None:
+    from datetime import timedelta
+
+    runtime = CurrentStateRuntime("wlp0s20f3")
+    start = datetime(2026, 9, 23, 22, 0, tzinfo=UTC)
+
+    def cycle(at: datetime, packets: int, retries: int) -> list[Observation]:
+        readings = (
+            ("wifi.connected", True, ObservationKind.STATE),
+            ("wifi.bssid", "aa:bb:cc:dd:ee:ff", ObservationKind.STATE),
+            ("wifi.rssi_dbm", -60, ObservationKind.GAUGE),
+            ("wifi.tx_packets", packets, ObservationKind.GAUGE),
+            ("wifi.tx_retries", retries, ObservationKind.GAUGE),
+            ("wifi.tx_failed", 0, ObservationKind.GAUGE),
+        )
+        return [
+            Observation("wifi", kind, metric, value, observed_at=at)
+            for metric, value, kind in readings
+        ]
+
+    with (
+        patch.object(
+            runtime.wifi,
+            "collect",
+            side_effect=[
+                cycle(start, 100, 10),
+                cycle(start + timedelta(seconds=1), 120, 14),
+                cycle(start + timedelta(seconds=30), 140, 18),
+            ],
+        ),
+        patch.object(runtime.network, "collect", return_value=[]),
+    ):
+        first = runtime.collect_cycle()
+        second = runtime.collect_cycle()
+        late = runtime.collect_cycle()
+
+    assert "tx_retries_per_100_packets" not in first.snapshot.wifi
+    assert second.snapshot.wifi["tx_retries_per_100_packets"] == 20
+    assert all(item.metric != "wifi.tx_retries_per_100_packets" for item in second.observations)
+    assert "tx_retries_per_100_packets" not in late.snapshot.wifi

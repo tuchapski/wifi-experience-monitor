@@ -12,6 +12,7 @@ import type {
   AgentCurrentState,
   AgentSummary,
   AgentWithState,
+  LinkScore,
   TelemetryPoint,
 } from "./agentTypes";
 import "./AgentWorkspace.css";
@@ -29,6 +30,14 @@ const RANGE_OPTIONS = [
   { hours: 6, label: "6h" },
   { hours: 24, label: "24h" },
 ] as const;
+
+const MAX_CURRENT_STATE_AGE_MS = 30_000;
+
+function isCurrentState(agent: AgentSummary, state: AgentCurrentState | null): boolean {
+  if (agent.status !== "online" || !state) return false;
+  const age = Date.now() - Date.parse(state.observed_at);
+  return Number.isFinite(age) && age >= -5_000 && age <= MAX_CURRENT_STATE_AGE_MS;
+}
 
 interface WorkspaceRoute {
   agentId: string | null;
@@ -255,6 +264,7 @@ function AgentList() {
                   <th>Status</th>
                   <th>Wi-Fi</th>
                   <th>Signal</th>
+                  <th>Link score</th>
                   <th>Channel</th>
                   <th>Last seen</th>
                   <th aria-label="Open agent" />
@@ -277,12 +287,20 @@ function AgentList() {
                       <small>{state?.wifi.bssid ?? "No current state"}</small>
                     </td>
                     <td>{formatMetric(state?.wifi.rssi_dbm, "dBm")}</td>
+                    <td>
+                      {isCurrentState(agent, state) && state?.wifi.link_score?.value != null
+                        ? `${state.wifi.link_score.value.toFixed(0)}/100`
+                        : "—"}
+                      <small>{isCurrentState(agent, state)
+                        ? state?.wifi.link_score?.status ?? "Unavailable"
+                        : "No current score"}</small>
+                    </td>
                     <td>{state?.wifi.channel ?? "—"}</td>
                     <td>
                       <strong>{formatRelativeTime(agent.last_seen_at)}</strong>
                       <small>{formatDate(agent.last_seen_at)}</small>
                     </td>
-                    <td><button type="button" className="agent-row-action" aria-label={`Open ${agent.name}`}>→</button></td>
+                    <td><button type="button" className="agent-row-action" aria-label={`Open ${agent.name}`} onClick={() => navigateToAgent(agent.id)}>→</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -291,6 +309,40 @@ function AgentList() {
         )}
       </section>
     </>
+  );
+}
+
+function LinkScorePanel({ score, fresh }: { score: LinkScore | null; fresh: boolean }) {
+  const visible = fresh ? score : null;
+  return (
+    <section className="agent-panel agent-link-score">
+      <div className="agent-panel-heading">
+        <div><span className="agent-eyebrow">Current link</span><h2>Wi-Fi link score</h2></div>
+        <small>{visible?.version ?? "Awaiting current data"}</small>
+      </div>
+      <div className="agent-link-score-body">
+        <div className="agent-link-score-value">
+          <strong>{visible?.value == null ? "—" : visible.value.toFixed(0)}</strong>
+          <span>/100</span>
+          <small>{visible?.status ?? "unavailable"}</small>
+        </div>
+        <div className="agent-link-score-explanation">
+          <p>
+            Based on the current RSSI and comparable TX counter intervals.
+            Metric coverage: <strong>{visible?.coverage_percent ?? 0}%</strong>.
+          </p>
+          {visible?.components.map((component) => (
+            <div className="agent-link-score-component" key={component.metric}>
+              <span>{component.label} · {component.weight_percent}% weight</span>
+              <strong>{formatMetric(component.reading, component.unit)}</strong>
+              <small>{component.score == null ? "No comparable reading" : `${component.score.toFixed(0)}/100`}</small>
+            </div>
+          ))}
+          {!fresh && <p>The Agent is offline or its Current State is older than 30 seconds.</p>}
+          {visible?.limitations.map((message) => <small key={message}>{message}</small>)}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -400,6 +452,11 @@ function AgentDetail({ agentId }: { agentId: string }) {
         <article><span>Channel</span><strong>{wifi?.channel ?? "—"}</strong><small>{wifi?.frequency_mhz ? `${wifi.frequency_mhz} MHz · ${wifi.channel_width_mhz ?? "—"} MHz` : "Frequency unavailable"}</small></article>
         <article><span>TX / RX</span><strong>{formatMetric(wifi?.tx_rate_mbps, "Mbps")}</strong><small>RX {formatMetric(wifi?.rx_rate_mbps, "Mbps")}</small></article>
       </section>
+
+      <LinkScorePanel
+        score={state?.wifi.link_score ?? null}
+        fresh={isCurrentState(agent, state)}
+      />
 
       <RecordingPanel agent={agent} />
 

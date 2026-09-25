@@ -35,6 +35,12 @@ function metricOrDash(value: number | null, suffix: string): string {
   return value == null ? "—" : `${value.toFixed(1)}${suffix}`;
 }
 
+const BSSID_METRICS = [
+  { key: "wifi.rssi_dbm", label: "RSSI", unit: "dBm" },
+  { key: "wifi.tx_retries_per_100_packets", label: "TX retries", unit: "/100" },
+  { key: "wifi.channel_utilization_percent", label: "Channel utilization", unit: "%" },
+] as const;
+
 export default function RecordingAnalysisPanel({
   recording,
   selectedWindow,
@@ -228,6 +234,52 @@ export default function RecordingAnalysisPanel({
                       <dd>{metricOrDash(window.maximum_channel_utilization_percent, "%")}</dd>
                     </dl>
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(analysis.summary.bssid_transitions?.length ?? 0) > 0 && (
+            <div className="recording-bssid-comparison">
+              <div className="recording-correlation-heading">
+                <div>
+                  <span className="agent-eyebrow">Association changes</span>
+                  <h3>Before and after BSSID changes</h3>
+                  <p>
+                    Median values within {analysis.summary.bssid_transitions?.[0].comparison_seconds}s
+                    on each side. Changes in channel and traffic can affect these measurements;
+                    they do not establish why the client changed APs.
+                  </p>
+                </div>
+              </div>
+              <div className="recording-bssid-list">
+                {analysis.summary.bssid_transitions?.map((transition, index) => (
+                  <article className="recording-bssid-card" key={`${transition.observed_at}-${index}`}>
+                    <header>
+                      <strong>{formatDate(transition.observed_at)}</strong>
+                      <span>{transition.status}</span>
+                    </header>
+                    <p><code>{transition.previous_bssid}</code> → <code>{transition.current_bssid}</code></p>
+                    <div className="recording-bssid-table-wrap">
+                      <table>
+                        <thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th></tr></thead>
+                        <tbody>
+                          {BSSID_METRICS.map(({ key, label, unit }) => {
+                            const metric = transition.metrics[key];
+                            return (
+                              <tr key={key}>
+                                <th scope="row">{label}</th>
+                                <td>{metricOrDash(metric?.before_median ?? null, ` ${unit}`)}</td>
+                                <td>{metricOrDash(metric?.after_median ?? null, ` ${unit}`)}</td>
+                                <td>{metric?.delta == null ? "—" : `${metric.delta > 0 ? "+" : ""}${metric.delta.toFixed(1)} ${unit}`}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {transition.limitations.map((reason) => <small key={reason}>{reason}</small>)}
+                  </article>
                 ))}
               </div>
             </div>

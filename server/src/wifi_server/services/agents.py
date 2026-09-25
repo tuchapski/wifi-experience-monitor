@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from wifi_server.analysis.current_link import score_link
 from wifi_server.config import ServerSettings
 from wifi_server.db.models import (
     Agent,
@@ -253,6 +254,8 @@ def update_current_state(
     )
     wifi = request.wifi
     network = request.network
+    link_score = score_link(wifi.model_dump(exclude_none=True), request.collector_errors)
+    raw_state["wifi"]["link_score"] = link_score
 
     if current is None:
         current = AgentCurrentState(
@@ -278,6 +281,7 @@ def update_current_state(
     current.gateway_latency_ms = network.gateway_latency_ms
     current.dns_latency_ms = network.dns_latency_ms
     current.internet_latency_ms = network.internet_latency_ms
+    current.experience_score = None  # Wi-Fi link quality is not end-to-end experience.
     current.raw_state = raw_state
     current.updated_at = now
 

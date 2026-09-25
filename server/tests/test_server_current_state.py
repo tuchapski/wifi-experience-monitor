@@ -42,6 +42,9 @@ def test_update_current_state_persists_snapshot() -> None:
     assert record.ssid == "CORP"
     assert record.rssi_dbm == -53
     assert record.raw_state["wifi"]["tx_mcs"] == 7
+    assert record.raw_state["wifi"]["link_score"]["status"] == "provisional"
+    assert record.raw_state["wifi"]["link_score"]["coverage_percent"] == 60
+    assert response.wifi.link_score["value"] == 100
     assert response.wifi.ssid == "CORP"
     session.commit.assert_called_once()
 

@@ -476,3 +476,42 @@ charts and score sections in HTML reports are outside this increment.
 Validation: run the regular Python checks, then `cd frontend && npm test`,
 `npm run build` and `npm run lint`. Frontend tests verify server-rendered panel
 states; they do not replace an interactive browser/hardware check.
+
+## Recording analysis: BSSID transitions (v5)
+
+The Server compares RSSI, TX retries per 100 packets and primary-channel
+utilization around each observed change between two nonempty BSSIDs. It reports
+the median of observations in the 10 seconds before and after the event and the
+signed difference. At least three readings are needed on each side, with a
+reading no more than three seconds from the transition on each side. Missing
+evidence is displayed as unavailable.
+
+An additional BSSID, SSID or connectivity change in this comparison window
+marks the result limited. The comparison remains descriptive even when complete:
+changing channels, traffic levels and other environmental changes can change
+the measured values. A BSSID change alone does not prove an 802.11 roam or
+establish why the client changed APs. Previous analyses remain readable; run
+the analysis again on a synchronized recording to use the v5 engine.
+
+## Current Wi-Fi link score (wifi-link-v1)
+
+The Agent's Current State now contains fresh TX counter deltas whenever two
+association-scoped snapshots are comparable. Intervals longer than three times
+the configured sampling cadence (or five seconds, whichever is longer) do not
+contribute a current retry or failure ratio. Raw observations sent to a
+diagnostic recording are unaffected.
+
+The Server computes a 0–100 **Wi-Fi link score** from RSSI (60%), retries per
+100 transmitted packets (25%) and TX failure percentage (15%). The anchors
+match the earlier experience-v1 Wi-Fi component; available weights are
+renormalized. An associated RSSI reading is required, and missing traffic
+counter ratios reduce the displayed evidence coverage. An observed disconnection
+scores zero; unknown association or RSSI produces no numeric score. Collection
+errors make an otherwise complete score provisional.
+
+The Agents list and detail view show this score only while the Agent is online
+and its Current State is no more than 30 seconds old. The detail view exposes
+each component, base weight, reading, score, coverage and limitations. It
+describes link quality only: the current Agent does not yet run gateway, DNS,
+Internet or application tests. No database migration is required; the score
+is stored in the existing Current State JSON.
