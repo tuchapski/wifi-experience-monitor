@@ -127,3 +127,26 @@ class RecordingManifestResponse(BaseModel):
     status: str
     sync_status: str
     missing_sequences: list[int] = Field(default_factory=list)
+
+
+class DiagnosticMetricStatistics(BaseModel):
+    sample_count: int
+    minimum: float | None = None
+    average: float | None = None
+    maximum: float | None = None
+
+
+class DiagnosticMetricComparison(BaseModel):
+    metric: str
+    before: DiagnosticMetricStatistics
+    during: DiagnosticMetricStatistics
+    after: DiagnosticMetricStatistics
+
+
+class DiagnosticWindowComparison(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    context_seconds: int
+    before_start: datetime
+    after_end: datetime
+    metrics: list[DiagnosticMetricComparison]
