@@ -61,7 +61,32 @@ def test_create_recording_queues_start_command() -> None:
     assert command.payload["recording_id"] == recording.id
     assert command.payload["max_duration_minutes"] == 60
     assert response.max_duration_minutes == 60
+    assert response.site is None
+    assert response.location is None
     session.commit.assert_called_once()
+
+
+def test_recording_context_is_saved_and_returned_without_changing_agent_command() -> None:
+    session = Mock(spec=Session)
+    session.get.return_value = _agent()
+    session.scalar.return_value = None
+    request = StartRecordingRequest(
+        name="Office issue",
+        site="  HQ  ",
+        location="  Floor 3 / West  ",
+        description="  Signal drops by the meeting room  ",
+    )
+
+    response = create_recording(session, "agt_test", request)
+
+    added = [call.args[0] for call in session.add.call_args_list]
+    recording = next(item for item in added if isinstance(item, DiagnosticRecording))
+    command = next(item for item in added if isinstance(item, AgentCommand))
+    assert recording.site == response.site == "HQ"
+    assert recording.location == response.location == "Floor 3 / West"
+    assert recording.description == response.description == "Signal drops by the meeting room"
+    assert "site" not in command.payload
+    assert "description" not in command.payload
 
 
 def test_delayed_start_ack_does_not_reopen_recording() -> None:

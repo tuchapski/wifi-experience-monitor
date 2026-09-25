@@ -546,6 +546,15 @@ recordings without a deadline retain their original manual-stop behavior.
 Apply the Server database migration (`cd server && alembic upgrade head`) before restarting
 the updated Server. The Agent upgrades its local SQLite table automatically.
 
+## Diagnostic recording context
+
+The recording form accepts optional site, location and notes about observed
+symptoms. This context is stored with the recording on the Server and remains
+visible in its history and detail view. Empty values are omitted. Context does
+not affect the Agent's collection or the analysis heuristics. Older recordings
+continue to show the fields as empty; the database already contains the site
+and location columns, so no migration is needed.
+
 ## Recording disconnection intervals (v7)
 
 The analysis now lists periods between observed Wi-Fi disconnection and

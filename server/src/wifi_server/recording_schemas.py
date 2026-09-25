@@ -1,14 +1,23 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class StartRecordingRequest(BaseModel):
     name: str = Field(default="Diagnostic Recording", min_length=1, max_length=255)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
+    site: str | None = Field(default=None, max_length=255)
+    location: str | None = Field(default=None, max_length=255)
     profile_id: str = Field(default="wifi-deep-dive", min_length=1, max_length=64)
     max_duration_minutes: int = Field(default=60, ge=1, le=1440)
+
+    @field_validator("description", "site", "location")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
 
 
 class RecordingResponse(BaseModel):
@@ -16,6 +25,8 @@ class RecordingResponse(BaseModel):
     agent_id: str
     name: str
     description: str | None
+    site: str | None
+    location: str | None
     status: str
     sync_status: str
     profile_id: str | None

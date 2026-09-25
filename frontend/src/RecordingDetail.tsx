@@ -358,6 +358,21 @@ export default function RecordingDetail({
 
       {error && <div className="agent-error" role="alert">{error}</div>}
 
+      {(recording.site || recording.location || recording.description) && (
+        <section className="recording-detail-context" aria-label="Recording context">
+          {recording.site && <div><span>Site</span><strong>{recording.site}</strong></div>}
+          {recording.location && (
+            <div><span>Location</span><strong>{recording.location}</strong></div>
+          )}
+          {recording.description && (
+            <div className="recording-detail-notes">
+              <span>Session notes</span>
+              <p>{recording.description}</p>
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="recording-detail-summary">
         <article><span>Started</span><strong>{formatDate(recording.started_at)}</strong></article>
         <article><span>Duration</span><strong>{formatDuration(recording.started_at, recording.ended_at)}</strong></article>

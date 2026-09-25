@@ -62,6 +62,9 @@ function navigateToRecording(agentId: string, recordingId: string): void {
 export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
   const [recordings, setRecordings] = useState<DiagnosticRecording[]>([]);
   const [recordingName, setRecordingName] = useState("");
+  const [site, setSite] = useState("");
+  const [location, setLocation] = useState("");
+  const [notes, setNotes] = useState("");
   const [maxDurationMinutes, setMaxDurationMinutes] = useState(60);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<"start" | "stop" | null>(null);
@@ -129,11 +132,16 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
         || `Diagnostic ${new Date().toLocaleString()}`;
       await startAgentRecording(agent.id, {
         name,
-        description: null,
+        description: notes.trim() || null,
+        site: site.trim() || null,
+        location: location.trim() || null,
         profile_id: "wifi-deep-dive",
         max_duration_minutes: maxDurationMinutes,
       });
       setRecordingName("");
+      setSite("");
+      setLocation("");
+      setNotes("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to start recording");
@@ -169,29 +177,58 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
         </div>
         {!activeRecording && (
           <form className="recording-start-form" onSubmit={(event) => void handleStart(event)}>
-            <input
-              type="text"
-              maxLength={255}
-              value={recordingName}
-              onChange={(event) => setRecordingName(event.target.value)}
-              placeholder="Optional recording name"
-              aria-label="Recording name"
+            <div className="recording-start-fields">
+              <input
+                type="text"
+                maxLength={255}
+                value={recordingName}
+                onChange={(event) => setRecordingName(event.target.value)}
+                placeholder="Optional recording name"
+                aria-label="Recording name"
+                disabled={agent.status !== "online" || action !== null}
+              />
+              <select
+                aria-label="Maximum recording duration"
+                value={maxDurationMinutes}
+                onChange={(event) => setMaxDurationMinutes(Number(event.target.value))}
+                disabled={agent.status !== "online" || action !== null}
+              >
+                <option value={15}>15 min</option>
+                <option value={30}>30 min</option>
+                <option value={60}>1 hour</option>
+                <option value={120}>2 hours</option>
+                <option value={240}>4 hours</option>
+                <option value={480}>8 hours</option>
+                <option value={1440}>24 hours</option>
+              </select>
+              <input
+                type="text"
+                maxLength={255}
+                value={site}
+                onChange={(event) => setSite(event.target.value)}
+                placeholder="Site (optional)"
+                aria-label="Recording site"
+                disabled={agent.status !== "online" || action !== null}
+              />
+              <input
+                type="text"
+                maxLength={255}
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="Floor / room (optional)"
+                aria-label="Recording location"
+                disabled={agent.status !== "online" || action !== null}
+              />
+            </div>
+            <textarea
+              maxLength={2000}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Observed symptoms or test context (optional)"
+              aria-label="Recording notes"
+              rows={2}
               disabled={agent.status !== "online" || action !== null}
             />
-            <select
-              aria-label="Maximum recording duration"
-              value={maxDurationMinutes}
-              onChange={(event) => setMaxDurationMinutes(Number(event.target.value))}
-              disabled={agent.status !== "online" || action !== null}
-            >
-              <option value={15}>15 min</option>
-              <option value={30}>30 min</option>
-              <option value={60}>1 hour</option>
-              <option value={120}>2 hours</option>
-              <option value={240}>4 hours</option>
-              <option value={480}>8 hours</option>
-              <option value={1440}>24 hours</option>
-            </select>
             <button
               type="submit"
               disabled={agent.status !== "online" || action !== null}
@@ -222,6 +259,11 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
               {activeRecording.max_duration_minutes != null
                 && ` · Auto-stop after ${activeRecording.max_duration_minutes} min`}
             </span>
+            {(activeRecording.site || activeRecording.location) && (
+              <span className="recording-active-place">
+                {[activeRecording.site, activeRecording.location].filter(Boolean).join(" · ")}
+              </span>
+            )}
           </div>
           <div className="recording-stat">
             <span>Elapsed</span>
@@ -307,6 +349,11 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                     >
                       {recording.name}
                     </button>
+                    {(recording.site || recording.location) && (
+                      <span className="recording-history-place">
+                        {[recording.site, recording.location].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                     <small>{recording.id}</small>
                   </td>
                   <td>
