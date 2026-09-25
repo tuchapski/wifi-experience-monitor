@@ -55,6 +55,7 @@ def create_recording(
         status="created",
         sync_status="pending",
         profile_id=request.profile_id,
+        max_duration_minutes=request.max_duration_minutes,
         started_at=None,
         ended_at=None,
         site=None,
@@ -73,7 +74,11 @@ def create_recording(
         _command(
             agent_id,
             "recording.start",
-            {"recording_id": recording.id, "profile_id": request.profile_id},
+            {
+                "recording_id": recording.id,
+                "profile_id": request.profile_id,
+                "max_duration_minutes": request.max_duration_minutes,
+            },
             now,
         )
     )
@@ -221,8 +226,11 @@ def acknowledge_command(
             recording.status = "failed"
             recording.sync_status = "failed"
         elif command.command_type == "recording.start":
-            recording.status = "recording"
-            recording.started_at = _datetime_from_data(request.data.get("started_at")) or now
+            if recording.status not in {"stopping", "completed", "failed", "cancelled"}:
+                recording.status = "recording"
+            recording.started_at = (
+                recording.started_at or _datetime_from_data(request.data.get("started_at")) or now
+            )
         elif command.command_type == "recording.stop":
             recording.status = "completed"
             recording.ended_at = _datetime_from_data(request.data.get("ended_at")) or now
@@ -384,6 +392,7 @@ def _response(recording: DiagnosticRecording) -> RecordingResponse:
         status=recording.status,
         sync_status=recording.sync_status,
         profile_id=recording.profile_id,
+        max_duration_minutes=recording.max_duration_minutes,
         started_at=recording.started_at,
         ended_at=recording.ended_at,
         agent_version=recording.agent_version,

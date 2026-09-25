@@ -31,6 +31,7 @@ class LocalRecording:
     metrics_count: int
     events_count: int
     manifest_pending: bool
+    deadline_at: datetime | None = None
 
     @property
     def batches_count(self) -> int:

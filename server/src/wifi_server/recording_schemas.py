@@ -8,6 +8,7 @@ class StartRecordingRequest(BaseModel):
     name: str = Field(default="Diagnostic Recording", min_length=1, max_length=255)
     description: str | None = None
     profile_id: str = Field(default="wifi-deep-dive", min_length=1, max_length=64)
+    max_duration_minutes: int = Field(default=60, ge=1, le=1440)
 
 
 class RecordingResponse(BaseModel):
@@ -18,6 +19,7 @@ class RecordingResponse(BaseModel):
     status: str
     sync_status: str
     profile_id: str | None
+    max_duration_minutes: int | None
     started_at: datetime | None
     ended_at: datetime | None
     agent_version: str | None

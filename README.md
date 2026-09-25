@@ -531,3 +531,17 @@ them reports continuity unavailable and marks evidence partial. The engine
 retains existing Wi-Fi findings and their severities even if continuity is
 limited. Continuous markers describe observed cycles, not proof that every
 collector produced a valid measurement. Rerun analysis to use the new engine.
+
+## Autonomous recording duration
+
+When starting a diagnostic recording, choose a maximum duration from 15 minutes
+to 24 hours (one hour by default). The Server stores the limit and sends it to
+the Agent. The Agent persists a local deadline based on its actual start time,
+and stops recording when the deadline arrives, even while disconnected from the
+Server. Pending data and the completion manifest synchronize when connectivity
+returns. Manual stop is still available. An Agent restart preserves the deadline;
+if the deadline passed during downtime, recording stops on startup. Existing
+recordings without a deadline retain their original manual-stop behavior.
+
+Apply the Server database migration (`cd server && alembic upgrade head`) before restarting
+the updated Server. The Agent upgrades its local SQLite table automatically.

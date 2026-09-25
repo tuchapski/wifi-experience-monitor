@@ -9,8 +9,13 @@ from wifi_server.db.recording_models import (
     RecordingEvent,
     RecordingMetric,
 )
-from wifi_server.recording_schemas import RecordingBatchRequest, StartRecordingRequest
+from wifi_server.recording_schemas import (
+    AgentCommandAckRequest,
+    RecordingBatchRequest,
+    StartRecordingRequest,
+)
 from wifi_server.services.recordings import (
+    acknowledge_command,
     create_recording,
     get_recording_events,
     get_recording_metrics,
@@ -54,7 +59,37 @@ def test_create_recording_queues_start_command() -> None:
     assert response.status == "created"
     assert command.command_type == "recording.start"
     assert command.payload["recording_id"] == recording.id
+    assert command.payload["max_duration_minutes"] == 60
+    assert response.max_duration_minutes == 60
     session.commit.assert_called_once()
+
+
+def test_delayed_start_ack_does_not_reopen_recording() -> None:
+    now = datetime.now(UTC)
+    for status in ("stopping", "completed"):
+        recording = DiagnosticRecording(
+            id="rec_delayed", status=status, started_at=None, updated_at=now
+        )
+        command = AgentCommand(
+            id="cmd_delayed",
+            command_type="recording.start",
+            payload={"recording_id": recording.id},
+            status="delivered",
+            created_at=now,
+            result={},
+        )
+        session = Mock(spec=Session)
+        session.get.return_value = recording
+
+        acknowledge_command(
+            session,
+            command,
+            AgentCommandAckRequest(status="acked", data={"started_at": now.isoformat()}),
+        )
+
+        assert recording.status == status
+        assert recording.started_at == now
+        session.commit.assert_called_once()
 
 
 def test_recording_batch_persists_raw_metric() -> None:

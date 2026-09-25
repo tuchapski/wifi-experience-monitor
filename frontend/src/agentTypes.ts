@@ -109,6 +109,7 @@ export interface DiagnosticRecording {
   status: string;
   sync_status: string;
   profile_id: string | null;
+  max_duration_minutes: number | null;
   started_at: string | null;
   ended_at: string | null;
   agent_version: string | null;
@@ -125,6 +126,7 @@ export interface StartRecordingInput {
   name: string;
   description: string | null;
   profile_id: string;
+  max_duration_minutes: number;
 }
 
 export interface RecordingMetricPoint {

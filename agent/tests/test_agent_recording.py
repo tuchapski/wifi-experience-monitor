@@ -1,4 +1,6 @@
+import sqlite3
 from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock
 
 from wifi_agent.config import AgentSettings
 from wifi_agent.recording import RecordingStore
@@ -81,3 +83,68 @@ def test_recording_marks_empty_collection_cycle(tmp_path) -> None:
         "configured_interval_seconds": settings.telemetry_sample_interval_seconds,
         "collector_errors_count": 1,
     }
+
+
+def test_autonomous_recording_stops_after_restart_and_queues_manifest(tmp_path) -> None:
+    settings = AgentSettings.from_environment()
+    identity = AgentIdentity("agent_test", "token", settings.server_url, datetime.now(UTC))
+    path = tmp_path / "agent.db"
+    controller = RecordingController(settings, identity, path)
+    controller.client.acknowledge_command = Mock()
+    controller._start("cmd_start", {"recording_id": "rec_timed", "max_duration_minutes": 15})
+    recording = controller.store.active()
+    assert recording is not None
+    assert recording.deadline_at == recording.started_at + timedelta(minutes=15)
+
+    restarted = RecordingController(settings, identity, path)
+    assert restarted.stop_if_due(recording.deadline_at - timedelta(seconds=1)) is False
+    assert restarted.stop_if_due(recording.deadline_at) is True
+    assert restarted.stop_if_due(recording.deadline_at + timedelta(minutes=1)) is False
+    completed = restarted.store.get("rec_timed")
+    assert completed is not None
+    assert completed.ended_at == recording.deadline_at
+    assert completed.manifest_pending is True
+    assert len(restarted.store.recordings_waiting_for_manifest()) == 1
+
+
+def test_recording_rejects_invalid_duration_before_start(tmp_path) -> None:
+    settings = AgentSettings.from_environment()
+    identity = AgentIdentity("agent_test", "token", settings.server_url, datetime.now(UTC))
+    controller = RecordingController(settings, identity, tmp_path / "agent.db")
+    for duration in (0, 1441, True, "60"):
+        try:
+            controller._start(
+                "cmd_start", {"recording_id": "rec_bad", "max_duration_minutes": duration}
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid duration was accepted: {duration!r}")
+    assert controller.store.active() is None
+
+
+def test_recording_store_adds_deadline_column_to_existing_database(tmp_path) -> None:
+    path = tmp_path / "agent.db"
+    legacy_start = datetime(2026, 9, 23, 22, 0, tzinfo=UTC)
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            """CREATE TABLE diagnostic_recordings_local (
+                recording_id TEXT PRIMARY KEY, status TEXT NOT NULL,
+                started_at TEXT NOT NULL, ended_at TEXT, next_sequence INTEGER NOT NULL,
+                metrics_count INTEGER NOT NULL, events_count INTEGER NOT NULL,
+                manifest_pending INTEGER NOT NULL DEFAULT 0
+            )"""
+        )
+        connection.execute(
+            """INSERT INTO diagnostic_recordings_local (
+                recording_id, status, started_at, next_sequence, metrics_count, events_count
+            ) VALUES (?, 'completed', ?, 1, 0, 0)""",
+            ("rec_legacy", legacy_start.isoformat()),
+        )
+    store = RecordingStore(path)
+    store.initialize()
+    legacy = store.get("rec_legacy")
+    assert legacy is not None
+    assert legacy.deadline_at is None
+    recording = store.start("rec_existing", datetime.now(UTC), max_duration_minutes=60)
+    assert recording.deadline_at == recording.started_at + timedelta(hours=1)

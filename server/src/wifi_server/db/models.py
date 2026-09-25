@@ -207,6 +207,7 @@ class DiagnosticRecording(Base):
         index=True,
     )
     profile_id: Mapped[str | None] = mapped_column(String(64))
+    max_duration_minutes: Mapped[int | None] = mapped_column(Integer)
 
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

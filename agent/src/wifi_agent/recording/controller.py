@@ -41,6 +41,17 @@ class RecordingController:
             "recording_id": active.recording_id if active else None,
         }
 
+    def stop_if_due(self, now: datetime | None = None) -> bool:
+        active = self.store.active()
+        if active is None or active.deadline_at is None:
+            return False
+        now = now or datetime.now(UTC)
+        if now < active.deadline_at:
+            return False
+        self.store.stop(active.recording_id, now)
+        LOGGER.info("recording duration reached recording_id=%s", active.recording_id)
+        return True
+
     def handle_commands(self, commands: list[dict[str, Any]]) -> None:
         for command in commands:
             command_id = str(command.get("id", ""))
@@ -207,12 +218,19 @@ class RecordingController:
         recording_id = str(payload.get("recording_id", ""))
         if not recording_id:
             raise ValueError("recording.start is missing recording_id")
+        max_duration_minutes = payload.get("max_duration_minutes")
+        if max_duration_minutes is not None and (
+            isinstance(max_duration_minutes, bool)
+            or not isinstance(max_duration_minutes, int)
+            or not 1 <= max_duration_minutes <= 1440
+        ):
+            raise ValueError("recording.start max_duration_minutes must be between 1 and 1440")
         active = self.store.active()
         if active is not None and active.recording_id != recording_id:
             raise RuntimeError(f"recording {active.recording_id} is already active")
 
         started_at = datetime.now(UTC)
-        recording = self.store.start(recording_id, started_at)
+        recording = self.store.start(recording_id, started_at, max_duration_minutes)
         self._last_state.clear()
         self._counter_delta.reset()
         self._survey_delta.reset()

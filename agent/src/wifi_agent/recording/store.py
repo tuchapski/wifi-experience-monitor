@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -27,7 +27,8 @@ class RecordingStore:
                     next_sequence INTEGER NOT NULL,
                     metrics_count INTEGER NOT NULL,
                     events_count INTEGER NOT NULL,
-                    manifest_pending INTEGER NOT NULL DEFAULT 0
+                    manifest_pending INTEGER NOT NULL DEFAULT 0,
+                    deadline_at TEXT
                 )
                 """
             )
@@ -44,6 +45,14 @@ class RecordingStore:
                 )
                 """
             )
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(diagnostic_recordings_local)")
+            }
+            if "deadline_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE diagnostic_recordings_local ADD COLUMN deadline_at TEXT"
+                )
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS ix_recording_batches_local_order
@@ -52,7 +61,12 @@ class RecordingStore:
             )
             connection.commit()
 
-    def start(self, recording_id: str, started_at: datetime) -> LocalRecording:
+    def start(
+        self,
+        recording_id: str,
+        started_at: datetime,
+        max_duration_minutes: int | None = None,
+    ) -> LocalRecording:
         existing = self.get(recording_id)
         if existing is not None:
             return existing
@@ -72,10 +86,17 @@ class RecordingStore:
                     next_sequence,
                     metrics_count,
                     events_count,
-                    manifest_pending
-                ) VALUES (?, 'recording', ?, NULL, 1, 0, 0, 0)
+                    manifest_pending,
+                    deadline_at
+                ) VALUES (?, 'recording', ?, NULL, 1, 0, 0, 0, ?)
                 """,
-                (recording_id, started_at.isoformat()),
+                (
+                    recording_id,
+                    started_at.isoformat(),
+                    (started_at + timedelta(minutes=max_duration_minutes)).isoformat()
+                    if max_duration_minutes is not None
+                    else None,
+                ),
             )
             connection.commit()
         recording = self.get(recording_id)
@@ -109,7 +130,7 @@ class RecordingStore:
             row = connection.execute(
                 """
                 SELECT recording_id, status, started_at, ended_at, next_sequence,
-                       metrics_count, events_count, manifest_pending
+                       metrics_count, events_count, manifest_pending, deadline_at
                 FROM diagnostic_recordings_local
                 WHERE status = 'recording'
                 ORDER BY started_at DESC
@@ -123,7 +144,7 @@ class RecordingStore:
             row = connection.execute(
                 """
                 SELECT recording_id, status, started_at, ended_at, next_sequence,
-                       metrics_count, events_count, manifest_pending
+                       metrics_count, events_count, manifest_pending, deadline_at
                 FROM diagnostic_recordings_local
                 WHERE recording_id = ?
                 """,
@@ -230,7 +251,7 @@ class RecordingStore:
             rows = connection.execute(
                 """
                 SELECT recording_id, status, started_at, ended_at, next_sequence,
-                       metrics_count, events_count, manifest_pending
+                       metrics_count, events_count, manifest_pending, deadline_at
                 FROM diagnostic_recordings_local
                 WHERE status = 'completed' AND manifest_pending = 1
                 ORDER BY ended_at
@@ -281,4 +302,5 @@ class RecordingStore:
             metrics_count=int(row[5]),
             events_count=int(row[6]),
             manifest_pending=bool(row[7]),
+            deadline_at=datetime.fromisoformat(row[8]) if row[8] else None,
         )

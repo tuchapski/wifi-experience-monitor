@@ -364,6 +364,7 @@ export default function RecordingDetail({
         <article><span>Raw metrics</span><strong>{recording.metrics_count.toLocaleString()}</strong></article>
         <article><span>State events</span><strong>{recording.events_count.toLocaleString()}</strong></article>
         <article><span>Profile</span><strong>{recording.profile_id ?? "—"}</strong></article>
+        <article><span>Max duration</span><strong>{recording.max_duration_minutes == null ? "—" : `${recording.max_duration_minutes} min`}</strong></article>
       </section>
 
       {recording.sync_status !== "complete" && (

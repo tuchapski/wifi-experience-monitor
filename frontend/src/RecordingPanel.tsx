@@ -62,6 +62,7 @@ function navigateToRecording(agentId: string, recordingId: string): void {
 export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
   const [recordings, setRecordings] = useState<DiagnosticRecording[]>([]);
   const [recordingName, setRecordingName] = useState("");
+  const [maxDurationMinutes, setMaxDurationMinutes] = useState(60);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<"start" | "stop" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +131,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
         name,
         description: null,
         profile_id: "wifi-deep-dive",
+        max_duration_minutes: maxDurationMinutes,
       });
       setRecordingName("");
       await refresh();
@@ -162,7 +164,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
           <span className="agent-eyebrow">Diagnostic recording</span>
           <h2>Capture high-resolution evidence</h2>
           <p>
-            Preserve raw one-second Wi-Fi observations and state changes for deeper analysis.
+            Preserve raw Wi-Fi observations and state changes for deeper analysis.
           </p>
         </div>
         {!activeRecording && (
@@ -176,6 +178,20 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
               aria-label="Recording name"
               disabled={agent.status !== "online" || action !== null}
             />
+            <select
+              aria-label="Maximum recording duration"
+              value={maxDurationMinutes}
+              onChange={(event) => setMaxDurationMinutes(Number(event.target.value))}
+              disabled={agent.status !== "online" || action !== null}
+            >
+              <option value={15}>15 min</option>
+              <option value={30}>30 min</option>
+              <option value={60}>1 hour</option>
+              <option value={120}>2 hours</option>
+              <option value={240}>4 hours</option>
+              <option value={480}>8 hours</option>
+              <option value={1440}>24 hours</option>
+            </select>
             <button
               type="submit"
               disabled={agent.status !== "online" || action !== null}
@@ -201,7 +217,11 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
                 {SYNC_LABELS[activeRecording.sync_status] ?? activeRecording.sync_status}
               </span>
             </div>
-            <span className="recording-active-id">{activeRecording.id}</span>
+            <span className="recording-active-id">
+              {activeRecording.id}
+              {activeRecording.max_duration_minutes != null
+                && ` · Auto-stop after ${activeRecording.max_duration_minutes} min`}
+            </span>
           </div>
           <div className="recording-stat">
             <span>Elapsed</span>

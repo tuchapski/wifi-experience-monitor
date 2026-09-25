@@ -29,7 +29,8 @@
   gap: 8px;
 }
 
-.recording-start-form input {
+.recording-start-form input,
+.recording-start-form select {
   width: min(280px, 34vw);
   min-height: 38px;
   padding: 8px 11px;
@@ -41,7 +42,8 @@
   font-size: 13px;
 }
 
-.recording-start-form input:focus {
+.recording-start-form input:focus,
+.recording-start-form select:focus {
   border-color: #7ba3d2;
   outline: 3px solid #e9f1fa;
 }
@@ -368,7 +370,8 @@
     flex-direction: column;
   }
 
-  .recording-start-form input {
+  .recording-start-form input,
+  .recording-start-form select {
     width: 100%;
   }
 

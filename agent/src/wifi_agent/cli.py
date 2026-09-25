@@ -158,6 +158,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     next_sync = 0.0
 
     while True:
+        recording_controller.stop_if_due()
         now = time.monotonic()
         if now >= next_heartbeat:
             try:
