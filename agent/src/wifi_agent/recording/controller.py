@@ -26,6 +26,7 @@ class RecordingController:
         database_path: Path,
     ):
         self.identity = identity
+        self.sample_interval_seconds = settings.telemetry_sample_interval_seconds
         self.client = RecordingApiClient(settings)
         self.store = RecordingStore(database_path)
         self.store.initialize()
@@ -69,14 +70,32 @@ class RecordingController:
                     message=str(exc),
                 )
 
-    def consume(self, observations: list[Observation]) -> None:
+    def consume(
+        self,
+        observations: list[Observation],
+        *,
+        observed_at: datetime | None = None,
+        collector_errors: list[str] | None = None,
+    ) -> None:
         active = self.store.active()
         if active is None:
             return
 
         metrics: list[dict[str, Any]] = []
         events: list[dict[str, Any]] = []
-        observed_at = datetime.now(UTC)
+        observed_at = observed_at or datetime.now(UTC)
+        metrics.append(
+            {
+                "observed_at": observed_at.isoformat(),
+                "metric": "sensor.collection_cycle",
+                "value": 1.0,
+                "unit": None,
+                "labels": {
+                    "configured_interval_seconds": self.sample_interval_seconds,
+                    "collector_errors_count": len(collector_errors or []),
+                },
+            }
+        )
 
         derived = [
             *self._counter_delta.consume(observations),

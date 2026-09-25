@@ -3,6 +3,6 @@
 from wifi_server.analysis.recording import (
     RecordingAnalysisResult,
 )
-from wifi_server.analysis.recording_v5 import ENGINE_VERSION, analyze_recording
+from wifi_server.analysis.recording_v6 import ENGINE_VERSION, analyze_recording
 
 __all__ = ["ENGINE_VERSION", "RecordingAnalysisResult", "analyze_recording"]

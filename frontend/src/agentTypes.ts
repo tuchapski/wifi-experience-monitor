@@ -196,6 +196,19 @@ export interface BssidTransitionComparison {
   metrics: Record<string, BssidMetricComparison>;
 }
 
+export interface CollectionIntegrity {
+  status: "continuous" | "interrupted" | "impaired" | "unavailable";
+  cycle_count: number;
+  configured_interval_seconds: number | null;
+  gap_threshold_seconds: number | null;
+  collector_error_cycles: number;
+  gaps: Array<{
+    started_at: string;
+    ended_at: string;
+    duration_seconds: number;
+  }>;
+}
+
 export interface RecordingAnalysisSummary {
   status: "critical" | "warning" | "observed" | "clear" | "limited";
   evidence_status: "complete" | "partial";
@@ -224,6 +237,7 @@ export interface RecordingAnalysisSummary {
   survey_intervals?: number;
   degraded_windows?: AnalysisDegradedWindow[];
   bssid_transitions?: BssidTransitionComparison[];
+  collection_integrity?: CollectionIntegrity;
   temporal_correlation?: {
     evaluable_samples: number;
     correlated_samples: number;

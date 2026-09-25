@@ -134,6 +134,32 @@
   border-bottom: 1px solid #edf1f5;
 }
 
+.recording-continuity {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.recording-continuity > .recording-correlation-heading > strong {
+  color: #425b78;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.recording-continuity-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 0 18px 14px;
+  color: #425b78;
+  font-size: 12px;
+}
+
+.recording-continuity ul {
+  margin: 0 18px 16px;
+  padding-left: 20px;
+  color: #825727;
+  font-size: 12px;
+}
+
 .recording-bssid-comparison {
   border-bottom: 1px solid #edf1f5;
 }

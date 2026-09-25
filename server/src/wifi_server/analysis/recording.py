@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from statistics import fmean
 from typing import Any
@@ -35,6 +35,7 @@ class MetricSample:
     observed_at: datetime
     metric: str
     value: float
+    labels: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

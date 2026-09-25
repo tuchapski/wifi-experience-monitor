@@ -46,6 +46,7 @@ def run_recording_analysis(
                 observed_at=row.observed_at,
                 metric=row.metric,
                 value=row.value,
+                labels=row.labels,
             )
             for row in metric_rows
         ],
@@ -57,6 +58,8 @@ def run_recording_analysis(
             )
             for row in event_rows
         ],
+        started_at=recording.started_at,
+        ended_at=recording.ended_at,
     )
 
     analysis = RecordingAnalysis(

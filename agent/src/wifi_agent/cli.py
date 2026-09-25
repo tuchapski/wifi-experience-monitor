@@ -174,7 +174,11 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         if runtime is not None and now >= next_collection:
             cycle = runtime.collect_cycle()
             aggregator.consume(cycle.observations)
-            recording_controller.consume(cycle.observations)
+            recording_controller.consume(
+                cycle.observations,
+                observed_at=cycle.snapshot.observed_at,
+                collector_errors=cycle.snapshot.collector_errors,
+            )
 
             if now >= next_state:
                 try:

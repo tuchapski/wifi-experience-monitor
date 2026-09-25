@@ -174,6 +174,46 @@ export default function RecordingAnalysisPanel({
             </span>
           </div>
 
+          {analysis.summary.collection_integrity && (
+            <div className="recording-continuity">
+              <div className="recording-correlation-heading">
+                <div>
+                  <span className="agent-eyebrow">Collection continuity</span>
+                  <h3>Observed collection cycles</h3>
+                  <p>
+                    Sync confirms delivery; cycle markers show when the Agent collected.
+                    Gaps and collector errors can limit conclusions from this recording.
+                  </p>
+                </div>
+                <strong>{analysis.summary.collection_integrity.status}</strong>
+              </div>
+              <div className="recording-continuity-stats">
+                <span>{analysis.summary.collection_integrity.cycle_count} cycles</span>
+                <span>
+                  Cadence {analysis.summary.collection_integrity.configured_interval_seconds == null
+                    ? "—"
+                    : `${analysis.summary.collection_integrity.configured_interval_seconds}s`}
+                </span>
+                <span>{analysis.summary.collection_integrity.collector_error_cycles} error cycles</span>
+                <span>
+                  {analysis.summary.collection_integrity.status === "unavailable"
+                    ? "Gaps unavailable"
+                    : `${analysis.summary.collection_integrity.gaps.length} gaps`}
+                </span>
+              </div>
+              {analysis.summary.collection_integrity.gaps.length > 0 && (
+                <ul>
+                  {analysis.summary.collection_integrity.gaps.map((gap, index) => (
+                    <li key={`${gap.started_at}-${index}`}>
+                      {formatDate(gap.started_at)} → {formatDate(gap.ended_at)}
+                      {" "}({gap.duration_seconds.toFixed(1)}s)
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {(analysis.summary.degraded_windows?.length ?? 0) > 0 && (
             <div className="recording-correlation">
               <div className="recording-correlation-heading">

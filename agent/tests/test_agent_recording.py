@@ -1,6 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
+from wifi_agent.config import AgentSettings
 from wifi_agent.recording import RecordingStore
+from wifi_agent.recording.controller import RecordingController
+from wifi_agent.storage import AgentIdentity
 
 
 def test_recording_store_persists_batches_and_manifest_state(tmp_path) -> None:
@@ -60,3 +63,21 @@ def test_recording_store_persists_batches_and_manifest_state(tmp_path) -> None:
 
     store.acknowledge_manifest("rec_test")
     assert store.recordings_waiting_for_manifest() == []
+
+
+def test_recording_marks_empty_collection_cycle(tmp_path) -> None:
+    settings = AgentSettings.from_environment()
+    identity = AgentIdentity("agent_test", "token", settings.server_url, datetime.now(UTC))
+    controller = RecordingController(settings, identity, tmp_path / "agent.db")
+    at = datetime.now(UTC)
+    controller.store.start("rec_cycle", at - timedelta(seconds=1))
+
+    controller.consume([], observed_at=at, collector_errors=["survey unavailable"])
+
+    batch = controller.store.pending()[0]
+    assert len(batch.metrics) == 1
+    assert batch.metrics[0]["metric"] == "sensor.collection_cycle"
+    assert batch.metrics[0]["labels"] == {
+        "configured_interval_seconds": settings.telemetry_sample_interval_seconds,
+        "collector_errors_count": 1,
+    }

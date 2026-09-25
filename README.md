@@ -515,3 +515,19 @@ each component, base weight, reading, score, coverage and limitations. It
 describes link quality only: the current Agent does not yet run gateway, DNS,
 Internet or application tests. No database migration is required; the score
 is stored in the existing Current State JSON.
+
+## Recording collection continuity (v6)
+
+The Agent stores one `sensor.collection_cycle` marker per collection cycle while
+a diagnostic recording is active, including its configured cadence and the
+number of collector errors. The Server compares these markers with the recording
+start/end times; intervals exceeding the greater of three cadences or one cadence
+plus two seconds appear as gaps in the analysis. The result also lists cycles
+with collector errors. Recording sync `complete` confirms delivery of captured
+data; it does not guarantee that collection ran without interruption.
+
+Older recordings without cycle markers remain readable. Running v6 analysis on
+them reports continuity unavailable and marks evidence partial. The engine
+retains existing Wi-Fi findings and their severities even if continuity is
+limited. Continuous markers describe observed cycles, not proof that every
+collector produced a valid measurement. Rerun analysis to use the new engine.
