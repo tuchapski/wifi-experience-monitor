@@ -7,7 +7,8 @@ import {
   getAgentTelemetry,
   renameAgent,
 } from "./agentApi";
-import RecordingPanel from "./RecordingPanel";
+import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
+import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
 import RecordingDetail from "./RecordingDetail";
 import type {
   AgentCurrentState,
@@ -38,28 +39,6 @@ function isCurrentState(agent: AgentSummary, state: AgentCurrentState | null): b
   if (agent.status !== "online" || !state) return false;
   const age = Date.now() - Date.parse(state.observed_at);
   return Number.isFinite(age) && age >= -5_000 && age <= MAX_CURRENT_STATE_AGE_MS;
-}
-
-interface WorkspaceRoute {
-  agentId: string | null;
-  recordingId: string | null;
-}
-
-function routeFromHash(): WorkspaceRoute {
-  const recordingMatch = window.location.hash.match(
-    /^#agents\/([^/]+)\/recordings\/([^/]+)$/,
-  );
-  if (recordingMatch) {
-    return {
-      agentId: decodeURIComponent(recordingMatch[1]),
-      recordingId: decodeURIComponent(recordingMatch[2]),
-    };
-  }
-  const agentMatch = window.location.hash.match(/^#agents\/([^/]+)$/);
-  return {
-    agentId: agentMatch ? decodeURIComponent(agentMatch[1]) : null,
-    recordingId: null,
-  };
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -503,7 +482,9 @@ function AgentDetail({ agentId }: { agentId: string }) {
         fresh={isCurrentState(agent, state)}
       />
 
-      <RecordingPanel agent={agent} />
+      <a className="agent-diagnostics-link" href={diagnosticsAgentHash(agent.id)}>
+        Open collections and analyses for this Agent →
+      </a>
 
       <div className="agent-detail-grid">
         <section className="agent-panel">
@@ -594,13 +575,13 @@ function AgentDetail({ agentId }: { agentId: string }) {
 }
 
 export default function AgentWorkspace() {
-  const [route, setRoute] = useState<WorkspaceRoute>(() => routeFromHash());
+  const [route, setRoute] = useState(() => parseWorkspaceRoute(window.location.hash));
 
   useEffect(() => {
     if (!window.location.hash) {
       window.history.replaceState(null, "", "#agents");
     }
-    const handleHash = () => setRoute(routeFromHash());
+    const handleHash = () => setRoute(parseWorkspaceRoute(window.location.hash));
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
@@ -613,13 +594,16 @@ export default function AgentWorkspace() {
           <div><strong>Wi-Fi Experience</strong><span>Network assurance</span></div>
         </div>
         <nav aria-label="Primary navigation">
-          <button type="button" className="active" onClick={navigateToAgents}>Agents</button>
+          <button type="button" className={route.section === "agents" ? "active" : ""} onClick={navigateToAgents}>Agents</button>
+          <button type="button" className={route.section === "diagnostics" ? "active" : ""} onClick={() => { window.location.hash = "#diagnostics"; }}>Diagnostics</button>
         </nav>
       </header>
 
       <div className="agent-content">
-        {route.agentId && route.recordingId ? (
+        {route.section === "diagnostics" && route.agentId && route.recordingId ? (
           <RecordingDetail agentId={route.agentId} recordingId={route.recordingId} />
+        ) : route.section === "diagnostics" ? (
+          <DiagnosticsWorkspace agentId={route.agentId} />
         ) : route.agentId ? (
           <AgentDetail agentId={route.agentId} />
         ) : (

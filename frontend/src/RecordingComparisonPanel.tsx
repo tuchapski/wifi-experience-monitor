@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getLatestRecordingAnalysis } from "./agentApi";
 import type { DiagnosticRecording, RecordingAnalysis } from "./agentTypes";
+import { diagnosticsRecordingHash } from "./diagnosticRoutes";
 import "./RecordingComparisonPanel.css";
 
 type Comparison = {
@@ -30,7 +31,7 @@ function formatDelta(before: number | null | undefined, after: number | null | u
 }
 
 function openRecording(agentId: string, recordingId: string): void {
-  window.location.hash = `#agents/${encodeURIComponent(agentId)}/recordings/${encodeURIComponent(recordingId)}`;
+  window.location.hash = diagnosticsRecordingHash(agentId, recordingId);
 }
 
 export default function RecordingComparisonPanel({

@@ -9,6 +9,7 @@ import type {
   AgentSummary,
   DiagnosticRecording,
 } from "./agentTypes";
+import { diagnosticsRecordingHash } from "./diagnosticRoutes";
 import RecordingComparisonPanel from "./RecordingComparisonPanel";
 import "./RecordingPanel.css";
 
@@ -57,7 +58,7 @@ function syncClass(status: string): string {
 }
 
 function navigateToRecording(agentId: string, recordingId: string): void {
-  window.location.hash = `#agents/${encodeURIComponent(agentId)}/recordings/${encodeURIComponent(recordingId)}`;
+  window.location.hash = diagnosticsRecordingHash(agentId, recordingId);
 }
 
 export default function RecordingPanel({ agent }: { agent: AgentSummary }) {

@@ -13,6 +13,7 @@ import type {
   RecordingEvent,
   RecordingMetricPoint,
 } from "./agentTypes";
+import { diagnosticsAgentHash } from "./diagnosticRoutes";
 import RecordingAnalysisPanel from "./RecordingAnalysisPanel";
 import "./RecordingDetail.css";
 
@@ -32,8 +33,8 @@ const RECORDING_METRICS = [
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
-function backToAgent(agentId: string): void {
-  window.location.hash = `#agents/${encodeURIComponent(agentId)}`;
+function backToDiagnostics(agentId: string): void {
+  window.location.hash = diagnosticsAgentHash(agentId);
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -327,15 +328,15 @@ export default function RecordingDetail({
     return (
       <div className="agent-error" role="alert">
         {error ?? "Recording not found"}
-        <button type="button" onClick={() => backToAgent(agentId)}>Back to agent</button>
+        <button type="button" onClick={() => backToDiagnostics(agentId)}>Back to diagnostics</button>
       </div>
     );
   }
 
   return (
     <>
-      <button type="button" className="agent-back" onClick={() => backToAgent(agentId)}>
-        ← {agent?.name ?? "Agent"}
+      <button type="button" className="agent-back" onClick={() => backToDiagnostics(agentId)}>
+        ← Diagnostics · {agent?.name ?? "Agent"}
       </button>
 
       <section className="recording-detail-heading">

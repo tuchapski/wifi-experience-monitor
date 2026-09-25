@@ -580,3 +580,12 @@ dash; the panel also shows evidence and collection continuity, and flags
 differences in analysis engine, collection profile, site, location and duration.
 Numeric changes require the same analysis engine version on both recordings.
 The comparison describes observations and does not attribute their cause.
+
+## Agent and Diagnostics navigation
+
+The frontend now has separate Agents and Diagnostics sections. Agents shows live
+Wi-Fi state, recent telemetry, capabilities and Agent management. Diagnostics
+lets you choose an Agent and start, stop, review, compare and analyze its
+recordings. Recording detail links previously opened under `#agents/...` still
+resolve in Diagnostics. This navigation update does not change stored recordings
+or require a database migration.

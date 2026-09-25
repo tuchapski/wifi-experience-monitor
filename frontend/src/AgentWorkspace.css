@@ -58,6 +58,7 @@
 }
 
 .agent-appbar nav button.active { background: #edf3fc; color: #173f77; }
+.agent-appbar nav { display: flex; gap: 5px; }
 
 .agent-content {
   width: min(1440px, calc(100% - 48px));
@@ -259,6 +260,7 @@
 
 @media (max-width: 760px) {
   .agent-appbar { padding: 0 16px; }
+  .agent-appbar nav button { padding: 9px 8px; font-size: 12px; }
   .agent-content { width: min(100% - 28px, 1440px); padding-top: 24px; }
   .agent-page-heading, .agent-detail-heading, .agent-telemetry-toolbar { align-items: stretch; flex-direction: column; }
   .agent-heading-meta { align-items: flex-start; }

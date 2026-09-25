@@ -1,0 +1,53 @@
+.diagnostics-agent-picker {
+  display: grid;
+  width: min(340px, 100%);
+  gap: 6px;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostics-agent-picker select {
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid #d9e1eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #23344b;
+  font: inherit;
+  font-weight: 400;
+}
+
+.diagnostics-agent-picker select:focus {
+  border-color: #7ba3d2;
+  outline: 3px solid #e9f1fa;
+}
+
+.diagnostics-agent-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #657184;
+  font-size: 12px;
+}
+
+.diagnostics-agent-context a,
+.agent-diagnostics-link {
+  color: #245f9f;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.diagnostics-agent-context a:hover,
+.agent-diagnostics-link:hover {
+  text-decoration: underline;
+}
+
+.agent-diagnostics-link {
+  display: inline-block;
+  margin-top: 8px;
+  margin-bottom: 18px;
+  font-size: 12px;
+}
