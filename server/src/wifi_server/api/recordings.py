@@ -10,6 +10,7 @@ from wifi_server.db.recording_models import AgentCommand
 from wifi_server.dependencies import get_database, get_session
 from wifi_server.recording_schemas import (
     AgentCommandAckRequest,
+    DiagnosticEvidenceCorrelation,
     DiagnosticWindowComparison,
     RecordingBatchRequest,
     RecordingBatchResponse,
@@ -24,6 +25,7 @@ from wifi_server.recording_schemas import (
 from wifi_server.services.agents import authenticate_agent
 from wifi_server.services.analyses import ensure_recording_analysis
 from wifi_server.services.diagnostic_windows import compare_diagnostic_window
+from wifi_server.services.evidence_correlation import correlate_diagnostic_evidence
 from wifi_server.services.metric_overviews import get_metric_overviews
 from wifi_server.services.recordings import (
     acknowledge_command,
@@ -126,6 +128,30 @@ def recording_metric_comparison(
     if not metric or len(metric) > 20 or any(not item or len(item) > 128 for item in metric):
         raise HTTPException(status_code=422, detail="Select between 1 and 20 metric names")
     return compare_diagnostic_window(
+        session,
+        recording_id,
+        list(dict.fromkeys(metric)),
+        window_start,
+        window_end,
+        context_seconds,
+    )
+
+
+@router.get(
+    "/recordings/{recording_id}/evidence/correlate",
+    response_model=DiagnosticEvidenceCorrelation,
+)
+def recording_evidence_correlation(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    metric: Annotated[list[str], Query()],
+    window_start: Annotated[datetime, Query()],
+    window_end: Annotated[datetime, Query()],
+    context_seconds: Annotated[int, Query(ge=5, le=900)] = 30,
+) -> DiagnosticEvidenceCorrelation:
+    if not metric or len(metric) > 20 or any(not item or len(item) > 128 for item in metric):
+        raise HTTPException(status_code=422, detail="Select between 1 and 20 metric names")
+    return correlate_diagnostic_evidence(
         session,
         recording_id,
         list(dict.fromkeys(metric)),

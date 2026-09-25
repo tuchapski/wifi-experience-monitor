@@ -161,3 +161,21 @@ class DiagnosticWindowComparison(BaseModel):
     after_end: datetime
     metrics: list[DiagnosticMetricComparison]
     findings: list[DiagnosticFinding] = Field(default_factory=list)
+
+
+class CorrelatedRecordingEvent(BaseModel):
+    observed_at: datetime
+    event_type: str
+    severity: str
+    phase: Literal["before", "during", "after"]
+    distance_seconds: float = Field(ge=0)
+    seconds_from_window_start: float
+    data: dict[str, Any]
+
+
+class DiagnosticEvidenceCorrelation(BaseModel):
+    window_start: datetime
+    window_end: datetime
+    context_seconds: int
+    findings: list[DiagnosticFinding] = Field(default_factory=list)
+    events: list[CorrelatedRecordingEvent] = Field(default_factory=list)
