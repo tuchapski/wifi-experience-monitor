@@ -62,6 +62,7 @@ export default function ProjectRunOverview({
                 <strong>{agentName(item.agent_id)}</strong>
                 <span>{state}</span>
               </div>
+              <small className="project-run-position">Position: {item.location || "Not specified"}</small>
               {analysis ? (
                 <div className="project-run-analysis">
                   <div className="project-run-analysis-meta">

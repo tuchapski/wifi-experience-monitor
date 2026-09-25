@@ -648,3 +648,15 @@ lock to avoid duplicate automatic results. Diagnostics shows pending analyses
 until they become available; manual analysis remains an option. The recovery
 scan also covers completed recordings from before this update. No additional
 schema migration is required.
+
+## Agent positions in diagnostic projects
+
+When creating a project, you can optionally name a position for each selected
+Agent (such as a room or floor area). The project's default location applies
+to Agents without a specific position and to older projects. Each project run
+copies the effective position into its own recording, so the run overview and
+the standalone report retain the position used when that collection began.
+Positions identify coverage areas; analyses and reports remain per Agent.
+
+Run `cd server && alembic upgrade head` before starting the Server to add the
+nullable Agent position field to existing projects.
