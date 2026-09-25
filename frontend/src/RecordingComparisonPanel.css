@@ -1,0 +1,125 @@
+.recording-comparison {
+  padding: 20px 22px;
+  border-top: 1px solid #edf1f5;
+}
+
+.recording-comparison-heading h3 {
+  margin: 0 0 4px;
+  color: #2b3e56;
+  font-size: 14px;
+}
+
+.recording-comparison-heading p,
+.recording-comparison-context,
+.recording-comparison-message {
+  margin: 0;
+  color: #66788b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recording-comparison-selectors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.recording-comparison-selectors label {
+  display: grid;
+  gap: 5px;
+  color: #34475e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recording-comparison-selectors select {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #d9e1eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #23344b;
+  font: inherit;
+  font-weight: 400;
+}
+
+.recording-comparison-selectors select:focus {
+  border-color: #7ba3d2;
+  outline: 3px solid #e9f1fa;
+}
+
+.recording-comparison-message {
+  margin-top: 10px;
+}
+
+.recording-comparison-message button {
+  margin-right: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #245f9f;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recording-comparison-error {
+  color: #8f3029;
+  font-size: 12px;
+}
+
+.recording-comparison-table-wrap {
+  overflow-x: auto;
+}
+
+.recording-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #394c63;
+  font-size: 12px;
+}
+
+.recording-comparison-table th,
+.recording-comparison-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #edf1f5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.recording-comparison-table thead th {
+  background: #f9fbfd;
+  color: #66788b;
+}
+
+.recording-comparison-table tbody th {
+  min-width: 160px;
+  font-weight: 650;
+}
+
+.recording-comparison-table td {
+  min-width: 105px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-comparison-context {
+  margin-top: 12px;
+}
+
+.recording-comparison-context p {
+  margin: 5px 0;
+}
+
+.recording-comparison-context ul {
+  margin: 7px 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 760px) {
+  .recording-comparison-selectors {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -9,6 +9,7 @@ import type {
   AgentSummary,
   DiagnosticRecording,
 } from "./agentTypes";
+import RecordingComparisonPanel from "./RecordingComparisonPanel";
 import "./RecordingPanel.css";
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
@@ -376,6 +377,7 @@ export default function RecordingPanel({ agent }: { agent: AgentSummary }) {
           </table>
         </div>
       )}
+      <RecordingComparisonPanel key={agent.id} agentId={agent.id} recordings={recordings} />
     </section>
   );
 }

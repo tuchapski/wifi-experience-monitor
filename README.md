@@ -568,3 +568,15 @@ overlaps an interval, that interval shows no duration and explains why. Collecto
 errors during an interval also limit it. Previous findings and their severities
 are preserved. Older analyses remain readable; rerun analysis on a synchronized
 recording for the v7 intervals. No database migration is required for v7.
+
+## Comparing diagnostic recordings
+
+With two completed, synchronized recordings for the same Agent, choose a before
+and after recording in Recording history. The panel loads their latest analyses
+and shows RSSI average, TX retries P90, TX failures P90 and channel utilization
+P90 alongside the numeric change (after minus before). Run an analysis from
+each recording's detail page if one is missing. Missing measurements show a
+dash; the panel also shows evidence and collection continuity, and flags
+differences in analysis engine, collection profile, site, location and duration.
+Numeric changes require the same analysis engine version on both recordings.
+The comparison describes observations and does not attribute their cause.
