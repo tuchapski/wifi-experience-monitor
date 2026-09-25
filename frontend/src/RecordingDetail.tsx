@@ -4,6 +4,7 @@ import {
   getAgent,
   getRecording,
   getRecordingEvents,
+  getRecordingMetricComparison,
   getRecordingMetricOverviews,
   recordingReportUrl,
 } from "./agentApi";
@@ -11,6 +12,7 @@ import type {
   AnalysisDegradedWindow,
   AgentSummary,
   DiagnosticRecording,
+  DiagnosticWindowComparison,
   RecordingEvent,
   RecordingMetricOverview,
 } from "./agentTypes";
@@ -293,9 +295,15 @@ function InvestigationTimeline({
 function DiagnosticEvidencePanel({
   selectedWindow,
   events,
+  comparison,
+  comparisonLoading,
+  comparisonError,
 }: {
   selectedWindow: AnalysisDegradedWindow | null;
   events: RecordingEvent[];
+  comparison: DiagnosticWindowComparison | null;
+  comparisonLoading: boolean;
+  comparisonError: string | null;
 }) {
   if (selectedWindow === null) return null;
 
@@ -387,6 +395,47 @@ function DiagnosticEvidencePanel({
           )}
         </article>
 
+        <article className="recording-evidence-comparison">
+          <div className="recording-evidence-events-heading">
+            <h3>Before → during → after</h3>
+            <small>Raw observations · 30s context</small>
+          </div>
+          {comparisonLoading ? (
+            <p className="recording-evidence-empty">Loading raw metric comparison…</p>
+          ) : comparisonError ? (
+            <p className="recording-evidence-error">{comparisonError}</p>
+          ) : comparison === null ? (
+            <p className="recording-evidence-empty">Comparison is unavailable for this window.</p>
+          ) : (
+            <div className="recording-evidence-comparison-table">
+              <div className="recording-evidence-comparison-row comparison-header">
+                <strong>Metric</strong>
+                <strong>Before</strong>
+                <strong>During</strong>
+                <strong>After</strong>
+              </div>
+              {comparison.metrics.map((metric) => {
+                const definition = RECORDING_METRICS.find((item) => item.key === metric.metric);
+                const renderPhase = (phase: typeof metric.before) => {
+                  if (phase.sample_count === 0 || phase.average === null) return "No data";
+                  return `${formatNumber(phase.average, definition?.unit ?? "")} · n=${phase.sample_count}`;
+                };
+                return (
+                  <div className="recording-evidence-comparison-row" key={metric.metric}>
+                    <strong>{definition?.label ?? metric.metric}</strong>
+                    <span>{renderPhase(metric.before)}</span>
+                    <span>{renderPhase(metric.during)}</span>
+                    <span>{renderPhase(metric.after)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="recording-evidence-comparison-note">
+            Averages summarize raw samples in each phase. Missing observations remain missing; they are not treated as zero.
+          </p>
+        </article>
+
         <article className="recording-evidence-events">
           <div className="recording-evidence-events-heading">
             <h3>Nearby state changes</h3>
@@ -454,6 +503,10 @@ export default function RecordingDetail({
   const [degradedWindows, setDegradedWindows] = useState<AnalysisDegradedWindow[]>([]);
   const [selectedWindow, setSelectedWindow] =
     useState<AnalysisDegradedWindow | null>(null);
+  const [windowComparison, setWindowComparison] =
+    useState<DiagnosticWindowComparison | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
 
   const shouldPoll = recording === null
     || ACTIVE_STATUSES.has(recording.status)
@@ -567,6 +620,42 @@ export default function RecordingDetail({
     };
   }, [agentId, recordingId, shouldPoll]);
 
+  useEffect(() => {
+    let active = true;
+    if (selectedWindow === null) {
+      setWindowComparison(null);
+      setComparisonError(null);
+      setComparisonLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setComparisonLoading(true);
+    setComparisonError(null);
+    void getRecordingMetricComparison(
+      recordingId,
+      RECORDING_METRICS.map(({ key }) => key),
+      selectedWindow.started_at,
+      selectedWindow.ended_at,
+    ).then((result) => {
+      if (active) setWindowComparison(result);
+    }).catch((err: unknown) => {
+      if (active) {
+        setWindowComparison(null);
+        setComparisonError(
+          err instanceof Error ? err.message : "Unable to compare diagnostic window",
+        );
+      }
+    }).finally(() => {
+      if (active) setComparisonLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [recordingId, selectedWindow]);
+
   if (loading && !recording) {
     return <div className="agent-empty">Loading diagnostic recording…</div>;
   }
@@ -676,6 +765,9 @@ export default function RecordingDetail({
       <DiagnosticEvidencePanel
         selectedWindow={selectedWindow}
         events={events}
+        comparison={windowComparison}
+        comparisonLoading={comparisonLoading}
+        comparisonError={comparisonError}
       />
 
       <section

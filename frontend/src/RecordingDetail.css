@@ -829,3 +829,50 @@
     grid-template-columns: auto auto;
   }
 }
+
+
+.recording-evidence-comparison {
+  grid-column: 1 / -1;
+}
+
+.recording-evidence-comparison-table {
+  overflow-x: auto;
+}
+
+.recording-evidence-comparison-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.25fr) repeat(3, minmax(8rem, 1fr));
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 42rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--border-color, #dbe3ec);
+}
+
+.recording-evidence-comparison-row.comparison-header {
+  border-top: 0;
+  color: var(--muted-color, #64748b);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.recording-evidence-comparison-row span {
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-evidence-comparison-note {
+  margin: 0.75rem 0 0;
+  color: var(--muted-color, #64748b);
+  font-size: 0.78rem;
+}
+
+.recording-evidence-error {
+  margin: 0;
+  color: #b91c1c;
+}
+
+@media (max-width: 820px) {
+  .recording-evidence-comparison {
+    grid-column: auto;
+  }
+}

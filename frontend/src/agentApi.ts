@@ -3,6 +3,7 @@ import type {
   AgentSummary,
   CreateDiagnosticProjectInput,
   DiagnosticRecording,
+  DiagnosticWindowComparison,
   DiagnosticProject,
   DiagnosticProjectRun,
   RecordingEvent,
@@ -201,6 +202,24 @@ export function getRecordingMetricOverviews(
   for (const metric of metrics) params.append("metric", metric);
   return request<RecordingMetricOverview[]>(
     `/recordings/${encodeURIComponent(recordingId)}/metrics/overview?${params.toString()}`,
+  );
+}
+
+export function getRecordingMetricComparison(
+  recordingId: string,
+  metrics: string[],
+  windowStart: string,
+  windowEnd: string,
+  contextSeconds = 30,
+): Promise<DiagnosticWindowComparison> {
+  const params = new URLSearchParams({
+    window_start: windowStart,
+    window_end: windowEnd,
+    context_seconds: String(contextSeconds),
+  });
+  for (const metric of metrics) params.append("metric", metric);
+  return request<DiagnosticWindowComparison>(
+    `/recordings/${encodeURIComponent(recordingId)}/metrics/compare?${params.toString()}`,
   );
 }
 

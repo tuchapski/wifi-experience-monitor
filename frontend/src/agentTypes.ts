@@ -185,6 +185,29 @@ export interface RecordingMetricOverview {
   points: { observed_at: string; value: number }[];
 }
 
+export interface DiagnosticMetricStatistics {
+  sample_count: number;
+  minimum: number | null;
+  average: number | null;
+  maximum: number | null;
+}
+
+export interface DiagnosticMetricComparison {
+  metric: string;
+  before: DiagnosticMetricStatistics;
+  during: DiagnosticMetricStatistics;
+  after: DiagnosticMetricStatistics;
+}
+
+export interface DiagnosticWindowComparison {
+  window_start: string;
+  window_end: string;
+  context_seconds: number;
+  before_start: string;
+  after_end: string;
+  metrics: DiagnosticMetricComparison[];
+}
+
 export interface StartRecordingInput {
   name: string;
   description: string | null;
