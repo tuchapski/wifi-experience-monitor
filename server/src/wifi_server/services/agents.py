@@ -26,6 +26,7 @@ from wifi_server.schemas import (
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
     AgentResponse,
+    RenameAgentRequest,
     TelemetryBatchRequest,
     TelemetryBatchResponse,
     TelemetryPointResponse,
@@ -194,6 +195,21 @@ def get_agent(session: Session, settings: ServerSettings, agent_id: str) -> Agen
     agent = session.get(Agent, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+    return _agent_response(session, settings, agent, datetime.now(UTC))
+
+
+def rename_agent(
+    session: Session,
+    settings: ServerSettings,
+    agent_id: str,
+    request: RenameAgentRequest,
+) -> AgentResponse:
+    agent = session.get(Agent, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+    agent.name = request.name
+    agent.updated_at = datetime.now(UTC)
+    session.commit()
     return _agent_response(session, settings, agent, datetime.now(UTC))
 
 

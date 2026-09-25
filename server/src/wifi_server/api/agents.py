@@ -14,6 +14,7 @@ from wifi_server.schemas import (
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
     AgentResponse,
+    RenameAgentRequest,
     TelemetryBatchRequest,
     TelemetryBatchResponse,
     TelemetryPointResponse,
@@ -27,6 +28,7 @@ from wifi_server.services.agents import (
     ingest_telemetry_batch,
     list_agents,
     process_heartbeat,
+    rename_agent,
     update_current_state,
 )
 from wifi_server.services.recordings import get_pending_commands
@@ -142,3 +144,13 @@ def agent(
     settings: Annotated[ServerSettings, Depends(get_settings)],
 ) -> AgentResponse:
     return get_agent(session, settings, agent_id)
+
+
+@router.patch("/{agent_id}", response_model=AgentResponse)
+def update_agent_name(
+    agent_id: str,
+    payload: RenameAgentRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+) -> AgentResponse:
+    return rename_agent(session, settings, agent_id, payload)

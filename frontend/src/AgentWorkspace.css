@@ -163,6 +163,13 @@
 
 .agent-back { margin-bottom: 16px; padding: 0; border: 0; background: transparent; color: #456b9b; font: inherit; font-weight: 650; cursor: pointer; }
 .agent-title-line { display: flex; align-items: center; gap: 12px; }
+.agent-rename-trigger { padding: 5px 9px; border: 1px solid #dbe3ed; border-radius: 8px; background: #fff; color: #315f98; font: inherit; font-size: 12px; cursor: pointer; }
+.agent-rename-form { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.agent-rename-form label { display: flex; flex-direction: column; gap: 5px; color: #536174; font-size: 12px; font-weight: 650; }
+.agent-rename-form input { min-width: 220px; min-height: 35px; padding: 6px 9px; border: 1px solid #dbe3ed; border-radius: 7px; font: inherit; }
+.agent-rename-form button { min-height: 35px; padding: 6px 11px; border: 1px solid #dbe3ed; border-radius: 7px; background: #fff; color: #315f98; font: inherit; cursor: pointer; }
+.agent-rename-form button[type="submit"] { border-color: #245f9f; background: #245f9f; color: #fff; }
+.agent-rename-form button:disabled { opacity: 0.55; cursor: not-allowed; }
 .agent-heading-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .agent-heading-meta span, .agent-heading-meta small { color: #7a8798; font-size: 11px; }
 .agent-heading-meta strong { font-size: 17px; }

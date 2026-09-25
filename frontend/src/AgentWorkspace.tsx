@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
   getAgent,
   getAgents,
   getAgentState,
   getAgentTelemetry,
+  renameAgent,
 } from "./agentApi";
 import RecordingPanel from "./RecordingPanel";
 import RecordingDetail from "./RecordingDetail";
@@ -348,6 +349,10 @@ function LinkScorePanel({ score, fresh }: { score: LinkScore | null; fresh: bool
 
 function AgentDetail({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<AgentSummary | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [state, setState] = useState<AgentCurrentState | null>(null);
   const [telemetry, setTelemetry] = useState<Record<string, TelemetryPoint[]>>({});
   const [rangeHours, setRangeHours] = useState<number>(1);
@@ -419,6 +424,23 @@ function AgentDetail({ agentId }: { agentId: string }) {
     );
   }
 
+  async function saveName(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const normalized = nameInput.trim();
+    if (!normalized || savingName || !agent) return;
+    setSavingName(true);
+    setNameError(null);
+    try {
+      const updated = await renameAgent(agent.id, normalized);
+      setAgent(updated);
+      setEditingName(false);
+    } catch (err) {
+      setNameError(err instanceof Error ? err.message : "Unable to rename agent");
+    } finally {
+      setSavingName(false);
+    }
+  }
+
   const wifi = state?.wifi;
   const network = state?.network;
 
@@ -433,8 +455,30 @@ function AgentDetail({ agentId }: { agentId: string }) {
             <span className={`agent-status ${statusClass(agent.status)}`}>
               <i />{agent.status === "online" ? "Online" : "Offline"}
             </span>
+            {!editingName && (
+              <button type="button" className="agent-rename-trigger" onClick={() => {
+                setNameInput(agent.name);
+                setNameError(null);
+                setEditingName(true);
+              }}>Rename agent</button>
+            )}
           </div>
           <p>{agent.hostname} · {agent.agent_type} · Agent {agent.agent_version}</p>
+          {editingName && (
+            <form className="agent-rename-form" onSubmit={(event) => void saveName(event)}>
+              <label htmlFor="agent-display-name">Agent display name
+                <input id="agent-display-name" autoFocus maxLength={128} required value={nameInput}
+                  onChange={(event) => setNameInput(event.target.value)} disabled={savingName} />
+              </label>
+              <button type="submit" disabled={!nameInput.trim() || savingName}>
+                {savingName ? "Saving…" : "Save"}
+              </button>
+              <button type="button" disabled={savingName} onClick={() => {
+                setEditingName(false);
+                setNameError(null);
+              }}>Cancel</button>
+            </form>
+          )}
         </div>
         <div className="agent-heading-meta">
           <span>Last seen</span>
@@ -444,6 +488,7 @@ function AgentDetail({ agentId }: { agentId: string }) {
       </section>
 
       {error && <div className="agent-error" role="alert">{error}</div>}
+      {nameError && <div className="agent-error" role="alert">{nameError}</div>}
 
       <section className="agent-current-strip" aria-label="Current Wi-Fi summary">
         <article><span>SSID</span><strong>{wifi?.ssid ?? "—"}</strong><small>{wifi?.connected === false ? "Disconnected" : wifi?.bssid ?? "No BSSID"}</small></article>

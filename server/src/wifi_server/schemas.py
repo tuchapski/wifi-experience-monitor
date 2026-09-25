@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CapabilityPayload(BaseModel):
@@ -65,6 +65,18 @@ class AgentResponse(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     capabilities: list[AgentCapabilityResponse] = Field(default_factory=list)
+
+
+class RenameAgentRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, name: str) -> str:
+        name = name.strip()
+        if not name:
+            raise ValueError("Agent name cannot be blank")
+        return name
 
 
 class WifiCurrentStatePayload(BaseModel):

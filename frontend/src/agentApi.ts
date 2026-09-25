@@ -53,7 +53,7 @@ async function requestOptional<T>(path: string): Promise<T | null> {
 
 async function mutationRequest<T>(
   path: string,
-  method: "POST",
+  method: "POST" | "PATCH",
   body?: unknown,
 ): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {
@@ -87,6 +87,14 @@ export function getAgents(): Promise<AgentSummary[]> {
 
 export function getAgent(agentId: string): Promise<AgentSummary> {
   return request<AgentSummary>(`/agents/${encodeURIComponent(agentId)}`);
+}
+
+export function renameAgent(agentId: string, name: string): Promise<AgentSummary> {
+  return mutationRequest<AgentSummary>(
+    `/agents/${encodeURIComponent(agentId)}`,
+    "PATCH",
+    { name },
+  );
 }
 
 export function getAgentState(agentId: string): Promise<AgentCurrentState | null> {
