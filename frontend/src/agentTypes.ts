@@ -101,6 +101,43 @@ export interface AgentWithState {
   state: AgentCurrentState | null;
 }
 
+export interface CreateDiagnosticProjectInput {
+  name: string;
+  objective: string | null;
+  site: string | null;
+  location: string | null;
+  profile_id: string;
+  max_duration_minutes: number;
+  agent_ids: string[];
+}
+
+export interface DiagnosticProjectRecording {
+  agent_id: string;
+  recording_id: string | null;
+  status: string | null;
+  sync_status: string | null;
+}
+
+export interface DiagnosticProjectRun {
+  id: string;
+  project_id: string;
+  started_at: string;
+  recordings: DiagnosticProjectRecording[];
+}
+
+export interface DiagnosticProject {
+  id: string;
+  name: string;
+  objective: string | null;
+  site: string | null;
+  location: string | null;
+  profile_id: string;
+  max_duration_minutes: number;
+  agent_ids: string[];
+  created_at: string;
+  runs: DiagnosticProjectRun[];
+}
+
 export interface DiagnosticRecording {
   id: string;
   agent_id: string;

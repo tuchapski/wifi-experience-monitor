@@ -1,7 +1,10 @@
 import type {
   AgentCurrentState,
   AgentSummary,
+  CreateDiagnosticProjectInput,
   DiagnosticRecording,
+  DiagnosticProject,
+  DiagnosticProjectRun,
   RecordingEvent,
   RecordingAnalysis,
   RecordingMetricPoint,
@@ -83,6 +86,23 @@ async function mutationRequest<T>(
 
 export function getAgents(): Promise<AgentSummary[]> {
   return request<AgentSummary[]>("/agents");
+}
+
+export function getDiagnosticProjects(): Promise<DiagnosticProject[]> {
+  return request<DiagnosticProject[]>("/diagnostic-projects");
+}
+
+export function createDiagnosticProject(
+  input: CreateDiagnosticProjectInput,
+): Promise<DiagnosticProject> {
+  return mutationRequest<DiagnosticProject>("/diagnostic-projects", "POST", input);
+}
+
+export function startDiagnosticProjectRun(projectId: string): Promise<DiagnosticProjectRun> {
+  return mutationRequest<DiagnosticProjectRun>(
+    `/diagnostic-projects/${encodeURIComponent(projectId)}/runs`,
+    "POST",
+  );
 }
 
 export function getAgent(agentId: string): Promise<AgentSummary> {

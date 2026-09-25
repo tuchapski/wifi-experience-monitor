@@ -1,0 +1,192 @@
+.diagnostic-projects {
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.diagnostic-projects .agent-panel-heading p,
+.diagnostic-project-history p,
+.diagnostic-project-help {
+  margin: 5px 0 0;
+  color: #758194;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.diagnostic-project-form {
+  display: grid;
+  gap: 14px;
+  padding: 0 22px 22px;
+}
+
+.diagnostic-project-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.diagnostic-project-form label {
+  display: grid;
+  gap: 5px;
+  color: #394c63;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.diagnostic-project-form input:not([type="checkbox"]),
+.diagnostic-project-form textarea,
+.diagnostic-project-form select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d9e1eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #23344b;
+  font: inherit;
+  font-weight: 400;
+}
+
+.diagnostic-project-form textarea {
+  resize: vertical;
+}
+
+.diagnostic-project-form fieldset {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #d9e1eb;
+  border-radius: 9px;
+}
+
+.diagnostic-project-form legend {
+  padding: 0 5px;
+  color: #394c63;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostic-project-agent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diagnostic-project-agent-list label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid #e3e9f1;
+  border-radius: 7px;
+  background: #f9fbfd;
+}
+
+.diagnostic-project-agent-list small {
+  color: #758194;
+  font-weight: 400;
+}
+
+.diagnostic-project-actions,
+.diagnostic-project-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.diagnostic-project-actions small {
+  color: #758194;
+  font-size: 11px;
+}
+
+.diagnostic-project-actions button,
+.diagnostic-project-card button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #245f9f;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.diagnostic-project-actions button:disabled,
+.diagnostic-project-card button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.diagnostic-project-history {
+  padding: 16px 22px 22px;
+  border-top: 1px solid #edf1f5;
+}
+
+.diagnostic-project-history h3 {
+  margin: 0 0 12px;
+  color: #2b3e56;
+  font-size: 14px;
+}
+
+.diagnostic-project-card {
+  margin-top: 12px;
+  padding: 15px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.diagnostic-project-card strong,
+.diagnostic-project-card small {
+  display: block;
+}
+
+.diagnostic-project-card small {
+  margin-top: 5px;
+  color: #657184;
+  font-size: 11px;
+}
+
+.diagnostic-project-run {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e1e7ef;
+  color: #536174;
+  font-size: 12px;
+}
+
+.diagnostic-project-run ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.diagnostic-project-run li {
+  margin: 5px 0;
+}
+
+.diagnostic-project-run a {
+  margin-left: 10px;
+  color: #245f9f;
+  font-weight: 700;
+}
+
+.diagnostic-project-run .diagnostic-project-stop {
+  min-height: 28px;
+  margin-left: 10px;
+  padding: 4px 8px;
+  background: #a73b35;
+}
+
+@media (max-width: 760px) {
+  .diagnostic-project-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .diagnostic-project-actions,
+  .diagnostic-project-card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

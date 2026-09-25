@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getAgents } from "./agentApi";
 import type { AgentSummary } from "./agentTypes";
 import { diagnosticsAgentHash } from "./diagnosticRoutes";
+import DiagnosticProjectsPanel from "./DiagnosticProjectsPanel";
 import RecordingPanel from "./RecordingPanel";
 import "./DiagnosticsWorkspace.css";
 
@@ -45,10 +46,10 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         <div>
           <span className="agent-eyebrow">Diagnostics</span>
           <h1>Collections and analysis</h1>
-          <p>Select an Agent to capture evidence, review recordings and compare results.</p>
+          <p>Create a project with one or more Agents, or review an individual Agent's recordings.</p>
         </div>
         <label htmlFor="diagnostics-agent-picker" className="diagnostics-agent-picker">
-          Collection Agent
+          Direct recording Agent
           <select
             id="diagnostics-agent-picker"
             value={agentId ?? ""}
@@ -71,6 +72,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       </section>
 
       {error && <div className="agent-error" role="alert">{error}</div>}
+      {!loading && <DiagnosticProjectsPanel agents={agents} />}
       {loading ? (
         <div className="agent-empty">Loading collection Agents…</div>
       ) : agents.length === 0 ? (
@@ -89,7 +91,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       ) : agentId ? (
         <div className="agent-empty">This Agent is no longer available. Choose another Agent.</div>
       ) : (
-        <div className="agent-empty">Choose an Agent to start a collection or review its history.</div>
+        <div className="agent-empty">Choose an Agent to review individual recordings.</div>
       )}
     </>
   );

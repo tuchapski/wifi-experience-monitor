@@ -29,6 +29,8 @@ def create_recording(
     session: Session,
     agent_id: str,
     request: StartRecordingRequest,
+    *,
+    commit: bool = True,
 ) -> RecordingResponse:
     agent = session.get(Agent, agent_id)
     if agent is None:
@@ -82,7 +84,8 @@ def create_recording(
             now,
         )
     )
-    session.commit()
+    if commit:
+        session.commit()
     return _response(recording)
 
 

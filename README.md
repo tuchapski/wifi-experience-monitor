@@ -581,6 +581,24 @@ differences in analysis engine, collection profile, site, location and duration.
 Numeric changes require the same analysis engine version on both recordings.
 The comparison describes observations and does not attribute their cause.
 
+## Multi-Agent diagnostic projects
+
+In Diagnostics, create a project with an objective, optional site and location,
+a maximum capture duration, and one or more Agents. Starting a project run
+queues a separate recording for every selected Agent in a single Server
+transaction. If one Agent is offline or already recording, no command from the
+run is committed. Each Agent begins on its next heartbeat, so start times are
+not synchronized. The project lists every run with the live recording and sync
+status for each member; open an individual recording to inspect its analysis.
+You can stop an active member's recording from the project run; the other
+Agents continue until stopped or their own duration limit expires.
+The project groups per-Agent analyses; it does not yet calculate a cross-Agent
+assessment. The capture profile is currently `wifi-deep-dive`. Individual
+recordings remain available through the Agent picker in Diagnostics.
+
+Apply the Server schema migration before starting this version:
+`cd server && alembic upgrade head`. The Agent needs no schema change.
+
 ## Agent and Diagnostics navigation
 
 The frontend now has separate Agents and Diagnostics sections. Agents shows live

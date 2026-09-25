@@ -5,12 +5,14 @@ from fastapi import FastAPI
 
 from wifi_server.api.agents import router as agents_router
 from wifi_server.api.analyses import router as analyses_router
+from wifi_server.api.projects import router as projects_router
 from wifi_server.api.recordings import router as recordings_router
 
 app = FastAPI(title="Wi-Fi Experience Monitor Server", version="0.1.0")
 app.include_router(agents_router)
 app.include_router(recordings_router)
 app.include_router(analyses_router)
+app.include_router(projects_router)
 
 
 @app.get("/health")
