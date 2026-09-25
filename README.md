@@ -636,3 +636,15 @@ separates project runs from direct Agent recordings. Recording detail links
 previously opened under `#agents/...` still
 resolve in Diagnostics. This navigation update does not change stored recordings
 or require a database migration.
+
+## Automatic analysis recovery
+
+The Server checks for completed, fully synchronized recordings that have no
+analysis for the current engine version and dataset counts when it starts, and
+every 30 seconds afterward. It processes up to ten candidates per scan. A
+failed recording is logged and retried on a later scan without blocking the
+other recordings. Concurrent scans use the existing per-recording database
+lock to avoid duplicate automatic results. Diagnostics shows pending analyses
+until they become available; manual analysis remains an option. The recovery
+scan also covers completed recordings from before this update. No additional
+schema migration is required.

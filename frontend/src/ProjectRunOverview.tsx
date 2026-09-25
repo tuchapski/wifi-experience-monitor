@@ -92,7 +92,7 @@ export default function ProjectRunOverview({
               ) : (
                 <p className="project-run-waiting">
                   {state === "Analysis pending"
-                    ? "Analysis starts automatically after sync. Open the recording to run it manually if needed."
+                    ? "The Server retries pending analyses automatically. Open the recording to run it now."
                     : state === "Incomplete dataset"
                       ? "The recording cannot be analyzed until its dataset is complete."
                       : state === "Collection failed" || state === "Collection cancelled"

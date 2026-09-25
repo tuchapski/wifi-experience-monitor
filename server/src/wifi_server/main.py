@@ -1,4 +1,6 @@
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -8,8 +10,20 @@ from wifi_server.api.analyses import router as analyses_router
 from wifi_server.api.projects import router as projects_router
 from wifi_server.api.recordings import router as recordings_router
 from wifi_server.api.reports import router as reports_router
+from wifi_server.services.analysis_recovery import start_analysis_recovery
 
-app = FastAPI(title="Wi-Fi Experience Monitor Server", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    stop, thread = start_analysis_recovery()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=5)
+
+
+app = FastAPI(title="Wi-Fi Experience Monitor Server", version="0.1.0", lifespan=lifespan)
 app.include_router(agents_router)
 app.include_router(recordings_router)
 app.include_router(analyses_router)

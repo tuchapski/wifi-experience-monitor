@@ -131,8 +131,8 @@ export default function RecordingAnalysisPanel({
         <div className="recording-analysis-empty">Loading latest analysis…</div>
       ) : analysis === null ? (
         <div className="recording-analysis-empty">
-          <strong>Waiting for automatic analysis.</strong>
-          <span>If this is an older recording, use Run analysis to generate findings.</span>
+          <strong>Automatic analysis pending.</strong>
+          <span>The Server retries pending analyses after interruptions. You can also run it now.</span>
         </div>
       ) : (
         <>
