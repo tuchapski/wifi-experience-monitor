@@ -2,6 +2,7 @@ import type {
   AgentCurrentState,
   AgentSummary,
   CreateDiagnosticProjectInput,
+  DiagnosticEvidenceCorrelation,
   DiagnosticRecording,
   DiagnosticWindowComparison,
   DiagnosticProject,
@@ -220,6 +221,24 @@ export function getRecordingMetricComparison(
   for (const metric of metrics) params.append("metric", metric);
   return request<DiagnosticWindowComparison>(
     `/recordings/${encodeURIComponent(recordingId)}/metrics/compare?${params.toString()}`,
+  );
+}
+
+export function getRecordingEvidenceCorrelation(
+  recordingId: string,
+  metrics: string[],
+  windowStart: string,
+  windowEnd: string,
+  contextSeconds = 30,
+): Promise<DiagnosticEvidenceCorrelation> {
+  const params = new URLSearchParams({
+    window_start: windowStart,
+    window_end: windowEnd,
+    context_seconds: String(contextSeconds),
+  });
+  for (const metric of metrics) params.append("metric", metric);
+  return request<DiagnosticEvidenceCorrelation>(
+    `/recordings/${encodeURIComponent(recordingId)}/evidence/correlate?${params.toString()}`,
   );
 }
 

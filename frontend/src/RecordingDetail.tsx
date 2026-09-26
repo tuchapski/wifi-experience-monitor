@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getAgent,
   getRecording,
+  getRecordingEvidenceCorrelation,
   getRecordingEvents,
   getRecordingMetricComparison,
   getRecordingMetricOverviews,
@@ -11,6 +12,7 @@ import {
 import type {
   AnalysisDegradedWindow,
   AgentSummary,
+  DiagnosticEvidenceCorrelation,
   DiagnosticRecording,
   DiagnosticWindowComparison,
   RecordingEvent,
@@ -294,28 +296,21 @@ function InvestigationTimeline({
 
 function DiagnosticEvidencePanel({
   selectedWindow,
-  events,
   comparison,
+  correlation,
   comparisonLoading,
   comparisonError,
 }: {
   selectedWindow: AnalysisDegradedWindow | null;
-  events: RecordingEvent[];
   comparison: DiagnosticWindowComparison | null;
+  correlation: DiagnosticEvidenceCorrelation | null;
   comparisonLoading: boolean;
   comparisonError: string | null;
 }) {
   if (selectedWindow === null) return null;
 
-  const startedAt = Date.parse(selectedWindow.started_at);
-  const endedAt = Date.parse(selectedWindow.ended_at);
-  const contextPaddingMs = 30_000;
-  const contextualEvents = events.filter((event) => {
-    const observedAt = Date.parse(event.observed_at);
-    return Number.isFinite(observedAt)
-      && observedAt >= startedAt - contextPaddingMs
-      && observedAt <= endedAt + contextPaddingMs;
-  });
+  const correlatedEvents = correlation?.events ?? [];
+  const findings = correlation?.findings ?? comparison?.findings ?? [];
   const metrics = [
     { label: "Minimum RSSI", value: selectedWindow.minimum_rssi_dbm, unit: "dBm" },
     {
@@ -436,38 +431,74 @@ function DiagnosticEvidencePanel({
           </p>
         </article>
 
-        <article className="recording-evidence-events">
+        <article className="recording-evidence-findings">
           <div className="recording-evidence-events-heading">
-            <h3>Nearby state changes</h3>
-            <small>30s before → 30s after</small>
+            <h3>Quantitative findings</h3>
+            <small>Threshold-qualified changes</small>
           </div>
-          {contextualEvents.length === 0 ? (
-            <p className="recording-evidence-empty">No state changes were observed near this window.</p>
+          {comparisonLoading ? (
+            <p className="recording-evidence-empty">Evaluating diagnostic findings…</p>
+          ) : findings.length === 0 ? (
+            <p className="recording-evidence-empty">
+              No metric change exceeded the diagnostic thresholds for this window.
+            </p>
           ) : (
-            <div className="recording-evidence-event-list">
-              {contextualEvents.map((event, index) => {
-                const detail = eventDescription(event);
-                const observedAt = Date.parse(event.observed_at);
-                const phase = observedAt < startedAt
-                  ? "before"
-                  : observedAt > endedAt
-                    ? "after"
-                    : "during";
+            <div className="recording-evidence-finding-list">
+              {findings.map((finding) => {
+                const definition = RECORDING_METRICS.find((item) => item.key === finding.metric);
+                const unit = definition?.unit ?? "";
                 return (
-                  <div key={`${event.observed_at}-${event.event_type}-${index}`}>
-                    <time>{formatClock(event.observed_at)}</time>
-                    <span className={`recording-evidence-phase phase-${phase}`}>{phase}</span>
-                    <strong>{detail.metric}</strong>
+                  <div key={finding.metric}>
+                    <strong>{definition?.label ?? finding.metric}</strong>
                     <span>
-                      {event.event_type === "state.initial"
-                        ? detail.current
-                        : `${detail.previous} → ${detail.current}`}
+                      {formatNumber(finding.baseline, unit)} → {formatNumber(finding.during, unit)}
+                    </span>
+                    <span className="recording-evidence-delta">
+                      Δ {finding.delta > 0 ? "+" : ""}{finding.delta.toFixed(1)} {unit}
+                    </span>
+                    <span className="recording-evidence-recovery">
+                      {finding.recovery.replaceAll("_", " ")}
                     </span>
                   </div>
                 );
               })}
             </div>
           )}
+        </article>
+
+        <article className="recording-evidence-events">
+          <div className="recording-evidence-events-heading">
+            <h3>Temporally correlated state changes</h3>
+            <small>{correlation?.context_seconds ?? 30}s context · state.changed only</small>
+          </div>
+          {comparisonLoading ? (
+            <p className="recording-evidence-empty">Correlating state changes…</p>
+          ) : correlatedEvents.length === 0 ? (
+            <p className="recording-evidence-empty">No state changes were observed near this window.</p>
+          ) : (
+            <div className="recording-evidence-event-list">
+              {correlatedEvents.map((event, index) => {
+                const metric = renderStateValue(event.data.metric);
+                const previous = renderStateValue(event.data.previous);
+                const current = renderStateValue(event.data.current);
+                const offset = event.seconds_from_window_start;
+                const offsetLabel = `${offset >= 0 ? "+" : ""}${offset.toFixed(1)}s`;
+                return (
+                  <div key={`${event.observed_at}-${event.event_type}-${index}`}>
+                    <time title={formatDate(event.observed_at)}>{offsetLabel}</time>
+                    <span className={`recording-evidence-phase phase-${event.phase}`}>
+                      {event.phase}
+                    </span>
+                    <strong>{metric}</strong>
+                    <span>{previous} → {current}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="recording-evidence-comparison-note">
+            These events are temporally adjacent evidence. Their proximity does not establish causality.
+          </p>
         </article>
       </div>
     </section>
@@ -505,6 +536,8 @@ export default function RecordingDetail({
     useState<AnalysisDegradedWindow | null>(null);
   const [windowComparison, setWindowComparison] =
     useState<DiagnosticWindowComparison | null>(null);
+  const [evidenceCorrelation, setEvidenceCorrelation] =
+    useState<DiagnosticEvidenceCorrelation | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
@@ -624,6 +657,7 @@ export default function RecordingDetail({
     let active = true;
     if (selectedWindow === null) {
       setWindowComparison(null);
+      setEvidenceCorrelation(null);
       setComparisonError(null);
       setComparisonLoading(false);
       return () => {
@@ -633,18 +667,31 @@ export default function RecordingDetail({
 
     setComparisonLoading(true);
     setComparisonError(null);
-    void getRecordingMetricComparison(
-      recordingId,
-      RECORDING_METRICS.map(({ key }) => key),
-      selectedWindow.started_at,
-      selectedWindow.ended_at,
-    ).then((result) => {
-      if (active) setWindowComparison(result);
+    const metrics = RECORDING_METRICS.map(({ key }) => key);
+    void Promise.all([
+      getRecordingMetricComparison(
+        recordingId,
+        metrics,
+        selectedWindow.started_at,
+        selectedWindow.ended_at,
+      ),
+      getRecordingEvidenceCorrelation(
+        recordingId,
+        metrics,
+        selectedWindow.started_at,
+        selectedWindow.ended_at,
+      ),
+    ]).then(([comparisonResult, correlationResult]) => {
+      if (active) {
+        setWindowComparison(comparisonResult);
+        setEvidenceCorrelation(correlationResult);
+      }
     }).catch((err: unknown) => {
       if (active) {
         setWindowComparison(null);
+        setEvidenceCorrelation(null);
         setComparisonError(
-          err instanceof Error ? err.message : "Unable to compare diagnostic window",
+          err instanceof Error ? err.message : "Unable to load diagnostic evidence",
         );
       }
     }).finally(() => {
@@ -764,8 +811,8 @@ export default function RecordingDetail({
 
       <DiagnosticEvidencePanel
         selectedWindow={selectedWindow}
-        events={events}
         comparison={windowComparison}
+        correlation={evidenceCorrelation}
         comparisonLoading={comparisonLoading}
         comparisonError={comparisonError}
       />

@@ -199,6 +199,16 @@ export interface DiagnosticMetricComparison {
   after: DiagnosticMetricStatistics;
 }
 
+export interface DiagnosticFinding {
+  metric: string;
+  direction: string;
+  baseline: number;
+  during: number;
+  delta: number;
+  after: number | null;
+  recovery: string;
+}
+
 export interface DiagnosticWindowComparison {
   window_start: string;
   window_end: string;
@@ -206,6 +216,25 @@ export interface DiagnosticWindowComparison {
   before_start: string;
   after_end: string;
   metrics: DiagnosticMetricComparison[];
+  findings: DiagnosticFinding[];
+}
+
+export interface CorrelatedRecordingEvent {
+  observed_at: string;
+  event_type: string;
+  severity: string;
+  phase: "before" | "during" | "after";
+  distance_seconds: number;
+  seconds_from_window_start: number;
+  data: Record<string, unknown>;
+}
+
+export interface DiagnosticEvidenceCorrelation {
+  window_start: string;
+  window_end: string;
+  context_seconds: number;
+  findings: DiagnosticFinding[];
+  events: CorrelatedRecordingEvent[];
 }
 
 export interface StartRecordingInput {
