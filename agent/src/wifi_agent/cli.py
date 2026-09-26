@@ -14,6 +14,7 @@ from wifi_agent.config import AgentSettings
 from wifi_agent.processors import CurrentStateSnapshot, TelemetryAggregator
 from wifi_agent.recording import RecordingController
 from wifi_agent.runtime import CurrentStateRuntime, TelemetrySyncEngine
+from wifi_agent.runtime.synthetic import SyntheticProbeRuntime
 from wifi_agent.storage import AgentIdentity, AgentIdentityStore, TelemetrySpool
 from wifi_agent.system_info import collect_system_info
 
@@ -150,16 +151,37 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     aggregator = TelemetryAggregator(settings.telemetry_window_seconds)
     sync_engine = TelemetrySyncEngine(settings, identity, spool)
     recording_controller = RecordingController(settings, identity, _database_path(settings))
+    probe_runtime = (
+        SyntheticProbeRuntime(
+            interface,
+            dns_query=settings.dns_probe_query,
+            internet_target=settings.internet_probe_target,
+            https_url=settings.https_probe_url,
+            timeout_seconds=settings.synthetic_probe_timeout_seconds,
+        )
+        if interface
+        else None
+    )
+    pending_probe_observations = []
+    pending_probe_errors: list[str] = []
+    last_gateway: str | None = None
 
     LOGGER.info("agent started agent_id=%s server=%s", identity.agent_id, settings.server_url)
     next_heartbeat = 0.0
     next_collection = 0.0
     next_state = 0.0
     next_sync = 0.0
+    next_probe = 0.0
 
     while True:
         recording_controller.stop_if_due()
         now = time.monotonic()
+        if probe_runtime is not None:
+            probe_batch = probe_runtime.poll()
+            if probe_batch is not None:
+                pending_probe_observations.extend(probe_batch.observations)
+                pending_probe_errors.extend(probe_batch.errors)
+
         if now >= next_heartbeat:
             try:
                 heartbeat = _heartbeat(
@@ -174,11 +196,20 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
 
         if runtime is not None and now >= next_collection:
             cycle = runtime.collect_cycle()
-            aggregator.consume(cycle.observations)
+            gateway = cycle.snapshot.network.get("gateway")
+            last_gateway = gateway if isinstance(gateway, str) else None
+            observations = [*cycle.observations, *pending_probe_observations]
+            collector_errors = [
+                *cycle.snapshot.collector_errors,
+                *pending_probe_errors,
+            ]
+            pending_probe_observations.clear()
+            pending_probe_errors.clear()
+            aggregator.consume(observations)
             recording_controller.consume(
-                cycle.observations,
+                observations,
                 observed_at=cycle.snapshot.observed_at,
-                collector_errors=cycle.snapshot.collector_errors,
+                collector_errors=collector_errors,
             )
 
             if now >= next_state:
@@ -199,6 +230,14 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
                 )
             next_collection = now + settings.telemetry_sample_interval_seconds
 
+        if (
+            probe_runtime is not None
+            and not probe_runtime.running
+            and now >= next_probe
+            and probe_runtime.start(last_gateway)
+        ):
+            next_probe = now + settings.synthetic_probe_interval_seconds
+
         if now >= next_sync:
             synced = sync_engine.sync_pending()
             if synced:
@@ -211,6 +250,8 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         due = [next_heartbeat, next_sync]
         if runtime is not None:
             due.extend([next_collection, next_state])
+        if probe_runtime is not None and not probe_runtime.running:
+            due.append(next_probe)
         time.sleep(max(0.1, min(1.0, min(due) - time.monotonic())))
 
 

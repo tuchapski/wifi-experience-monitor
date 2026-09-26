@@ -12,6 +12,18 @@ DEFAULT_TELEMETRY_METRICS = frozenset(
         "wifi.snr_db",
         "wifi.tx_rate_mbps",
         "wifi.rx_rate_mbps",
+        "network.gateway_latency_ms",
+        "network.gateway_packet_loss_percent",
+        "network.gateway_jitter_ms",
+        "network.dns_latency_ms",
+        "network.internet_latency_ms",
+        "network.internet_packet_loss_percent",
+        "network.internet_jitter_ms",
+        "network.https_dns_ms",
+        "network.https_tcp_connect_ms",
+        "network.https_tls_handshake_ms",
+        "network.https_ttfb_ms",
+        "network.https_total_ms",
     }
 )
 
