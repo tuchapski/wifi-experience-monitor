@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { getAgentRecordings, getAgents } from "./agentApi";
+import { deleteRecording, getAgentRecordings, getAgents } from "./agentApi";
 import type { AgentSummary, DiagnosticRecording } from "./agentTypes";
 import { diagnosticsRecordingHash } from "./diagnosticRoutes";
 import DiagnosticCollectionLauncher from "./DiagnosticCollectionLauncher";
@@ -15,6 +15,9 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "Failed",
   cancelled: "Cancelled",
 };
+
+const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
+const DATASETS_PER_PAGE = 15;
 
 interface IndividualDataset {
   agent: AgentSummary;
@@ -37,8 +40,17 @@ function formatDuration(start: string | null, end: string | null): string {
   return `${seconds}s`;
 }
 
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+    </svg>
+  );
+}
+
 export default function DiagnosticsWorkspace({ agentId }: { agentId: string | null }) {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
+  const agentsRef = useRef<AgentSummary[]>([]);
   const [datasets, setDatasets] = useState<IndividualDataset[]>([]);
   const [recordingsByAgent, setRecordingsByAgent] = useState<Record<string, DiagnosticRecording[]>>({});
   const [loading, setLoading] = useState(true);
@@ -49,10 +61,22 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const [datasetAgentFilter, setDatasetAgentFilter] = useState(agentId ?? "");
   const [datasetStatusFilter, setDatasetStatusFilter] = useState("");
   const [datasetSearch, setDatasetSearch] = useState("");
+  const [datasetPage, setDatasetPage] = useState(1);
+  const [selectedDatasetIds, setSelectedDatasetIds] = useState<Set<string>>(new Set());
+  const [deletingDatasets, setDeletingDatasets] = useState(false);
+  const [launcherOpen, setLauncherOpen] = useState(Boolean(agentId));
 
   useEffect(() => {
-    if (agentId) setDatasetAgentFilter(agentId);
+    if (agentId) {
+      setDatasetAgentFilter(agentId);
+      setLauncherOpen(true);
+    }
   }, [agentId]);
+
+  useEffect(() => {
+    setDatasetPage(1);
+    setSelectedDatasetIds(new Set());
+  }, [datasetAgentFilter, datasetSearch, datasetStatusFilter, datasetView]);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +84,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       try {
         const data = await getAgents();
         if (active) {
+          agentsRef.current = data;
           setAgents(data);
           setLoading(false);
           setError(null);
@@ -80,10 +105,18 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     };
   }, []);
 
+  const agentIdsKey = useMemo(
+    () => agents.map((agent) => agent.id).sort().join("|"),
+    [agents],
+  );
+
   useEffect(() => {
+    if (loading) return;
+
     let active = true;
     async function refreshDatasets(): Promise<void> {
-      if (agents.length === 0) {
+      const currentAgents = agentsRef.current;
+      if (currentAgents.length === 0) {
         setDatasets([]);
         setRecordingsByAgent({});
         setDatasetsLoading(false);
@@ -91,7 +124,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       }
       try {
         const results = await Promise.allSettled(
-          agents.map(async (agent) => ({ agent, recordings: await getAgentRecordings(agent.id) })),
+          currentAgents.map(async (agent) => ({ agent, recordings: await getAgentRecordings(agent.id) })),
         );
         if (!active) return;
         const recordingMap: Record<string, DiagnosticRecording[]> = {};
@@ -116,14 +149,13 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       }
     }
 
-    setDatasetsLoading(true);
     void refreshDatasets();
     const timer = window.setInterval(() => void refreshDatasets(), 5000);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [agents]);
+  }, [agentIdsKey, loading]);
 
   const statuses = useMemo(
     () => [...new Set(datasets.map(({ recording }) => recording.status))].sort(),
@@ -146,6 +178,16 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         - Date.parse(left.recording.started_at ?? left.recording.created_at));
   }, [datasetAgentFilter, datasetSearch, datasetStatusFilter, datasets]);
 
+  const pageCount = Math.max(1, Math.ceil(filteredDatasets.length / DATASETS_PER_PAGE));
+  const currentPage = Math.min(datasetPage, pageCount);
+  const pageStart = (currentPage - 1) * DATASETS_PER_PAGE;
+  const paginatedDatasets = filteredDatasets.slice(pageStart, pageStart + DATASETS_PER_PAGE);
+  const selectablePageIds = paginatedDatasets
+    .filter(({ recording }) => !ACTIVE_STATUSES.has(recording.status))
+    .map(({ recording }) => recording.id);
+  const allPageSelected = selectablePageIds.length > 0
+    && selectablePageIds.every((id) => selectedDatasetIds.has(id));
+
   function handleCollectionStarted(agent: AgentSummary, recording: DiagnosticRecording): void {
     setRecordingsByAgent((current) => ({
       ...current,
@@ -160,6 +202,78 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         ...current.filter((item) => item.recording.id !== recording.id),
       ]);
     }
+    setLauncherOpen(false);
+  }
+
+  function toggleDatasetSelection(recordingId: string): void {
+    setSelectedDatasetIds((current) => {
+      const next = new Set(current);
+      if (next.has(recordingId)) next.delete(recordingId);
+      else next.add(recordingId);
+      return next;
+    });
+  }
+
+  function togglePageSelection(): void {
+    setSelectedDatasetIds((current) => {
+      const next = new Set(current);
+      if (allPageSelected) selectablePageIds.forEach((id) => next.delete(id));
+      else selectablePageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function removeDatasets(recordingIds: string[]): Promise<void> {
+    if (recordingIds.length === 0 || deletingDatasets) return;
+    setDeletingDatasets(true);
+    setDatasetError(null);
+    const results = await Promise.allSettled(recordingIds.map((id) => deleteRecording(id)));
+    const deletedIds = new Set(
+      recordingIds.filter((_, index) => results[index]?.status === "fulfilled"),
+    );
+    const failedCount = results.length - deletedIds.size;
+
+    if (deletedIds.size > 0) {
+      setDatasets((current) => current.filter(({ recording }) => !deletedIds.has(recording.id)));
+      setRecordingsByAgent((current) => Object.fromEntries(
+        Object.entries(current).map(([id, recordings]) => [
+          id,
+          recordings.filter((recording) => !deletedIds.has(recording.id)),
+        ]),
+      ));
+      setSelectedDatasetIds((current) => {
+        const next = new Set(current);
+        deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+
+    if (failedCount > 0) {
+      const firstFailure = results.find((result) => result.status === "rejected");
+      setDatasetError(
+        firstFailure?.status === "rejected" && firstFailure.reason instanceof Error
+          ? `${failedCount} dataset${failedCount === 1 ? "" : "s"} could not be deleted: ${firstFailure.reason.message}`
+          : `${failedCount} dataset${failedCount === 1 ? "" : "s"} could not be deleted.`,
+      );
+    }
+    setDeletingDatasets(false);
+  }
+
+  function confirmSingleDelete(recording: DiagnosticRecording): void {
+    if (ACTIVE_STATUSES.has(recording.status)) return;
+    if (!window.confirm(
+      `Delete dataset "${recording.name}"?\n\nThis permanently removes its metrics, events and analysis data.`,
+    )) return;
+    void removeDatasets([recording.id]);
+  }
+
+  function confirmBulkDelete(): void {
+    const ids = [...selectedDatasetIds];
+    if (ids.length === 0) return;
+    if (!window.confirm(
+      `Delete ${ids.length} selected dataset${ids.length === 1 ? "" : "s"}?\n\nThis action is permanent.`,
+    )) return;
+    void removeDatasets(ids);
   }
 
   return (
@@ -170,9 +284,27 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
           <h1>Datasets and analysis</h1>
           <p>Investigate captured evidence and start an individual collection when needed.</p>
         </div>
+        <button
+          type="button"
+          className={`diagnostics-launcher-toggle${launcherOpen ? " active" : ""}`}
+          aria-expanded={launcherOpen}
+          onClick={() => setLauncherOpen((current) => !current)}
+        >
+          {launcherOpen ? "Close collection form" : "Start collection"}
+        </button>
       </section>
 
       {error && <div className="agent-error" role="alert">{error}</div>}
+
+      {launcherOpen && (
+        <DiagnosticCollectionLauncher
+          agents={agents}
+          recordingsByAgent={recordingsByAgent}
+          initialAgentId={agentId}
+          loading={loading}
+          onStarted={handleCollectionStarted}
+        />
+      )}
 
       <section className="diagnostics-datasets" aria-labelledby="datasets-title">
         <div className="diagnostics-datasets-heading">
@@ -216,42 +348,98 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                   placeholder="Name, site, location or Agent" />
               </label>
             </div>
+            {selectedDatasetIds.size > 0 && (
+              <div className="diagnostics-bulk-actions">
+                <span>{selectedDatasetIds.size} selected</span>
+                <div>
+                  <button type="button" onClick={() => setSelectedDatasetIds(new Set())} disabled={deletingDatasets}>
+                    Clear selection
+                  </button>
+                  <button type="button" className="danger" onClick={confirmBulkDelete} disabled={deletingDatasets}>
+                    {deletingDatasets ? "Deleting…" : "Delete selected"}
+                  </button>
+                </div>
+              </div>
+            )}
             {datasetError && <div className="diagnostics-error" role="alert">{datasetError}</div>}
             {datasetsLoading ? (
               <div className="agent-empty">Loading individual datasets…</div>
             ) : filteredDatasets.length === 0 ? (
               <div className="agent-empty">No individual datasets match the current filters.</div>
             ) : (
-              <div className="diagnostics-dataset-table-wrap">
-                <table className="diagnostics-dataset-table">
-                  <thead><tr><th>Dataset</th><th>Agent</th><th>Status</th><th>Started</th><th>Duration</th><th>Evidence</th><th /></tr></thead>
-                  <tbody>{filteredDatasets.map(({ agent, recording }) => (
-                    <tr key={recording.id}>
-                      <td><strong>{recording.name}</strong>{(recording.site || recording.location) && <small>{[recording.site, recording.location].filter(Boolean).join(" · ")}</small>}</td>
-                      <td><strong>{agent.name}</strong><small>{agent.hostname}</small></td>
-                      <td><span className={`diagnostics-status diagnostics-status-${recording.status}`}>{STATUS_LABELS[recording.status] ?? recording.status}</span></td>
-                      <td>{formatDate(recording.started_at ?? recording.created_at)}</td>
-                      <td>{formatDuration(recording.started_at, recording.ended_at)}</td>
-                      <td>{recording.metrics_count.toLocaleString()} metrics · {recording.events_count.toLocaleString()} events</td>
-                      <td>{recording.status === "completed" && recording.sync_status === "complete" && (
-                        <button type="button" onClick={() => { window.location.hash = diagnosticsRecordingHash(agent.id, recording.id); }}>View analysis</button>
-                      )}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
+              <>
+                <div className="diagnostics-dataset-table-wrap">
+                  <table className="diagnostics-dataset-table">
+                    <thead>
+                      <tr>
+                        <th className="diagnostics-select-column">
+                          <input
+                            type="checkbox"
+                            aria-label="Select datasets on this page"
+                            checked={allPageSelected}
+                            disabled={selectablePageIds.length === 0 || deletingDatasets}
+                            onChange={togglePageSelection}
+                          />
+                        </th>
+                        <th>Dataset</th><th>Agent</th><th>Status</th><th>Started</th><th>Duration</th><th>Evidence</th><th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>{paginatedDatasets.map(({ agent, recording }) => {
+                      const active = ACTIVE_STATUSES.has(recording.status);
+                      return (
+                        <tr key={recording.id}>
+                          <td className="diagnostics-select-column">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${recording.name}`}
+                              checked={selectedDatasetIds.has(recording.id)}
+                              disabled={active || deletingDatasets}
+                              onChange={() => toggleDatasetSelection(recording.id)}
+                            />
+                          </td>
+                          <td><strong>{recording.name}</strong>{(recording.site || recording.location) && <small>{[recording.site, recording.location].filter(Boolean).join(" · ")}</small>}</td>
+                          <td><strong>{agent.name}</strong><small>{agent.hostname}</small></td>
+                          <td><span className={`diagnostics-status diagnostics-status-${recording.status}`}>{STATUS_LABELS[recording.status] ?? recording.status}</span></td>
+                          <td>{formatDate(recording.started_at ?? recording.created_at)}</td>
+                          <td>{formatDuration(recording.started_at, recording.ended_at)}</td>
+                          <td>{recording.metrics_count.toLocaleString()} metrics · {recording.events_count.toLocaleString()} events</td>
+                          <td>
+                            <div className="diagnostics-row-actions">
+                              {recording.status === "completed" && recording.sync_status === "complete" && (
+                                <button type="button" onClick={() => { window.location.hash = diagnosticsRecordingHash(agent.id, recording.id); }}>View analysis</button>
+                              )}
+                              <button
+                                type="button"
+                                className="diagnostics-delete-button"
+                                aria-label={`Delete ${recording.name}`}
+                                title={active ? "Active collections cannot be deleted" : "Delete dataset"}
+                                disabled={active || deletingDatasets}
+                                onClick={() => confirmSingleDelete(recording)}
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table>
+                </div>
+                <div className="diagnostics-pagination">
+                  <span>
+                    Showing {pageStart + 1}–{Math.min(pageStart + DATASETS_PER_PAGE, filteredDatasets.length)} of {filteredDatasets.length}
+                  </span>
+                  <div>
+                    <button type="button" disabled={currentPage <= 1} onClick={() => setDatasetPage(currentPage - 1)}>Previous</button>
+                    <span>Page {currentPage} of {pageCount}</span>
+                    <button type="button" disabled={currentPage >= pageCount} onClick={() => setDatasetPage(currentPage + 1)}>Next</button>
+                  </div>
+                </div>
+              </>
             )}
           </>
         )}
       </section>
-
-      <DiagnosticCollectionLauncher
-        agents={agents}
-        recordingsByAgent={recordingsByAgent}
-        initialAgentId={agentId}
-        loading={loading}
-        onStarted={handleCollectionStarted}
-      />
     </>
   );
 }

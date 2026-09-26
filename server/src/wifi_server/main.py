@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from wifi_server.api.agents import router as agents_router
 from wifi_server.api.analyses import router as analyses_router
 from wifi_server.api.projects import router as projects_router
+from wifi_server.api.recording_deletion import router as recording_deletion_router
 from wifi_server.api.recordings import router as recordings_router
 from wifi_server.api.reports import router as reports_router
 from wifi_server.services.analysis_recovery import start_analysis_recovery
@@ -26,6 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Wi-Fi Experience Monitor Server", version="0.1.0", lifespan=lifespan)
 app.include_router(agents_router)
 app.include_router(recordings_router)
+app.include_router(recording_deletion_router)
 app.include_router(analyses_router)
 app.include_router(projects_router)
 app.include_router(reports_router)

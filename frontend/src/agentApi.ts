@@ -40,6 +40,26 @@ async function request<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function deleteRequest(path: string): Promise<void> {
+  const response = await fetch(`${API_ROOT}${path}`, {
+    method: "DELETE",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    let detail = `API request failed: ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) detail = payload.detail;
+    } catch {
+      // Response had no JSON body.
+    }
+    throw new Error(detail);
+  }
+}
+
 async function requestOptional<T>(path: string): Promise<T | null> {
   const response = await fetch(`${API_ROOT}${path}`, {
     headers: {
@@ -167,6 +187,10 @@ export function stopRecording(
     `/recordings/${encodeURIComponent(recordingId)}/stop`,
     "POST",
   );
+}
+
+export function deleteRecording(recordingId: string): Promise<void> {
+  return deleteRequest(`/recordings/${encodeURIComponent(recordingId)}`);
 }
 
 export function getRecording(

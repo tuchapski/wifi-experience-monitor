@@ -80,7 +80,7 @@
 }
 
 .diagnostics-launcher {
-  margin-top: 28px;
+  margin: 0 0 22px;
   overflow: hidden;
   border: 1px solid #dfe6ef;
   border-radius: 12px;
@@ -351,7 +351,7 @@
   border-bottom: 0;
 }
 
-.diagnostics-dataset-table td:first-child {
+.diagnostics-dataset-table td:nth-child(2) {
   min-width: 220px;
   white-space: normal;
 }
@@ -393,5 +393,176 @@
 
   .diagnostics-dataset-tabs button {
     flex: 1;
+  }
+}
+
+.diagnostics-launcher-toggle {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #245f9f;
+  border-radius: 8px;
+  background: #245f9f;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.diagnostics-launcher-toggle.active {
+  border-color: #d9e1eb;
+  background: #fff;
+  color: #315f98;
+}
+
+.diagnostics-bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid #dce5ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostics-bulk-actions > div {
+  display: flex;
+  gap: 8px;
+}
+
+.diagnostics-bulk-actions button,
+.diagnostics-pagination button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #d9e1eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #315f98;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.diagnostics-bulk-actions button.danger {
+  border-color: #c9534c;
+  background: #c9534c;
+  color: #fff;
+}
+
+.diagnostics-bulk-actions button:disabled,
+.diagnostics-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.diagnostics-select-column {
+  width: 42px;
+  min-width: 42px;
+  padding-right: 6px !important;
+  text-align: center !important;
+}
+
+.diagnostics-select-column input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #245f9f;
+  cursor: pointer;
+}
+
+.diagnostics-select-column input:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.diagnostics-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.diagnostics-dataset-table .diagnostics-delete-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #9b423c;
+}
+
+.diagnostics-dataset-table .diagnostics-delete-button:hover:not(:disabled) {
+  border-color: #f0cbc8;
+  background: #fff5f4;
+  text-decoration: none;
+}
+
+.diagnostics-dataset-table .diagnostics-delete-button:disabled {
+  color: #aab2bd;
+  cursor: not-allowed;
+}
+
+.diagnostics-delete-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.diagnostics-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 4px 0;
+  color: #758194;
+  font-size: 11px;
+}
+
+.diagnostics-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diagnostics-pagination > div > span {
+  color: #536174;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .diagnostics-page-heading {
+    align-items: stretch;
+  }
+
+  .diagnostics-launcher-toggle {
+    align-self: flex-start;
+  }
+
+  .diagnostics-bulk-actions,
+  .diagnostics-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .diagnostics-bulk-actions > div {
+    justify-content: flex-end;
+  }
+
+  .diagnostics-pagination > div {
+    justify-content: space-between;
   }
 }
