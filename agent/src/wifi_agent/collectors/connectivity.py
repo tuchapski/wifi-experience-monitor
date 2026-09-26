@@ -152,28 +152,31 @@ def probe_https(
     url: str,
     interface: str,
     timeout_seconds: float,
+    source_address: str | None = None,
 ) -> ProbeResult:
     """Measure cumulative HTTPS transaction milestones using curl."""
-    result = run_command(
+    command = [
+        "curl",
+        "--ipv4",
+        "--silent",
+        "--show-error",
+        "--output",
+        "/dev/null",
+        "--max-time",
+        f"{timeout_seconds:g}",
+    ]
+    if source_address:
+        command.extend(["--interface", source_address])
+    command.extend(
         [
-            "curl",
-            "--ipv4",
-            "--silent",
-            "--show-error",
-            "--output",
-            "/dev/null",
-            "--max-time",
-            f"{timeout_seconds:g}",
-            "--interface",
-            interface,
             "--user-agent",
             "wifi-experience-monitor/0.1",
             "--write-out",
             _HTTP_WRITE_OUT,
             url,
-        ],
-        timeout=timeout_seconds + 1.0,
+        ]
     )
+    result = run_command(command, timeout=timeout_seconds + 1.0)
     observed_at = datetime.now(UTC)
     labels = _labels(interface, url)
     timing_line = next(
@@ -200,13 +203,21 @@ def probe_https(
         "network.https_tcp_connect_ms",
         "network.https_tls_handshake_ms",
         "network.https_ttfb_ms",
-        "network.https_total_ms",
     )
     observations.extend(
         _gauge(metric, value, "ms", observed_at, labels)
-        for metric, value in zip(metric_names, timings, strict=True)
+        for metric, value in zip(metric_names, timings[:4], strict=True)
         if value is not None
     )
+    total_ms = timings[4]
+    transaction_completed = result.returncode == 0 and status_code is not None
+    if total_ms is not None:
+        metric = (
+            "network.https_total_ms"
+            if transaction_completed
+            else "network.https_failure_elapsed_ms"
+        )
+        observations.append(_gauge(metric, total_ms, "ms", observed_at, labels))
     errors = []
     if result.returncode in {124, 127}:
         detail = result.stderr or f"curl exited with status {result.returncode}"

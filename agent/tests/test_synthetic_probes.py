@@ -1,8 +1,10 @@
+from concurrent.futures import Future
 from unittest.mock import patch
 
 from wifi_agent.collectors.command import CommandResult
-from wifi_agent.collectors.connectivity import probe_dns, probe_https, probe_ping
+from wifi_agent.collectors.connectivity import ProbeResult, probe_dns, probe_https, probe_ping
 from wifi_agent.processors import TelemetryAggregator
+from wifi_agent.runtime.synthetic import SyntheticProbeRuntime
 
 
 def _values(result):
@@ -71,7 +73,15 @@ def test_https_probe_emits_cumulative_transaction_timings(mock_run_command) -> N
         returncode=0,
     )
 
-    result = probe_https("https://example.com", "wlp0s20f3", 5.0)
+    result = probe_https(
+        "https://example.com",
+        "wlp0s20f3",
+        5.0,
+        source_address="192.168.1.25",
+    )
+
+    command = mock_run_command.call_args.args[0]
+    assert command[command.index("--interface") + 1] == "192.168.1.25"
 
     values = _values(result)
     assert values["network.https_success"] is True
@@ -83,6 +93,67 @@ def test_https_probe_emits_cumulative_transaction_timings(mock_run_command) -> N
     assert values["network.https_total_ms"] == 40.0
 
 
+@patch("wifi_agent.collectors.connectivity.run_command")
+def test_https_timeout_uses_failure_elapsed_instead_of_total(mock_run_command) -> None:
+    mock_run_command.return_value = CommandResult(
+        stdout="__WEM_HTTP_TIMING__:000|0.001|0.000|0.000|0.000|6.001",
+        stderr="curl: (28) Connection timed out",
+        returncode=28,
+    )
+
+    result = probe_https("https://example.com", "wlp0s20f3", 6.0, "192.168.1.25")
+
+    values = _values(result)
+    assert values["network.https_success"] is False
+    assert values["network.https_dns_ms"] == 1.0
+    assert values["network.https_failure_elapsed_ms"] == 6001.0
+    assert "network.https_total_ms" not in values
+    assert result.errors == []
+
+
+def test_runtime_releases_completed_probe_without_waiting_for_slowest() -> None:
+    runtime = SyntheticProbeRuntime(
+        "wlp0s20f3",
+        dns_query="example.com",
+        internet_target="1.1.1.1",
+        https_url="https://example.com",
+        timeout_seconds=6.0,
+    )
+    slow: Future[ProbeResult] = Future()
+    completed: Future[ProbeResult] = Future()
+    completed.set_result(ProbeResult([], []))
+    runtime._pending = {"https": slow, "dns": completed}
+
+    result = runtime.poll()
+
+    assert result == ProbeResult([], [])
+    assert set(runtime._pending) == {"https"}
+    runtime.close()
+
+
+def test_runtime_schedules_missing_probes_while_https_is_pending() -> None:
+    runtime = SyntheticProbeRuntime(
+        "wlp0s20f3",
+        dns_query="example.com",
+        internet_target="1.1.1.1",
+        https_url="https://example.com",
+        timeout_seconds=6.0,
+    )
+    runtime._pending = {"https": Future()}
+    scheduled: list[tuple] = []
+
+    def fake_submit(function, *args):
+        scheduled.append((function, *args))
+        return Future()
+
+    with patch.object(runtime._executor, "submit", side_effect=fake_submit):
+        assert runtime.start("192.168.1.1", "192.168.1.25") is True
+
+    assert set(runtime._pending) == {"https", "dns", "internet", "gateway"}
+    assert len(scheduled) == 3
+    runtime.close()
+
+
 def test_network_probe_gauges_are_part_of_default_telemetry() -> None:
     aggregator = TelemetryAggregator(10.0)
     assert "network.gateway_latency_ms" in aggregator.metrics
@@ -90,3 +161,4 @@ def test_network_probe_gauges_are_part_of_default_telemetry() -> None:
     assert "network.dns_latency_ms" in aggregator.metrics
     assert "network.internet_latency_ms" in aggregator.metrics
     assert "network.https_total_ms" in aggregator.metrics
+    assert "network.https_failure_elapsed_ms" in aggregator.metrics

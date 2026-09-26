@@ -24,6 +24,7 @@ DEFAULT_TELEMETRY_METRICS = frozenset(
         "network.https_tls_handshake_ms",
         "network.https_ttfb_ms",
         "network.https_total_ms",
+        "network.https_failure_elapsed_ms",
     }
 )
 

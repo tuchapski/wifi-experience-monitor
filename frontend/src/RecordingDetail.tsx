@@ -36,6 +36,21 @@ const RECORDING_METRICS = [
   { key: "wifi.channel_tx_percent", label: "Channel TX airtime", unit: "%" },
 ] as const;
 
+const NETWORK_SERVICE_METRICS = [
+  { key: "network.gateway_latency_ms", label: "Gateway latency", unit: "ms" },
+  { key: "network.gateway_packet_loss_percent", label: "Gateway packet loss", unit: "%" },
+  { key: "network.gateway_jitter_ms", label: "Gateway jitter", unit: "ms" },
+  { key: "network.dns_latency_ms", label: "DNS latency", unit: "ms" },
+  { key: "network.internet_latency_ms", label: "Internet latency", unit: "ms" },
+  { key: "network.internet_packet_loss_percent", label: "Internet packet loss", unit: "%" },
+  { key: "network.internet_jitter_ms", label: "Internet jitter", unit: "ms" },
+  { key: "network.https_dns_ms", label: "HTTPS DNS milestone", unit: "ms" },
+  { key: "network.https_tcp_connect_ms", label: "HTTPS TCP milestone", unit: "ms" },
+  { key: "network.https_tls_handshake_ms", label: "HTTPS TLS milestone", unit: "ms" },
+  { key: "network.https_ttfb_ms", label: "HTTPS TTFB milestone", unit: "ms" },
+  { key: "network.https_total_ms", label: "HTTPS total", unit: "ms" },
+] as const;
+
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
 function backToDiagnostics(agentId: string): void {
@@ -624,10 +639,18 @@ export default function RecordingDetail({
 
     async function refreshSeries(): Promise<void> {
       try {
-        const overviews = await getRecordingMetricOverviews(
-          recordingId, RECORDING_METRICS.map(({ key }) => key),
-        );
+        const [wifiOverviews, networkOverviews] = await Promise.all([
+          getRecordingMetricOverviews(
+            recordingId,
+            RECORDING_METRICS.map(({ key }) => key),
+          ),
+          getRecordingMetricOverviews(
+            recordingId,
+            NETWORK_SERVICE_METRICS.map(({ key }) => key),
+          ),
+        ]);
         if (active) {
+          const overviews = [...wifiOverviews, ...networkOverviews];
           setSeries(Object.fromEntries(overviews.map((item) => [item.metric, item])));
           setSeriesError(null);
         }
@@ -852,6 +875,35 @@ export default function RecordingDetail({
         )}
         <div className="recording-detail-chart-grid">
           {RECORDING_METRICS.map((metric) => (
+            <RawMetricChart
+              key={metric.key}
+              label={metric.label}
+              unit={metric.unit}
+              overview={series[metric.key]}
+              timeline={timeline}
+              degradedWindows={degradedWindows}
+              selectedWindow={selectedWindow}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="agent-panel recording-detail-data">
+        <div className="recording-detail-section-heading">
+          <div>
+            <span className="agent-eyebrow">Network / service experience</span>
+            <h2>Path and service telemetry across the full recording</h2>
+            <p>
+              Synthetic probes quantify whether Wi-Fi degradation propagated into
+              gateway, DNS, Internet or HTTPS experience.
+            </p>
+          </div>
+          <small>
+            HTTPS timings are cumulative milestones measured from transaction start.
+          </small>
+        </div>
+        <div className="recording-detail-chart-grid">
+          {NETWORK_SERVICE_METRICS.map((metric) => (
             <RawMetricChart
               key={metric.key}
               label={metric.label}

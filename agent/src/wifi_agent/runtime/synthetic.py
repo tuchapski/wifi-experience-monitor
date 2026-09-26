@@ -27,47 +27,53 @@ class SyntheticProbeRuntime:
     def running(self) -> bool:
         return bool(self._pending)
 
-    def start(self, gateway: str | None) -> bool:
-        if self._pending:
-            return False
-        pending: dict[str, Future[ProbeResult]] = {
-            "dns": self._executor.submit(
+    def start(self, gateway: str | None, source_address: str | None = None) -> bool:
+        submitted = False
+        if "dns" not in self._pending:
+            self._pending["dns"] = self._executor.submit(
                 probe_dns,
                 self.dns_query,
                 self.interface,
                 self.timeout_seconds,
-            ),
-            "internet": self._executor.submit(
+            )
+            submitted = True
+        if "internet" not in self._pending:
+            self._pending["internet"] = self._executor.submit(
                 probe_ping,
                 "internet",
                 self.internet_target,
                 self.interface,
                 self.timeout_seconds,
-            ),
-            "https": self._executor.submit(
+            )
+            submitted = True
+        if "https" not in self._pending:
+            self._pending["https"] = self._executor.submit(
                 probe_https,
                 self.https_url,
                 self.interface,
                 self.timeout_seconds,
-            ),
-        }
-        if gateway:
-            pending["gateway"] = self._executor.submit(
+                source_address,
+            )
+            submitted = True
+        if gateway and "gateway" not in self._pending:
+            self._pending["gateway"] = self._executor.submit(
                 probe_ping,
                 "gateway",
                 gateway,
                 self.interface,
                 self.timeout_seconds,
             )
-        self._pending = pending
-        return True
+            submitted = True
+        return submitted
 
     def poll(self) -> ProbeResult | None:
-        if not self._pending or not all(future.done() for future in self._pending.values()):
+        completed = [(name, future) for name, future in self._pending.items() if future.done()]
+        if not completed:
             return None
         observations = []
         errors = []
-        for name, future in self._pending.items():
+        for name, future in completed:
+            self._pending.pop(name, None)
             try:
                 result = future.result()
             except Exception as exc:  # pragma: no cover - defensive boundary around worker threads
@@ -75,7 +81,6 @@ class SyntheticProbeRuntime:
                 continue
             observations.extend(result.observations)
             errors.extend(result.errors)
-        self._pending = {}
         return ProbeResult(observations, errors)
 
     def close(self) -> None:

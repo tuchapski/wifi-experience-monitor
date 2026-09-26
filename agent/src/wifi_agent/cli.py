@@ -165,6 +165,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     pending_probe_observations = []
     pending_probe_errors: list[str] = []
     last_gateway: str | None = None
+    last_ipv4_address: str | None = None
 
     LOGGER.info("agent started agent_id=%s server=%s", identity.agent_id, settings.server_url)
     next_heartbeat = 0.0
@@ -198,6 +199,8 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             cycle = runtime.collect_cycle()
             gateway = cycle.snapshot.network.get("gateway")
             last_gateway = gateway if isinstance(gateway, str) else None
+            ipv4_address = cycle.snapshot.network.get("ipv4_address")
+            last_ipv4_address = ipv4_address if isinstance(ipv4_address, str) else None
             observations = [*cycle.observations, *pending_probe_observations]
             collector_errors = [
                 *cycle.snapshot.collector_errors,
@@ -230,12 +233,8 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
                 )
             next_collection = now + settings.telemetry_sample_interval_seconds
 
-        if (
-            probe_runtime is not None
-            and not probe_runtime.running
-            and now >= next_probe
-            and probe_runtime.start(last_gateway)
-        ):
+        if probe_runtime is not None and now >= next_probe:
+            probe_runtime.start(last_gateway, last_ipv4_address)
             next_probe = now + settings.synthetic_probe_interval_seconds
 
         if now >= next_sync:
@@ -250,7 +249,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         due = [next_heartbeat, next_sync]
         if runtime is not None:
             due.extend([next_collection, next_state])
-        if probe_runtime is not None and not probe_runtime.running:
+        if probe_runtime is not None:
             due.append(next_probe)
         time.sleep(max(0.1, min(1.0, min(due) - time.monotonic())))
 
