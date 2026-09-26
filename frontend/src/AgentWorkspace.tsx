@@ -8,6 +8,7 @@ import {
   renameAgent,
 } from "./agentApi";
 import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
+import ManagedAgentCard from "./ManagedAgentCard";
 import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
 import RecordingDetail from "./RecordingDetail";
 import type {
@@ -236,55 +237,16 @@ function AgentList() {
             <span>Start an Agent and run <code>wifi-agent enroll</code>.</span>
           </div>
         ) : (
-          <div className="agent-table-wrap">
-            <table className="agent-table">
-              <thead>
-                <tr>
-                  <th>Agent</th>
-                  <th>Status</th>
-                  <th>Wi-Fi</th>
-                  <th>Signal</th>
-                  <th>Link score</th>
-                  <th>Channel</th>
-                  <th>Last seen</th>
-                  <th aria-label="Open agent" />
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map(({ agent, state }) => (
-                  <tr key={agent.id}>
-                    <td>
-                      <button type="button" className="agent-name-link" onClick={() => navigateToAgent(agent.id)}>{agent.name}</button>
-                      <small>{agent.hostname}</small>
-                    </td>
-                    <td>
-                      <span className={`agent-status ${statusClass(agent.status)}`}>
-                        <i />{agent.status === "online" ? "Online" : "Offline"}
-                      </span>
-                    </td>
-                    <td>
-                      <strong>{state?.wifi.ssid ?? "—"}</strong>
-                      <small>{state?.wifi.bssid ?? "No current state"}</small>
-                    </td>
-                    <td>{formatMetric(state?.wifi.rssi_dbm, "dBm")}</td>
-                    <td>
-                      {isCurrentState(agent, state) && state?.wifi.link_score?.value != null
-                        ? `${state.wifi.link_score.value.toFixed(0)}/100`
-                        : "—"}
-                      <small>{isCurrentState(agent, state)
-                        ? state?.wifi.link_score?.status ?? "Unavailable"
-                        : "No current score"}</small>
-                    </td>
-                    <td>{state?.wifi.channel ?? "—"}</td>
-                    <td>
-                      <strong>{formatRelativeTime(agent.last_seen_at)}</strong>
-                      <small>{formatDate(agent.last_seen_at)}</small>
-                    </td>
-                    <td><button type="button" className="agent-row-action" aria-label={`Open ${agent.name}`} onClick={() => navigateToAgent(agent.id)}>→</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="managed-agent-grid">
+            {agents.map(({ agent, state }) => (
+              <ManagedAgentCard
+                key={agent.id}
+                agent={agent}
+                state={state}
+                stateFresh={isCurrentState(agent, state)}
+                onOpen={() => navigateToAgent(agent.id)}
+              />
+            ))}
           </div>
         )}
       </section>
