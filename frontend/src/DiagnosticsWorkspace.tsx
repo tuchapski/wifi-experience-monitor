@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getAgentRecordings, getAgents } from "./agentApi";
 import type { AgentSummary, DiagnosticRecording } from "./agentTypes";
-import { diagnosticsAgentHash, diagnosticsRecordingHash } from "./diagnosticRoutes";
+import { diagnosticsRecordingHash } from "./diagnosticRoutes";
+import DiagnosticCollectionLauncher from "./DiagnosticCollectionLauncher";
 import DiagnosticProjectsPanel from "./DiagnosticProjectsPanel";
-import RecordingPanel from "./RecordingPanel";
 import "./DiagnosticsWorkspace.css";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -40,6 +40,7 @@ function formatDuration(start: string | null, end: string | null): string {
 export default function DiagnosticsWorkspace({ agentId }: { agentId: string | null }) {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [datasets, setDatasets] = useState<IndividualDataset[]>([]);
+  const [recordingsByAgent, setRecordingsByAgent] = useState<Record<string, DiagnosticRecording[]>>({});
   const [loading, setLoading] = useState(true);
   const [datasetsLoading, setDatasetsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     async function refreshDatasets(): Promise<void> {
       if (agents.length === 0) {
         setDatasets([]);
+        setRecordingsByAgent({});
         setDatasetsLoading(false);
         return;
       }
@@ -92,11 +94,15 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
           agents.map(async (agent) => ({ agent, recordings: await getAgentRecordings(agent.id) })),
         );
         if (!active) return;
-        const loaded = results.flatMap((result) => result.status === "fulfilled"
-          ? result.value.recordings
-              .filter((recording) => !recording.project_run_id)
-              .map((recording) => ({ agent: result.value.agent, recording }))
-          : []);
+        const recordingMap: Record<string, DiagnosticRecording[]> = {};
+        const loaded = results.flatMap((result) => {
+          if (result.status !== "fulfilled") return [];
+          recordingMap[result.value.agent.id] = result.value.recordings;
+          return result.value.recordings
+            .filter((recording) => !recording.project_run_id)
+            .map((recording) => ({ agent: result.value.agent, recording }));
+        });
+        setRecordingsByAgent(recordingMap);
         setDatasets(loaded);
         setDatasetError(results.some((result) => result.status === "rejected")
           ? "Some Agent datasets could not be loaded. Available datasets are shown below."
@@ -119,7 +125,6 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     };
   }, [agents]);
 
-  const selected = agents.find((agent) => agent.id === agentId);
   const statuses = useMemo(
     () => [...new Set(datasets.map(({ recording }) => recording.status))].sort(),
     [datasets],
@@ -127,8 +132,8 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const filteredDatasets = useMemo(() => {
     const search = datasetSearch.trim().toLowerCase();
     return datasets
-    	.filter(({ agent }) => !datasetAgentFilter || agent.id === datasetAgentFilter)
-    	.filter(({ recording }) => !datasetStatusFilter || recording.status === datasetStatusFilter)
+      .filter(({ agent }) => !datasetAgentFilter || agent.id === datasetAgentFilter)
+      .filter(({ recording }) => !datasetStatusFilter || recording.status === datasetStatusFilter)
       .filter(({ agent, recording }) => !search || [
         recording.name,
         recording.site,
@@ -141,68 +146,33 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         - Date.parse(left.recording.started_at ?? left.recording.created_at));
   }, [datasetAgentFilter, datasetSearch, datasetStatusFilter, datasets]);
 
+  function handleCollectionStarted(agent: AgentSummary, recording: DiagnosticRecording): void {
+    setRecordingsByAgent((current) => ({
+      ...current,
+      [agent.id]: [
+        recording,
+        ...(current[agent.id] ?? []).filter((item) => item.id !== recording.id),
+      ],
+    }));
+    if (!recording.project_run_id) {
+      setDatasets((current) => [
+        { agent, recording },
+        ...current.filter((item) => item.recording.id !== recording.id),
+      ]);
+    }
+  }
+
   return (
     <>
       <section className="agent-page-heading diagnostics-page-heading">
         <div>
           <span className="agent-eyebrow">Diagnostics</span>
-          <h1>Collections and analysis</h1>
-          <p>Start diagnostic collections and investigate captured evidence.</p>
+          <h1>Datasets and analysis</h1>
+          <p>Investigate captured evidence and start an individual collection when needed.</p>
         </div>
       </section>
 
       {error && <div className="agent-error" role="alert">{error}</div>}
-
-      <section className="diagnostics-individual" aria-labelledby="collection-title">
-        <div className="diagnostics-individual-heading">
-          <div>
-            <span className="agent-eyebrow">Start collection</span>
-            <h2 id="collection-title">Individual diagnostic collection</h2>
-            <p>Select an Agent only when you want to start or control an individual recording.</p>
-          </div>
-          <label htmlFor="diagnostics-agent-picker" className="diagnostics-agent-picker">
-            Collection Agent
-            <select
-              id="diagnostics-agent-picker"
-              value={agentId ?? ""}
-              onChange={(event) => {
-                window.location.hash = event.target.value
-                  ? diagnosticsAgentHash(event.target.value)
-                  : "#diagnostics";
-              }}
-              disabled={loading || agents.length === 0}
-            >
-              <option value="">Choose an Agent</option>
-              {agentId && !selected && <option value={agentId}>Agent unavailable</option>}
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name} · {agent.status === "online" ? "Online" : "Offline"}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {loading ? (
-          <div className="agent-empty">Loading collection Agents…</div>
-        ) : agents.length === 0 ? (
-          <div className="agent-empty">No Agents are enrolled yet.</div>
-        ) : selected ? (
-          <>
-            <div className="diagnostics-agent-context">
-              <span className={`agent-status ${selected.status === "online" ? "agent-status-online" : "agent-status-offline"}`}>
-                <i />{selected.status === "online" ? "Online" : "Offline"}
-              </span>
-              <span>{selected.hostname}</span>
-              <a href={`#agents/${encodeURIComponent(selected.id)}`}>View Agent status and settings</a>
-            </div>
-            <RecordingPanel key={selected.id} agent={selected} />
-          </>
-        ) : agentId ? (
-          <div className="agent-empty">This Agent is no longer available. Choose another Agent.</div>
-        ) : (
-          <div className="agent-empty">Choose an Agent when you want to start an individual collection.</div>
-        )}
-      </section>
 
       <section className="diagnostics-datasets" aria-labelledby="datasets-title">
         <div className="diagnostics-datasets-heading">
@@ -246,7 +216,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                   placeholder="Name, site, location or Agent" />
               </label>
             </div>
-            {datasetError && <div className="recording-error" role="alert">{datasetError}</div>}
+            {datasetError && <div className="diagnostics-error" role="alert">{datasetError}</div>}
             {datasetsLoading ? (
               <div className="agent-empty">Loading individual datasets…</div>
             ) : filteredDatasets.length === 0 ? (
@@ -259,7 +229,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                     <tr key={recording.id}>
                       <td><strong>{recording.name}</strong>{(recording.site || recording.location) && <small>{[recording.site, recording.location].filter(Boolean).join(" · ")}</small>}</td>
                       <td><strong>{agent.name}</strong><small>{agent.hostname}</small></td>
-                      <td><span className={`recording-status recording-status-${recording.status}`}>{STATUS_LABELS[recording.status] ?? recording.status}</span></td>
+                      <td><span className={`diagnostics-status diagnostics-status-${recording.status}`}>{STATUS_LABELS[recording.status] ?? recording.status}</span></td>
                       <td>{formatDate(recording.started_at ?? recording.created_at)}</td>
                       <td>{formatDuration(recording.started_at, recording.ended_at)}</td>
                       <td>{recording.metrics_count.toLocaleString()} metrics · {recording.events_count.toLocaleString()} events</td>
@@ -274,6 +244,14 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
           </>
         )}
       </section>
+
+      <DiagnosticCollectionLauncher
+        agents={agents}
+        recordingsByAgent={recordingsByAgent}
+        initialAgentId={agentId}
+        loading={loading}
+        onStarted={handleCollectionStarted}
+      />
     </>
   );
 }

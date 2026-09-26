@@ -1,11 +1,10 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getAgentRecordings, startAgentRecording, stopRecording } from "./agentApi";
-import type { AgentCurrentState, AgentSummary, DiagnosticRecording } from "./agentTypes";
+import type { AgentCurrentState, AgentSummary, DiagnosticRecording, StartRecordingInput } from "./agentTypes";
+import CollectionStartForm from "./CollectionStartForm";
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
-const DURATIONS = [15, 30, 60, 120, 240, 480, 1440];
-
 function formatDuration(start: string | null, end: string | null, now: number): string {
   if (!start) return "—";
   const seconds = Math.max(0, Math.floor(((end ? Date.parse(end) : now) - Date.parse(start)) / 1000));
@@ -30,11 +29,6 @@ export default function ManagedAgentCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [recordings, setRecordings] = useState<DiagnosticRecording[]>([]);
-  const [name, setName] = useState("");
-  const [site, setSite] = useState("");
-  const [location, setLocation] = useState("");
-  const [notes, setNotes] = useState("");
-  const [duration, setDuration] = useState(60);
   const [busy, setBusy] = useState<"start" | "stop" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -75,28 +69,18 @@ export default function ManagedAgentCard({
     return () => window.clearInterval(timer);
   }, [activeRecording]);
 
-  async function handleStart(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (busy || activeRecording || activeProjectRecording || agent.status !== "online") return;
+  async function handleStart(input: StartRecordingInput): Promise<boolean> {
+    if (busy || activeRecording || activeProjectRecording || agent.status !== "online") return false;
     setBusy("start");
     setError(null);
     try {
-      const recording = await startAgentRecording(agent.id, {
-        name: name.trim() || `Diagnostic ${new Date().toLocaleString()}`,
-        description: notes.trim() || null,
-        site: site.trim() || null,
-        location: location.trim() || null,
-        profile_id: "wifi-deep-dive",
-        max_duration_minutes: duration,
-      });
+      const recording = await startAgentRecording(agent.id, input);
       setRecordings((current) => [recording, ...current.filter((item) => item.id !== recording.id)]);
-      setName("");
-      setSite("");
-      setLocation("");
-      setNotes("");
       setExpanded(true);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to start collection");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -178,33 +162,11 @@ export default function ManagedAgentCard({
               </button>
             </div>
           ) : (
-            <form className="managed-agent-collection-form" onSubmit={(event) => void handleStart(event)}>
-              <div className="managed-agent-form-grid">
-                <label>Collection name
-                  <input maxLength={255} value={name} onChange={(event) => setName(event.target.value)} placeholder="Optional collection name" disabled={collectionBlocked || busy !== null} />
-                </label>
-                <label>Maximum duration
-                  <select value={duration} onChange={(event) => setDuration(Number(event.target.value))} disabled={collectionBlocked || busy !== null}>
-                    {DURATIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
-                  </select>
-                </label>
-                <label>Site
-                  <input maxLength={255} value={site} onChange={(event) => setSite(event.target.value)} placeholder="Optional" disabled={collectionBlocked || busy !== null} />
-                </label>
-                <label>Location
-                  <input maxLength={255} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Floor / room (optional)" disabled={collectionBlocked || busy !== null} />
-                </label>
-              </div>
-              <label>Observed symptoms or test context
-                <textarea maxLength={2000} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional notes" disabled={collectionBlocked || busy !== null} />
-              </label>
-              <div className="managed-agent-form-actions">
-                <small>Capture profile: Wi-Fi deep dive</small>
-                <button type="submit" disabled={collectionBlocked || busy !== null}>
-                  {busy === "start" ? "Starting…" : "Start collection"}
-                </button>
-              </div>
-            </form>
+            <CollectionStartForm
+              disabled={collectionBlocked}
+              busy={busy === "start"}
+              onSubmit={handleStart}
+            />
           )}
         </div>
       )}
