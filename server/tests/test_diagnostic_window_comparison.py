@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
+import pytest
 from sqlalchemy.orm import Session
 from wifi_server.services.diagnostic_windows import compare_diagnostic_window
 
@@ -94,13 +95,13 @@ def test_findings_ignore_noise_and_preserve_unknown_recovery() -> None:
         iter(
             [
                 ("wifi.rssi_dbm", 5, -55.0, -52.0, -50.0),
-                ("wifi.tx_retries_per_100", 5, 1.0, 2.0, 3.0),
+                ("wifi.tx_retries_per_100_packets", 5, 1.0, 2.0, 3.0),
             ]
         ),
         iter(
             [
                 ("wifi.rssi_dbm", 5, -57.0, -55.0, -53.0),
-                ("wifi.tx_retries_per_100", 5, 8.0, 10.0, 12.0),
+                ("wifi.tx_retries_per_100_packets", 5, 8.0, 10.0, 12.0),
             ]
         ),
         iter([]),
@@ -109,13 +110,56 @@ def test_findings_ignore_noise_and_preserve_unknown_recovery() -> None:
     result = compare_diagnostic_window(
         session,
         "rec_test",
-        ["wifi.rssi_dbm", "wifi.tx_retries_per_100"],
+        ["wifi.rssi_dbm", "wifi.tx_retries_per_100_packets"],
         start + timedelta(seconds=60),
         start + timedelta(seconds=90),
         30,
     )
 
-    assert [finding.metric for finding in result.findings] == ["wifi.tx_retries_per_100"]
+    assert [finding.metric for finding in result.findings] == ["wifi.tx_retries_per_100_packets"]
     assert result.findings[0].direction == "increased"
     assert result.findings[0].delta == 8.0
     assert result.findings[0].recovery == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("metric", "baseline", "during", "after", "expected_delta"),
+    [
+        ("wifi.tx_retries_per_100_packets", 2.0, 10.0, 3.0, 8.0),
+        ("wifi.tx_failed_percent", 0.5, 3.0, 1.0, 2.5),
+        ("wifi.channel_utilization_percent", 30.0, 55.0, 35.0, 25.0),
+        ("wifi.channel_rx_percent", 10.0, 35.0, 15.0, 25.0),
+        ("wifi.channel_tx_percent", 10.0, 35.0, 15.0, 25.0),
+    ],
+)
+def test_findings_use_canonical_recorded_metric_names(
+    metric: str,
+    baseline: float,
+    during: float,
+    after: float,
+    expected_delta: float,
+) -> None:
+    session = Mock(spec=Session)
+    start = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
+    session.get.return_value = Mock(started_at=start, ended_at=start + timedelta(minutes=10))
+    session.execute.side_effect = [
+        iter([(metric, 5, baseline, baseline, baseline)]),
+        iter([(metric, 5, during, during, during)]),
+        iter([(metric, 5, after, after, after)]),
+    ]
+
+    result = compare_diagnostic_window(
+        session,
+        "rec_test",
+        [metric],
+        start + timedelta(seconds=60),
+        start + timedelta(seconds=90),
+        30,
+    )
+
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert finding.metric == metric
+    assert finding.direction == "increased"
+    assert finding.delta == expected_delta
+    assert finding.recovery == "recovered"

@@ -1,0 +1,13 @@
+"""Canonical metric identifiers shared by server-side diagnostic logic."""
+
+WIFI_RSSI_DBM = "wifi.rssi_dbm"
+WIFI_SIGNAL_AVG_DBM = "wifi.signal_avg_dbm"
+WIFI_NOISE_DBM = "wifi.noise_dbm"
+WIFI_SNR_DB = "wifi.snr_db"
+WIFI_TX_RATE_MBPS = "wifi.tx_rate_mbps"
+WIFI_RX_RATE_MBPS = "wifi.rx_rate_mbps"
+WIFI_TX_RETRIES_PER_100_PACKETS = "wifi.tx_retries_per_100_packets"
+WIFI_TX_FAILED_PERCENT = "wifi.tx_failed_percent"
+WIFI_CHANNEL_UTILIZATION_PERCENT = "wifi.channel_utilization_percent"
+WIFI_CHANNEL_RX_PERCENT = "wifi.channel_rx_percent"
+WIFI_CHANNEL_TX_PERCENT = "wifi.channel_tx_percent"

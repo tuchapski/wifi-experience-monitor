@@ -8,6 +8,19 @@ from sqlalchemy.orm import Session
 
 from wifi_server.db.models import DiagnosticRecording
 from wifi_server.db.recording_models import RecordingMetric
+from wifi_server.metric_names import (
+    WIFI_CHANNEL_RX_PERCENT,
+    WIFI_CHANNEL_TX_PERCENT,
+    WIFI_CHANNEL_UTILIZATION_PERCENT,
+    WIFI_NOISE_DBM,
+    WIFI_RSSI_DBM,
+    WIFI_RX_RATE_MBPS,
+    WIFI_SIGNAL_AVG_DBM,
+    WIFI_SNR_DB,
+    WIFI_TX_FAILED_PERCENT,
+    WIFI_TX_RATE_MBPS,
+    WIFI_TX_RETRIES_PER_100_PACKETS,
+)
 from wifi_server.recording_schemas import (
     DiagnosticFinding,
     DiagnosticMetricComparison,
@@ -59,17 +72,17 @@ def _period_statistics(
 # Minimum change in the mean required before a metric becomes a diagnostic finding.
 # Direction indicates which movement represents deterioration for that metric.
 _FINDING_RULES: dict[str, tuple[float, str]] = {
-    "wifi.rssi_dbm": (5.0, "decrease"),
-    "wifi.signal_avg_dbm": (5.0, "decrease"),
-    "wifi.snr_db": (5.0, "decrease"),
-    "wifi.tx_rate_mbps": (20.0, "decrease"),
-    "wifi.rx_rate_mbps": (20.0, "decrease"),
-    "wifi.tx_retries_per_100": (5.0, "increase"),
-    "wifi.tx_failed_pct": (2.0, "increase"),
-    "wifi.channel_utilization_pct": (15.0, "increase"),
-    "wifi.airtime_rx_pct": (15.0, "increase"),
-    "wifi.airtime_tx_pct": (15.0, "increase"),
-    "wifi.noise_dbm": (5.0, "increase"),
+    WIFI_RSSI_DBM: (5.0, "decrease"),
+    WIFI_SIGNAL_AVG_DBM: (5.0, "decrease"),
+    WIFI_SNR_DB: (5.0, "decrease"),
+    WIFI_TX_RATE_MBPS: (20.0, "decrease"),
+    WIFI_RX_RATE_MBPS: (20.0, "decrease"),
+    WIFI_TX_RETRIES_PER_100_PACKETS: (5.0, "increase"),
+    WIFI_TX_FAILED_PERCENT: (2.0, "increase"),
+    WIFI_CHANNEL_UTILIZATION_PERCENT: (15.0, "increase"),
+    WIFI_CHANNEL_RX_PERCENT: (15.0, "increase"),
+    WIFI_CHANNEL_TX_PERCENT: (15.0, "increase"),
+    WIFI_NOISE_DBM: (5.0, "increase"),
 }
 
 
