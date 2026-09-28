@@ -12,8 +12,10 @@ import {
 import type {
   AnalysisDegradedWindow,
   AgentSummary,
+  CrossLayerDiagnosticEpisode,
   DiagnosticEvidenceCorrelation,
   DiagnosticEvidenceDomain,
+  DiagnosticInvestigationFocus,
   DiagnosticRecording,
   DiagnosticWindowComparison,
   RecordingEvent,
@@ -133,6 +135,7 @@ function RawMetricChart({
   timeline,
   degradedWindows,
   selectedWindow,
+  selectedEpisode,
 }: {
   label: string;
   unit: string;
@@ -140,6 +143,7 @@ function RawMetricChart({
   timeline: TimelineBounds | null;
   degradedWindows: AnalysisDegradedWindow[];
   selectedWindow: AnalysisDegradedWindow | null;
+  selectedEpisode: CrossLayerDiagnosticEpisode | null;
 }) {
   const points = overview?.points ?? [];
 
@@ -207,6 +211,20 @@ function RawMetricChart({
             />
           );
         })}
+        {selectedEpisode && (
+          <rect
+            x={xForTime(Date.parse(selectedEpisode.started_at))}
+            y="28"
+            width={Math.max(
+              1.5,
+              xForTime(Date.parse(selectedEpisode.ended_at))
+                - xForTime(Date.parse(selectedEpisode.started_at)),
+            )}
+            height="126"
+            className="recording-detail-episode-band"
+            aria-hidden="true"
+          />
+        )}
         <line x1="16" x2="704" y1="28" y2="28" className="recording-detail-gridline" />
         <line x1="16" x2="704" y1="91" y2="91" className="recording-detail-gridline" />
         <line x1="16" x2="704" y1="154" y2="154" className="recording-detail-gridline" />
@@ -336,20 +354,26 @@ function InvestigationTimeline({
 }
 
 function DiagnosticEvidencePanel({
-  selectedWindow,
+  selectedFocus,
   comparison,
   correlation,
   comparisonLoading,
   comparisonError,
 }: {
-  selectedWindow: AnalysisDegradedWindow | null;
+  selectedFocus: DiagnosticInvestigationFocus | null;
   comparison: DiagnosticWindowComparison | null;
   correlation: DiagnosticEvidenceCorrelation | null;
   comparisonLoading: boolean;
   comparisonError: string | null;
 }) {
-  if (selectedWindow === null) return null;
+  if (selectedFocus === null) return null;
 
+  const selectedWindow = selectedFocus.source === "wifi_window"
+    ? selectedFocus.window
+    : null;
+  const selectedEpisode = selectedFocus.source === "cross_layer_episode"
+    ? selectedFocus.episode
+    : null;
   const correlatedEvents = correlation?.events ?? [];
   const findings = correlation?.findings ?? comparison?.findings ?? [];
   const evidenceDomains = comparison?.evidence_domains ?? correlation?.evidence_domains ?? [];
@@ -360,31 +384,37 @@ function DiagnosticEvidencePanel({
       findings: findings.filter((finding) => finding.evidence_domain === domain.domain),
     }))
     .filter((domain) => domain.findings.length > 0);
-  const metrics = [
-    { label: "Minimum RSSI", value: selectedWindow.minimum_rssi_dbm, unit: "dBm" },
-    {
-      label: "Maximum TX retries",
-      value: selectedWindow.maximum_retries_per_100_packets,
-      unit: "/100 packets",
-    },
-    {
-      label: "Maximum TX failures",
-      value: selectedWindow.maximum_tx_failed_percent,
-      unit: "%",
-    },
-    {
-      label: "Maximum channel utilization",
-      value: selectedWindow.maximum_channel_utilization_percent,
-      unit: "%",
-    },
-  ];
+  const metrics = selectedWindow
+    ? [
+      { label: "Minimum RSSI", value: selectedWindow.minimum_rssi_dbm, unit: "dBm" },
+      {
+        label: "Maximum TX retries",
+        value: selectedWindow.maximum_retries_per_100_packets,
+        unit: "/100 packets",
+      },
+      {
+        label: "Maximum TX failures",
+        value: selectedWindow.maximum_tx_failed_percent,
+        unit: "%",
+      },
+      {
+        label: "Maximum channel utilization",
+        value: selectedWindow.maximum_channel_utilization_percent,
+        unit: "%",
+      },
+    ]
+    : [];
 
   return (
     <section className="agent-panel recording-evidence">
       <div className="recording-detail-section-heading">
         <div>
           <span className="agent-eyebrow">Diagnostic evidence</span>
-          <h2>Evidence for the focused degraded window</h2>
+          <h2>
+            {selectedWindow
+              ? "Evidence for the focused degraded window"
+              : "Evidence for the focused diagnostic episode"}
+          </h2>
           <p>
             Observations recorded for the selected interval, with nearby state changes for context.
           </p>
@@ -395,49 +425,119 @@ function DiagnosticEvidencePanel({
       <div className="recording-evidence-window">
         <div>
           <span>Focused interval</span>
-          <strong>{formatClock(selectedWindow.started_at)} → {formatClock(selectedWindow.ended_at)}</strong>
-        </div>
-        <div>
-          <span>Severity</span>
-          <strong className={`recording-evidence-severity severity-${selectedWindow.severity}`}>
-            {selectedWindow.severity}
+          <strong>
+            {formatClock(selectedFocus.started_at)} → {formatClock(selectedFocus.ended_at)}
           </strong>
         </div>
-        <div>
-          <span>Duration</span>
-          <strong>{selectedWindow.duration_seconds.toFixed(1)}s</strong>
-        </div>
-        <div>
-          <span>Wi-Fi domains</span>
-          <strong>{selectedWindow.domains.join(" + ") || "—"}</strong>
-        </div>
+        {selectedWindow ? (
+          <>
+            <div>
+              <span>Severity</span>
+              <strong className={`recording-evidence-severity severity-${selectedWindow.severity}`}>
+                {selectedWindow.severity}
+              </strong>
+            </div>
+            <div>
+              <span>Duration</span>
+              <strong>{selectedWindow.duration_seconds.toFixed(1)}s</strong>
+            </div>
+            <div>
+              <span>Wi-Fi domains</span>
+              <strong>{selectedWindow.domains.join(" + ") || "—"}</strong>
+            </div>
+          </>
+        ) : selectedEpisode ? (
+          <>
+            <div>
+              <span>Scope</span>
+              <strong>{selectedEpisode.scope.replaceAll("_", " ")}</strong>
+            </div>
+            <div>
+              <span>Duration</span>
+              <strong>{selectedEpisode.duration_seconds.toFixed(1)}s</strong>
+            </div>
+            <div>
+              <span>Earliest observed domain</span>
+              <strong>{EVIDENCE_DOMAIN_LABELS[selectedEpisode.trigger_domain]}</strong>
+            </div>
+            <div>
+              <span>Recovery</span>
+              <strong>{selectedEpisode.recovery_confirmed ? "confirmed" : "unconfirmed"}</strong>
+            </div>
+            <div className="recording-evidence-window-domains">
+              <span>Observed domains</span>
+              <strong>
+                {selectedEpisode.observed_domains
+                  .map((domain) => EVIDENCE_DOMAIN_LABELS[domain])
+                  .join(" · ")}
+              </strong>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="recording-evidence-grid">
-        <article>
-          <h3>Window measurements</h3>
-          <dl className="recording-evidence-metrics">
-            {metrics.map((metric) => (
-              <div key={metric.label}>
-                <dt>{metric.label}</dt>
-                <dd>{formatNumber(metric.value, metric.unit)}</dd>
-              </div>
-            ))}
-          </dl>
-        </article>
+        {selectedWindow ? (
+          <>
+            <article>
+              <h3>Window measurements</h3>
+              <dl className="recording-evidence-metrics">
+                {metrics.map((metric) => (
+                  <div key={metric.label}>
+                    <dt>{metric.label}</dt>
+                    <dd>{formatNumber(metric.value, metric.unit)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
 
-        <article>
-          <h3>Analysis evidence</h3>
-          {selectedWindow.evidence.length === 0 ? (
-            <p className="recording-evidence-empty">No additional evidence was recorded.</p>
-          ) : (
-            <ul className="recording-evidence-list">
-              {selectedWindow.evidence.map((item, index) => (
-                <li key={`${item}-${index}`}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </article>
+            <article>
+              <h3>Analysis evidence</h3>
+              {selectedWindow.evidence.length === 0 ? (
+                <p className="recording-evidence-empty">No additional evidence was recorded.</p>
+              ) : (
+                <ul className="recording-evidence-list">
+                  {selectedWindow.evidence.map((item, index) => (
+                    <li key={`${item}-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          </>
+        ) : selectedEpisode ? (
+          <>
+            <article>
+              <h3>Episode evidence</h3>
+              <dl className="recording-evidence-metrics">
+                <div>
+                  <dt>Trigger metric</dt>
+                  <dd>{selectedEpisode.trigger_metric}</dd>
+                </div>
+                <div>
+                  <dt>Metrics involved</dt>
+                  <dd>{selectedEpisode.metrics.length}</dd>
+                </div>
+                <div>
+                  <dt>Degraded samples</dt>
+                  <dd>{selectedEpisode.degraded_samples}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article>
+              <h3>Detector observations</h3>
+              <ul className="recording-evidence-list">
+                {selectedEpisode.observed_domains.map((domain) => (
+                  <li key={domain}>
+                    <strong>{EVIDENCE_DOMAIN_LABELS[domain]}</strong>
+                    {": "}
+                    {(selectedEpisode.domain_evidence[domain] ?? []).join(", ") || "observed"}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </>
+        ) : null}
 
         <article className="recording-evidence-comparison">
           <div className="recording-evidence-events-heading">
@@ -449,7 +549,7 @@ function DiagnosticEvidencePanel({
           ) : comparisonError ? (
             <p className="recording-evidence-error">{comparisonError}</p>
           ) : comparison === null ? (
-            <p className="recording-evidence-empty">Comparison is unavailable for this window.</p>
+            <p className="recording-evidence-empty">Comparison is unavailable for this interval.</p>
           ) : (
             <div className="recording-evidence-comparison-table">
               <div className="recording-evidence-comparison-row comparison-header">
@@ -571,8 +671,16 @@ function DiagnosticEvidencePanel({
             </div>
           )}
           <p className="recording-evidence-comparison-note">
-            This is not a root-cause verdict. Current focused windows are triggered by Wi-Fi
-            degradation, so the assessment is scoped to this interval rather than the whole session.
+            {selectedWindow
+              ? (
+                "This is not a root-cause verdict. This focus originates from a Wi-Fi degraded "
+                + "window, so the assessment is scoped to this interval rather than the whole session."
+              )
+              : (
+                "This is not a root-cause verdict. The episode's earliest observed domain is "
+                + "detector timing evidence; probable domain is independently derived from "
+                + "Before/During/After evidence."
+              )}
           </p>
         </article>
 
@@ -585,7 +693,7 @@ function DiagnosticEvidencePanel({
             <p className="recording-evidence-empty">Evaluating diagnostic findings…</p>
           ) : findings.length === 0 ? (
             <p className="recording-evidence-empty">
-              No metric change exceeded the diagnostic thresholds for this window.
+              No metric change exceeded the diagnostic thresholds for this interval.
             </p>
           ) : (
             <div className="recording-evidence-finding-list">
@@ -627,7 +735,7 @@ function DiagnosticEvidencePanel({
           {comparisonLoading ? (
             <p className="recording-evidence-empty">Correlating state changes…</p>
           ) : correlatedEvents.length === 0 ? (
-            <p className="recording-evidence-empty">No state changes were observed near this window.</p>
+            <p className="recording-evidence-empty">No state changes were observed near this interval.</p>
           ) : (
             <div className="recording-evidence-event-list">
               {correlatedEvents.map((event, index) => {
@@ -685,8 +793,14 @@ export default function RecordingDetail({
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [degradedWindows, setDegradedWindows] = useState<AnalysisDegradedWindow[]>([]);
-  const [selectedWindow, setSelectedWindow] =
-    useState<AnalysisDegradedWindow | null>(null);
+  const [selectedFocus, setSelectedFocus] =
+    useState<DiagnosticInvestigationFocus | null>(null);
+  const selectedWindow = selectedFocus?.source === "wifi_window"
+    ? selectedFocus.window
+    : null;
+  const selectedEpisode = selectedFocus?.source === "cross_layer_episode"
+    ? selectedFocus.episode
+    : null;
   const [windowComparison, setWindowComparison] =
     useState<DiagnosticWindowComparison | null>(null);
   const [evidenceCorrelation, setEvidenceCorrelation] =
@@ -728,20 +842,19 @@ export default function RecordingDetail({
 
   const handleWindowsChange = useCallback((windows: AnalysisDegradedWindow[]) => {
     setDegradedWindows(windows);
-    setSelectedWindow((current) => {
-      if (current === null) return null;
+    setSelectedFocus((current) => {
+      if (current?.source !== "wifi_window") return current;
       return windows.some(
         (window) =>
-          window.started_at === current.started_at
-          && window.ended_at === current.ended_at,
+          window.started_at === current.window.started_at
+          && window.ended_at === current.window.ended_at,
       )
         ? current
         : null;
     });
   }, []);
 
-  const handleSelectWindow = useCallback((selected: AnalysisDegradedWindow) => {
-    setSelectedWindow(selected);
+  const scrollToFocusedMetrics = useCallback(() => {
     window.requestAnimationFrame(() => {
       document.getElementById("recording-raw-metrics")?.scrollIntoView({
         behavior: "smooth",
@@ -749,6 +862,28 @@ export default function RecordingDetail({
       });
     });
   }, []);
+
+  const handleSelectWindow = useCallback((selected: AnalysisDegradedWindow) => {
+    setSelectedFocus({
+      source: "wifi_window",
+      started_at: selected.started_at,
+      ended_at: selected.ended_at,
+      duration_seconds: selected.duration_seconds,
+      window: selected,
+    });
+    scrollToFocusedMetrics();
+  }, [scrollToFocusedMetrics]);
+
+  const handleSelectEpisode = useCallback((selected: CrossLayerDiagnosticEpisode) => {
+    setSelectedFocus({
+      source: "cross_layer_episode",
+      started_at: selected.started_at,
+      ended_at: selected.ended_at,
+      duration_seconds: selected.duration_seconds,
+      episode: selected,
+    });
+    scrollToFocusedMetrics();
+  }, [scrollToFocusedMetrics]);
 
   useEffect(() => {
     let active = true;
@@ -816,7 +951,7 @@ export default function RecordingDetail({
 
   useEffect(() => {
     let active = true;
-    if (selectedWindow === null) {
+    if (selectedFocus === null) {
       setWindowComparison(null);
       setEvidenceCorrelation(null);
       setComparisonError(null);
@@ -833,14 +968,14 @@ export default function RecordingDetail({
       getRecordingMetricComparison(
         recordingId,
         metrics,
-        selectedWindow.started_at,
-        selectedWindow.ended_at,
+        selectedFocus.started_at,
+        selectedFocus.ended_at,
       ),
       getRecordingEvidenceCorrelation(
         recordingId,
         metrics,
-        selectedWindow.started_at,
-        selectedWindow.ended_at,
+        selectedFocus.started_at,
+        selectedFocus.ended_at,
       ),
     ]).then(([comparisonResult, correlationResult]) => {
       if (active) {
@@ -862,7 +997,7 @@ export default function RecordingDetail({
     return () => {
       active = false;
     };
-  }, [recordingId, selectedWindow]);
+  }, [recordingId, selectedFocus]);
 
   if (loading && !recording) {
     return <div className="agent-empty">Loading diagnostic recording…</div>;
@@ -958,7 +1093,9 @@ export default function RecordingDetail({
       <RecordingAnalysisPanel
         recording={recording}
         selectedWindow={selectedWindow}
+        selectedEpisode={selectedEpisode}
         onSelectWindow={handleSelectWindow}
+        onSelectEpisode={handleSelectEpisode}
         onWindowsChange={handleWindowsChange}
       />
 
@@ -971,7 +1108,7 @@ export default function RecordingDetail({
       />
 
       <DiagnosticEvidencePanel
-        selectedWindow={selectedWindow}
+        selectedFocus={selectedFocus}
         comparison={windowComparison}
         correlation={evidenceCorrelation}
         comparisonLoading={comparisonLoading}
@@ -990,22 +1127,30 @@ export default function RecordingDetail({
           </div>
           <small>Original measurements remain available for analysis.</small>
         </div>
-        {selectedWindow && (
+        {selectedFocus && (
           <div className="recording-detail-focus">
             <div>
-              <span>Focused degraded window</span>
+              <span>
+                {selectedFocus.source === "wifi_window"
+                  ? "Focused degraded window"
+                  : "Focused diagnostic episode"}
+              </span>
               <strong>
-                {formatClock(selectedWindow.started_at)} →{" "}
-                {formatClock(selectedWindow.ended_at)}
+                {formatClock(selectedFocus.started_at)} →{" "}
+                {formatClock(selectedFocus.ended_at)}
               </strong>
               <small>
-                {selectedWindow.duration_seconds.toFixed(1)}s ·{" "}
-                {selectedWindow.domains.join(" + ")}
+                {selectedFocus.duration_seconds.toFixed(1)}s ·{" "}
+                {selectedFocus.source === "wifi_window"
+                  ? selectedFocus.window.domains.join(" + ")
+                  : selectedFocus.episode.observed_domains
+                    .map((domain) => EVIDENCE_DOMAIN_LABELS[domain])
+                    .join(" · ")}
               </small>
             </div>
             <button
               type="button"
-              onClick={() => setSelectedWindow(null)}
+              onClick={() => setSelectedFocus(null)}
             >
               Clear focus
             </button>
@@ -1021,6 +1166,7 @@ export default function RecordingDetail({
               timeline={timeline}
               degradedWindows={degradedWindows}
               selectedWindow={selectedWindow}
+              selectedEpisode={selectedEpisode}
             />
           ))}
         </div>
@@ -1050,6 +1196,7 @@ export default function RecordingDetail({
               timeline={timeline}
               degradedWindows={degradedWindows}
               selectedWindow={selectedWindow}
+              selectedEpisode={selectedEpisode}
             />
           ))}
         </div>

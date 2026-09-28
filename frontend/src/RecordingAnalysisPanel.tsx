@@ -6,6 +6,7 @@ import {
 } from "./agentApi";
 import type {
   AnalysisDegradedWindow,
+  CrossLayerDiagnosticEpisode,
   DiagnosticRecording,
   RecordingAnalysis,
 } from "./agentTypes";
@@ -56,12 +57,16 @@ function evidenceDomainLabel(domain: string): string {
 export default function RecordingAnalysisPanel({
   recording,
   selectedWindow,
+  selectedEpisode,
   onSelectWindow,
+  onSelectEpisode,
   onWindowsChange,
 }: {
   recording: DiagnosticRecording;
   selectedWindow: AnalysisDegradedWindow | null;
+  selectedEpisode: CrossLayerDiagnosticEpisode | null;
   onSelectWindow: (window: AnalysisDegradedWindow) => void;
+  onSelectEpisode: (episode: CrossLayerDiagnosticEpisode) => void;
   onWindowsChange: (windows: AnalysisDegradedWindow[]) => void;
 }) {
   const [analysis, setAnalysis] = useState<RecordingAnalysis | null>(null);
@@ -305,7 +310,18 @@ export default function RecordingAnalysisPanel({
               ) : (
                 <div className="recording-cross-layer-list">
                   {analysis.summary.cross_layer_episodes.map((episode, index) => (
-                    <article key={`${episode.started_at}-${index}`}>
+                    <button
+                      type="button"
+                      key={`${episode.started_at}-${index}`}
+                      className={[
+                        "recording-cross-layer-episode",
+                        selectedEpisode?.started_at === episode.started_at
+                          && selectedEpisode?.ended_at === episode.ended_at
+                          ? "is-selected"
+                          : "",
+                      ].join(" ")}
+                      onClick={() => onSelectEpisode(episode)}
+                    >
                       <header>
                         <div>
                           <span>{episode.scope.replaceAll("_", " ")}</span>
@@ -339,7 +355,7 @@ export default function RecordingAnalysisPanel({
                           <dd>{episode.recovery_confirmed ? "confirmed" : "unconfirmed"}</dd>
                         </div>
                       </dl>
-                    </article>
+                    </button>
                   ))}
                 </div>
               )}

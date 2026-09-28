@@ -351,6 +351,22 @@ export interface CrossLayerDiagnosticEpisode {
   baselines: Record<string, number>;
 }
 
+export type DiagnosticInvestigationFocus =
+  | {
+    source: "wifi_window";
+    started_at: string;
+    ended_at: string;
+    duration_seconds: number;
+    window: AnalysisDegradedWindow;
+  }
+  | {
+    source: "cross_layer_episode";
+    started_at: string;
+    ended_at: string;
+    duration_seconds: number;
+    episode: CrossLayerDiagnosticEpisode;
+  };
+
 export interface BssidMetricComparison {
   before_samples: number;
   after_samples: number;

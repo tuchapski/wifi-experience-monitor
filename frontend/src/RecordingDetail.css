@@ -343,6 +343,13 @@
   color: #9e312b;
 }
 
+.recording-detail-episode-band {
+  pointer-events: none;
+  fill: rgba(77, 127, 183, 0.16);
+  stroke: #4d7fb7;
+  stroke-width: 1.5;
+}
+
 .recording-detail-gridline {
   stroke: #e8edf3;
   stroke-width: 1;
@@ -711,6 +718,10 @@
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--border-color, #dbe3ec);
   border-radius: 0.75rem;
+}
+
+.recording-evidence-window > .recording-evidence-window-domains {
+  grid-column: 1 / -1;
 }
 
 .recording-evidence-window span,

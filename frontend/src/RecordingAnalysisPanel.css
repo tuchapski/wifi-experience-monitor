@@ -221,29 +221,48 @@
   padding: 0 18px 14px;
 }
 
-.recording-cross-layer-list article {
+.recording-cross-layer-episode {
   min-width: 0;
   padding: 14px 15px;
   border: 1px solid #dce5ef;
   border-left: 4px solid #4d7fb7;
   border-radius: 10px;
   background: #fbfcfe;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
-.recording-cross-layer-list header {
+.recording-cross-layer-episode:hover {
+  border-color: #9fb8d3;
+  box-shadow: 0 5px 14px rgba(32, 52, 78, 0.08);
+}
+
+.recording-cross-layer-episode.is-selected {
+  border-color: #6e96c1;
+  box-shadow: 0 0 0 3px rgba(52, 105, 164, 0.11);
+}
+
+.recording-cross-layer-episode:focus-visible {
+  outline: 3px solid rgba(52, 105, 164, 0.2);
+  outline-offset: 2px;
+}
+
+.recording-cross-layer-episode header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.recording-cross-layer-list header > div {
+.recording-cross-layer-episode header > div {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.recording-cross-layer-list header span {
+.recording-cross-layer-episode header span {
   color: #6f7f92;
   font-size: 9px;
   font-weight: 800;
@@ -251,23 +270,23 @@
   text-transform: uppercase;
 }
 
-.recording-cross-layer-list header strong {
+.recording-cross-layer-episode header strong {
   color: #2f435b;
   font-size: 13px;
 }
 
-.recording-cross-layer-list header small {
+.recording-cross-layer-episode header small {
   color: #8793a2;
   font-size: 10px;
 }
 
-.recording-cross-layer-list p {
+.recording-cross-layer-episode p {
   margin: 10px 0 0;
   color: #66778b;
   font-size: 11px;
 }
 
-.recording-cross-layer-list code {
+.recording-cross-layer-episode code {
   color: #526b87;
   font-size: 10px;
 }
@@ -289,23 +308,23 @@
   text-transform: uppercase;
 }
 
-.recording-cross-layer-list dl {
+.recording-cross-layer-episode dl {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 12px 0 0;
 }
 
-.recording-cross-layer-list dl > div {
+.recording-cross-layer-episode dl > div {
   min-width: 0;
 }
 
-.recording-cross-layer-list dt {
+.recording-cross-layer-episode dt {
   color: #8692a2;
   font-size: 9px;
 }
 
-.recording-cross-layer-list dd {
+.recording-cross-layer-episode dd {
   margin: 3px 0 0;
   color: #3d526b;
   font-size: 11px;
