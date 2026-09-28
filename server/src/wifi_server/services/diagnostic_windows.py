@@ -8,26 +8,10 @@ from sqlalchemy.orm import Session
 
 from wifi_server.db.models import DiagnosticRecording
 from wifi_server.db.recording_models import RecordingMetric
-from wifi_server.metric_names import (
-    NETWORK_DNS_LATENCY_MS,
-    NETWORK_GATEWAY_JITTER_MS,
-    NETWORK_GATEWAY_LATENCY_MS,
-    NETWORK_GATEWAY_PACKET_LOSS_PERCENT,
-    NETWORK_HTTPS_TOTAL_MS,
-    NETWORK_INTERNET_JITTER_MS,
-    NETWORK_INTERNET_LATENCY_MS,
-    NETWORK_INTERNET_PACKET_LOSS_PERCENT,
-    WIFI_CHANNEL_RX_PERCENT,
-    WIFI_CHANNEL_TX_PERCENT,
-    WIFI_CHANNEL_UTILIZATION_PERCENT,
-    WIFI_NOISE_DBM,
-    WIFI_RSSI_DBM,
-    WIFI_RX_RATE_MBPS,
-    WIFI_SIGNAL_AVG_DBM,
-    WIFI_SNR_DB,
-    WIFI_TX_FAILED_PERCENT,
-    WIFI_TX_RATE_MBPS,
-    WIFI_TX_RETRIES_PER_100_PACKETS,
+from wifi_server.diagnostic_policy import (
+    EVIDENCE_DOMAIN_ORDER,
+    FINDING_RULES,
+    METRIC_EVIDENCE_DOMAIN,
 )
 from wifi_server.recording_schemas import (
     DiagnosticEvidenceDomainSummary,
@@ -35,7 +19,6 @@ from wifi_server.recording_schemas import (
     DiagnosticMetricComparison,
     DiagnosticMetricStatistics,
     DiagnosticWindowComparison,
-    EvidenceDomain,
 )
 
 
@@ -79,77 +62,6 @@ def _period_statistics(
     return _statistics(list(session.execute(statement)))
 
 
-# Minimum change in the mean required before a metric becomes a diagnostic finding.
-# Direction indicates which movement represents deterioration for that metric.
-_FINDING_RULES: dict[str, tuple[float, str]] = {
-    WIFI_RSSI_DBM: (5.0, "decrease"),
-    WIFI_SIGNAL_AVG_DBM: (5.0, "decrease"),
-    WIFI_SNR_DB: (5.0, "decrease"),
-    WIFI_TX_RATE_MBPS: (20.0, "decrease"),
-    WIFI_RX_RATE_MBPS: (20.0, "decrease"),
-    WIFI_TX_RETRIES_PER_100_PACKETS: (5.0, "increase"),
-    WIFI_TX_FAILED_PERCENT: (2.0, "increase"),
-    WIFI_CHANNEL_UTILIZATION_PERCENT: (15.0, "increase"),
-    WIFI_CHANNEL_RX_PERCENT: (15.0, "increase"),
-    WIFI_CHANNEL_TX_PERCENT: (15.0, "increase"),
-    WIFI_NOISE_DBM: (5.0, "increase"),
-    NETWORK_GATEWAY_LATENCY_MS: (10.0, "increase"),
-    NETWORK_GATEWAY_PACKET_LOSS_PERCENT: (1.0, "increase"),
-    NETWORK_GATEWAY_JITTER_MS: (5.0, "increase"),
-    NETWORK_DNS_LATENCY_MS: (50.0, "increase"),
-    NETWORK_INTERNET_LATENCY_MS: (20.0, "increase"),
-    NETWORK_INTERNET_PACKET_LOSS_PERCENT: (1.0, "increase"),
-    NETWORK_INTERNET_JITTER_MS: (10.0, "increase"),
-    NETWORK_HTTPS_TOTAL_MS: (100.0, "increase"),
-}
-
-_EVIDENCE_DOMAIN_ORDER: tuple[EvidenceDomain, ...] = (
-    "wifi_rf",
-    "local_network",
-    "dns",
-    "internet",
-    "application",
-)
-
-_EVIDENCE_DOMAIN_METRICS: dict[EvidenceDomain, frozenset[str]] = {
-    "wifi_rf": frozenset(
-        {
-            WIFI_RSSI_DBM,
-            WIFI_SIGNAL_AVG_DBM,
-            WIFI_SNR_DB,
-            WIFI_TX_RATE_MBPS,
-            WIFI_RX_RATE_MBPS,
-            WIFI_TX_RETRIES_PER_100_PACKETS,
-            WIFI_TX_FAILED_PERCENT,
-            WIFI_CHANNEL_UTILIZATION_PERCENT,
-            WIFI_CHANNEL_RX_PERCENT,
-            WIFI_CHANNEL_TX_PERCENT,
-            WIFI_NOISE_DBM,
-        }
-    ),
-    "local_network": frozenset(
-        {
-            NETWORK_GATEWAY_LATENCY_MS,
-            NETWORK_GATEWAY_PACKET_LOSS_PERCENT,
-            NETWORK_GATEWAY_JITTER_MS,
-        }
-    ),
-    "dns": frozenset({NETWORK_DNS_LATENCY_MS}),
-    "internet": frozenset(
-        {
-            NETWORK_INTERNET_LATENCY_MS,
-            NETWORK_INTERNET_PACKET_LOSS_PERCENT,
-            NETWORK_INTERNET_JITTER_MS,
-        }
-    ),
-    "application": frozenset({NETWORK_HTTPS_TOTAL_MS}),
-}
-
-_METRIC_EVIDENCE_DOMAIN: dict[str, EvidenceDomain] = {
-    metric: domain for domain, metrics in _EVIDENCE_DOMAIN_METRICS.items() for metric in metrics
-}
-
-
 def _recovery_state(
     baseline: float,
     during: float,
@@ -168,8 +80,8 @@ def _recovery_state(
 
 
 def _finding_for_comparison(comparison: DiagnosticMetricComparison) -> DiagnosticFinding | None:
-    rule = _FINDING_RULES.get(comparison.metric)
-    evidence_domain = _METRIC_EVIDENCE_DOMAIN.get(comparison.metric)
+    rule = FINDING_RULES.get(comparison.metric)
+    evidence_domain = METRIC_EVIDENCE_DOMAIN.get(comparison.metric)
     baseline = comparison.before.average
     during = comparison.during.average
     if rule is None or evidence_domain is None or baseline is None or during is None:
@@ -211,11 +123,11 @@ def _evidence_domains(
     findings: list[DiagnosticFinding],
 ) -> list[DiagnosticEvidenceDomainSummary]:
     summaries: list[DiagnosticEvidenceDomainSummary] = []
-    for domain in _EVIDENCE_DOMAIN_ORDER:
+    for domain in EVIDENCE_DOMAIN_ORDER:
         evaluated_metrics = [
             comparison.metric
             for comparison in comparisons
-            if _METRIC_EVIDENCE_DOMAIN.get(comparison.metric) == domain
+            if METRIC_EVIDENCE_DOMAIN.get(comparison.metric) == domain
             and comparison.before.sample_count > 0
             and comparison.before.average is not None
             and comparison.during.sample_count > 0

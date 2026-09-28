@@ -41,6 +41,18 @@ const BSSID_METRICS = [
   { key: "wifi.channel_utilization_percent", label: "Channel utilization", unit: "%" },
 ] as const;
 
+const EVIDENCE_DOMAIN_LABELS: Record<string, string> = {
+  wifi_rf: "Wi-Fi / RF",
+  local_network: "Local network",
+  dns: "DNS",
+  internet: "Internet / upstream",
+  application: "Application",
+};
+
+function evidenceDomainLabel(domain: string): string {
+  return EVIDENCE_DOMAIN_LABELS[domain] ?? domain.replaceAll("_", " ");
+}
+
 export default function RecordingAnalysisPanel({
   recording,
   selectedWindow,
@@ -167,6 +179,10 @@ export default function RecordingAnalysisPanel({
               <span>Degraded windows</span>
               <strong>{analysis.summary.degraded_windows?.length ?? 0}</strong>
             </article>
+            <article>
+              <span>Diagnostic episodes</span>
+              <strong>{analysis.summary.cross_layer_episodes?.length ?? 0}</strong>
+            </article>
           </div>
 
           <div className="recording-analysis-meta">
@@ -262,6 +278,75 @@ export default function RecordingAnalysisPanel({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {analysis.summary.cross_layer_episodes && (
+            <div className="recording-cross-layer">
+              <div className="recording-correlation-heading">
+                <div>
+                  <span className="agent-eyebrow">Cross-layer detection</span>
+                  <h3>Diagnostic episodes</h3>
+                  <p>
+                    Sustained deterioration relative to the initial recording baseline,
+                    grouped across Wi-Fi, local network, DNS, Internet and application evidence.
+                    Episodes define investigation intervals; they do not identify root cause.
+                  </p>
+                </div>
+                <small>
+                  {analysis.summary.cross_layer_episode_summary?.cross_layer ?? 0} cross-layer ·{" "}
+                  {analysis.summary.cross_layer_episode_summary?.single_domain ?? 0} single-domain
+                </small>
+              </div>
+              {analysis.summary.cross_layer_episodes.length === 0 ? (
+                <p className="recording-cross-layer-empty">
+                  No sustained relative deterioration formed a diagnostic episode.
+                </p>
+              ) : (
+                <div className="recording-cross-layer-list">
+                  {analysis.summary.cross_layer_episodes.map((episode, index) => (
+                    <article key={`${episode.started_at}-${index}`}>
+                      <header>
+                        <div>
+                          <span>{episode.scope.replaceAll("_", " ")}</span>
+                          <strong>
+                            {formatClock(episode.started_at)} → {formatClock(episode.ended_at)}
+                          </strong>
+                        </div>
+                        <small>{episode.duration_seconds.toFixed(1)}s</small>
+                      </header>
+                      <p>
+                        Earliest observed domain:{" "}
+                        <strong>{evidenceDomainLabel(episode.trigger_domain)}</strong>
+                        {" "}· <code>{episode.trigger_metric}</code>
+                      </p>
+                      <div className="recording-cross-layer-domains">
+                        {episode.observed_domains.map((domain) => (
+                          <span key={domain}>{evidenceDomainLabel(domain)}</span>
+                        ))}
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>Metrics</dt>
+                          <dd>{episode.metrics.length}</dd>
+                        </div>
+                        <div>
+                          <dt>Degraded samples</dt>
+                          <dd>{episode.degraded_samples}</dd>
+                        </div>
+                        <div>
+                          <dt>Recovery</dt>
+                          <dd>{episode.recovery_confirmed ? "confirmed" : "unconfirmed"}</dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+              )}
+              <p className="recording-cross-layer-note">
+                V1 uses the first 30 seconds as a fixed baseline and requires three consecutive
+                deteriorated samples per metric. Nearby metric intervals are merged within 10 seconds.
+              </p>
             </div>
           )}
 

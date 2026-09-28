@@ -335,6 +335,22 @@ export interface AnalysisDegradedWindow {
   maximum_channel_utilization_percent: number | null;
 }
 
+export interface CrossLayerDiagnosticEpisode {
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  trigger_domain: DiagnosticEvidenceDomain;
+  trigger_metric: string;
+  observed_domains: DiagnosticEvidenceDomain[];
+  scope: "single_domain" | "cross_layer";
+  metrics: string[];
+  degraded_samples: number;
+  recovery_confirmed: boolean;
+  domain_evidence: Partial<Record<DiagnosticEvidenceDomain, string[]>>;
+  peak_deltas: Record<string, number>;
+  baselines: Record<string, number>;
+}
+
 export interface BssidMetricComparison {
   before_samples: number;
   after_samples: number;
@@ -401,6 +417,14 @@ export interface RecordingAnalysisSummary {
   channel_tx_percent?: AnalysisMetricStats | null;
   survey_intervals?: number;
   degraded_windows?: AnalysisDegradedWindow[];
+  cross_layer_episodes?: CrossLayerDiagnosticEpisode[];
+  cross_layer_episode_summary?: {
+    total: number;
+    single_domain: number;
+    cross_layer: number;
+    baseline_metrics: number;
+    unavailable_baseline_metrics: string[];
+  };
   bssid_transitions?: BssidTransitionComparison[];
   collection_integrity?: CollectionIntegrity;
   disconnection_intervals?: DisconnectionInterval[];
