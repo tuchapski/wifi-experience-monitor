@@ -51,6 +51,23 @@ const NETWORK_SERVICE_METRICS = [
   { key: "network.https_total_ms", label: "HTTPS total", unit: "ms" },
 ] as const;
 
+const METRIC_DEFINITIONS = [...RECORDING_METRICS, ...NETWORK_SERVICE_METRICS] as const;
+
+const DIAGNOSTIC_COMPARISON_METRICS = [
+  "wifi.rssi_dbm",
+  "wifi.tx_retries_per_100_packets",
+  "wifi.tx_failed_percent",
+  "wifi.channel_utilization_percent",
+  "network.gateway_latency_ms",
+  "network.gateway_packet_loss_percent",
+  "network.gateway_jitter_ms",
+  "network.dns_latency_ms",
+  "network.internet_latency_ms",
+  "network.internet_packet_loss_percent",
+  "network.internet_jitter_ms",
+  "network.https_total_ms",
+] as const;
+
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
 function backToDiagnostics(agentId: string): void {
@@ -425,7 +442,7 @@ function DiagnosticEvidencePanel({
                 <strong>After</strong>
               </div>
               {comparison.metrics.map((metric) => {
-                const definition = RECORDING_METRICS.find((item) => item.key === metric.metric);
+                const definition = METRIC_DEFINITIONS.find((item) => item.key === metric.metric);
                 const renderPhase = (phase: typeof metric.before) => {
                   if (phase.sample_count === 0 || phase.average === null) return "No data";
                   return `${formatNumber(phase.average, definition?.unit ?? "")} · n=${phase.sample_count}`;
@@ -690,7 +707,7 @@ export default function RecordingDetail({
 
     setComparisonLoading(true);
     setComparisonError(null);
-    const metrics = RECORDING_METRICS.map(({ key }) => key);
+    const metrics = [...DIAGNOSTIC_COMPARISON_METRICS];
     void Promise.all([
       getRecordingMetricComparison(
         recordingId,
