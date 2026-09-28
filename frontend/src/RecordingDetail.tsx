@@ -353,6 +353,7 @@ function DiagnosticEvidencePanel({
   const correlatedEvents = correlation?.events ?? [];
   const findings = correlation?.findings ?? comparison?.findings ?? [];
   const evidenceDomains = comparison?.evidence_domains ?? correlation?.evidence_domains ?? [];
+  const probableDomain = correlation?.probable_domain ?? null;
   const findingsByDomain = evidenceDomains
     .map((domain) => ({
       ...domain,
@@ -520,6 +521,58 @@ function DiagnosticEvidencePanel({
           <p className="recording-evidence-comparison-note">
             A degraded evidence domain means one or more metrics changed beyond the comparison
             threshold. It does not identify the cause of the degradation.
+          </p>
+        </article>
+
+        <article className="recording-evidence-probable-domain">
+          <div className="recording-evidence-events-heading">
+            <h3>Probable domain</h3>
+            <small>earliest-supported-domain-v1 · heuristic interpretation</small>
+          </div>
+          {comparisonLoading ? (
+            <p className="recording-evidence-empty">Evaluating probable domain…</p>
+          ) : probableDomain === null ? (
+            <p className="recording-evidence-empty">Probable-domain assessment is unavailable.</p>
+          ) : (
+            <div className="recording-evidence-probable-card">
+              <div>
+                <span className={`recording-evidence-probable-status status-${probableDomain.status}`}>
+                  {probableDomain.status.replaceAll("_", " ")}
+                </span>
+                <strong>
+                  {probableDomain.domain
+                    ? EVIDENCE_DOMAIN_LABELS[probableDomain.domain]
+                    : probableDomain.status.replaceAll("_", " ")}
+                </strong>
+              </div>
+              <p>{probableDomain.rationale}</p>
+              <dl>
+                <div>
+                  <dt>Degraded evidence</dt>
+                  <dd>
+                    {probableDomain.degraded_domains.length > 0
+                      ? probableDomain.degraded_domains
+                        .map((domain) => EVIDENCE_DOMAIN_LABELS[domain])
+                        .join(", ")
+                      : "None observed"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Unresolved evidence</dt>
+                  <dd>
+                    {probableDomain.unresolved_domains.length > 0
+                      ? probableDomain.unresolved_domains
+                        .map((domain) => EVIDENCE_DOMAIN_LABELS[domain])
+                        .join(", ")
+                      : "None"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
+          <p className="recording-evidence-comparison-note">
+            This is not a root-cause verdict. Current focused windows are triggered by Wi-Fi
+            degradation, so the assessment is scoped to this interval rather than the whole session.
           </p>
         </article>
 

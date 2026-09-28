@@ -816,6 +816,7 @@
 }
 
 .recording-evidence-domains,
+.recording-evidence-probable-domain,
 .recording-evidence-findings {
   grid-column: 1 / -1;
 }
@@ -861,6 +862,55 @@
 .recording-evidence-domain-status.status-degraded {
   background: rgba(185, 28, 28, 0.1);
   color: #991b1b;
+}
+
+.recording-evidence-probable-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-color, #dbe3ec);
+  border-radius: 0.75rem;
+}
+
+.recording-evidence-probable-card > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.recording-evidence-probable-card p {
+  margin: 0;
+  color: #42566d;
+}
+
+.recording-evidence-probable-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.recording-evidence-probable-card dl > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.recording-evidence-probable-card dt {
+  color: var(--muted-color, #64748b);
+  font-size: 0.72rem;
+}
+
+.recording-evidence-probable-card dd {
+  margin: 0;
+}
+
+.recording-evidence-probable-status {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.12);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: capitalize;
 }
 
 .recording-evidence-finding-list {
@@ -913,11 +963,16 @@
 
 @media (max-width: 820px) {
   .recording-evidence-domains,
+  .recording-evidence-probable-domain,
   .recording-evidence-findings {
     grid-column: auto;
   }
 
   .recording-evidence-domain-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recording-evidence-probable-card dl {
     grid-template-columns: 1fr;
   }
 

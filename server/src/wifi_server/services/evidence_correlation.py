@@ -11,6 +11,7 @@ from wifi_server.recording_schemas import (
     DiagnosticEvidenceCorrelation,
 )
 from wifi_server.services.diagnostic_windows import compare_diagnostic_window
+from wifi_server.services.probable_domain import assess_probable_domain
 
 
 def _correlated_event(
@@ -76,5 +77,6 @@ def correlate_diagnostic_evidence(
         context_seconds=context_seconds,
         findings=comparison.findings,
         evidence_domains=comparison.evidence_domains,
+        probable_domain=assess_probable_domain(comparison.evidence_domains),
         events=[_correlated_event(event, window_start, window_end) for event in events],
     )

@@ -145,6 +145,12 @@ class DiagnosticMetricComparison(BaseModel):
 
 EvidenceDomain = Literal["wifi_rf", "local_network", "dns", "internet", "application"]
 EvidenceDomainStatus = Literal["degraded", "no_significant_change", "unavailable"]
+ProbableDomainAssessmentStatus = Literal[
+    "probable",
+    "ambiguous",
+    "insufficient_evidence",
+    "not_observed",
+]
 
 
 class DiagnosticEvidenceDomainSummary(BaseModel):
@@ -152,6 +158,15 @@ class DiagnosticEvidenceDomainSummary(BaseModel):
     status: EvidenceDomainStatus
     evaluated_metrics: list[str] = Field(default_factory=list)
     finding_metrics: list[str] = Field(default_factory=list)
+
+
+class DiagnosticProbableDomainAssessment(BaseModel):
+    method: Literal["earliest-supported-domain-v1"] = "earliest-supported-domain-v1"
+    status: ProbableDomainAssessmentStatus
+    domain: EvidenceDomain | None = None
+    degraded_domains: list[EvidenceDomain] = Field(default_factory=list)
+    unresolved_domains: list[EvidenceDomain] = Field(default_factory=list)
+    rationale: str
 
 
 class DiagnosticFinding(BaseModel):
@@ -192,4 +207,5 @@ class DiagnosticEvidenceCorrelation(BaseModel):
     context_seconds: int
     findings: list[DiagnosticFinding] = Field(default_factory=list)
     evidence_domains: list[DiagnosticEvidenceDomainSummary] = Field(default_factory=list)
+    probable_domain: DiagnosticProbableDomainAssessment | None = None
     events: list[CorrelatedRecordingEvent] = Field(default_factory=list)

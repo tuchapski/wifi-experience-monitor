@@ -218,6 +218,21 @@ export interface DiagnosticEvidenceDomainSummary {
   finding_metrics: string[];
 }
 
+export type DiagnosticProbableDomainStatus =
+  | "probable"
+  | "ambiguous"
+  | "insufficient_evidence"
+  | "not_observed";
+
+export interface DiagnosticProbableDomainAssessment {
+  method: "earliest-supported-domain-v1";
+  status: DiagnosticProbableDomainStatus;
+  domain: DiagnosticEvidenceDomain | null;
+  degraded_domains: DiagnosticEvidenceDomain[];
+  unresolved_domains: DiagnosticEvidenceDomain[];
+  rationale: string;
+}
+
 export interface DiagnosticFinding {
   metric: string;
   evidence_domain: DiagnosticEvidenceDomain;
@@ -256,6 +271,7 @@ export interface DiagnosticEvidenceCorrelation {
   context_seconds: number;
   findings: DiagnosticFinding[];
   evidence_domains: DiagnosticEvidenceDomainSummary[];
+  probable_domain: DiagnosticProbableDomainAssessment | null;
   events: CorrelatedRecordingEvent[];
 }
 
