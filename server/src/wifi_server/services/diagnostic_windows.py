@@ -9,6 +9,14 @@ from sqlalchemy.orm import Session
 from wifi_server.db.models import DiagnosticRecording
 from wifi_server.db.recording_models import RecordingMetric
 from wifi_server.metric_names import (
+    NETWORK_DNS_LATENCY_MS,
+    NETWORK_GATEWAY_JITTER_MS,
+    NETWORK_GATEWAY_LATENCY_MS,
+    NETWORK_GATEWAY_PACKET_LOSS_PERCENT,
+    NETWORK_HTTPS_TOTAL_MS,
+    NETWORK_INTERNET_JITTER_MS,
+    NETWORK_INTERNET_LATENCY_MS,
+    NETWORK_INTERNET_PACKET_LOSS_PERCENT,
     WIFI_CHANNEL_RX_PERCENT,
     WIFI_CHANNEL_TX_PERCENT,
     WIFI_CHANNEL_UTILIZATION_PERCENT,
@@ -83,6 +91,14 @@ _FINDING_RULES: dict[str, tuple[float, str]] = {
     WIFI_CHANNEL_RX_PERCENT: (15.0, "increase"),
     WIFI_CHANNEL_TX_PERCENT: (15.0, "increase"),
     WIFI_NOISE_DBM: (5.0, "increase"),
+    NETWORK_GATEWAY_LATENCY_MS: (10.0, "increase"),
+    NETWORK_GATEWAY_PACKET_LOSS_PERCENT: (1.0, "increase"),
+    NETWORK_GATEWAY_JITTER_MS: (5.0, "increase"),
+    NETWORK_DNS_LATENCY_MS: (50.0, "increase"),
+    NETWORK_INTERNET_LATENCY_MS: (20.0, "increase"),
+    NETWORK_INTERNET_PACKET_LOSS_PERCENT: (1.0, "increase"),
+    NETWORK_INTERNET_JITTER_MS: (10.0, "increase"),
+    NETWORK_HTTPS_TOTAL_MS: (100.0, "increase"),
 }
 
 
