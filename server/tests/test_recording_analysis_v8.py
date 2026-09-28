@@ -18,9 +18,27 @@ def series(metric: str, baseline: float, degraded: float | None = None) -> list[
     return samples
 
 
+def stable(metric: str, baseline: float) -> list[MetricSample]:
+    samples = series(metric, baseline)
+    samples.extend(sample(second, metric, baseline) for second in (60, 65, 70, 75, 80))
+    return samples
+
+
 def analyze(metrics: list[MetricSample]):
+    cycles = [
+        MetricSample(
+            START + timedelta(seconds=second),
+            "sensor.collection_cycle",
+            1.0,
+            {
+                "configured_interval_seconds": 5.0,
+                "collector_errors_count": 0,
+            },
+        )
+        for second in range(0, 91, 5)
+    ]
     return analyze_recording(
-        metrics,
+        [*metrics, *cycles],
         [],
         started_at=START,
         ended_at=START + timedelta(seconds=90),
@@ -84,6 +102,8 @@ def test_internet_only_degradation_creates_episode_without_wifi_trigger() -> Non
     assert episode["trigger_domain"] == "internet"
     assert episode["observed_domains"] == ["internet"]
     assert episode["scope"] == "single_domain"
+    assert result.summary["degraded_windows"] == []
+    assert result.summary["status"] == "observed"
 
 
 def test_dns_only_degradation_is_detected_as_independent_episode() -> None:
@@ -100,6 +120,8 @@ def test_dns_only_degradation_is_detected_as_independent_episode() -> None:
     episode = result.summary["cross_layer_episodes"][0]
     assert episode["trigger_domain"] == "dns"
     assert episode["observed_domains"] == ["dns"]
+    assert result.summary["degraded_windows"] == []
+    assert result.summary["status"] == "observed"
 
 
 def test_nearby_domain_degradations_merge_into_one_episode() -> None:
@@ -154,3 +176,65 @@ def test_episode_without_recovery_samples_is_marked_unconfirmed() -> None:
 
     episode = result.summary["cross_layer_episodes"][0]
     assert episode["recovery_confirmed"] is False
+
+
+def test_application_only_degradation_creates_non_wifi_episode() -> None:
+    metrics = [
+        *stable("wifi.rssi_dbm", -55.0),
+        *stable("network.gateway_latency_ms", 3.0),
+        *stable("network.dns_latency_ms", 3.0),
+        *stable("network.internet_latency_ms", 20.0),
+        *series("network.https_total_ms", 50.0, 220.0),
+    ]
+
+    result = analyze(metrics)
+
+    assert result.summary["degraded_windows"] == []
+    assert len(result.summary["cross_layer_episodes"]) == 1
+    episode = result.summary["cross_layer_episodes"][0]
+    assert episode["trigger_domain"] == "application"
+    assert episode["observed_domains"] == ["application"]
+    assert episode["scope"] == "single_domain"
+    assert result.summary["status"] == "observed"
+
+
+def test_local_network_first_episode_can_propagate_without_wifi_degradation() -> None:
+    metrics = [
+        *stable("wifi.rssi_dbm", -55.0),
+        *series("network.gateway_latency_ms", 3.0, 40.0),
+        *stable("network.dns_latency_ms", 3.0),
+        *series("network.internet_latency_ms", 20.0, 90.0),
+        *series("network.https_total_ms", 50.0, 220.0),
+    ]
+
+    result = analyze(metrics)
+
+    assert result.summary["degraded_windows"] == []
+    episode = result.summary["cross_layer_episodes"][0]
+    assert episode["trigger_domain"] == "local_network"
+    assert episode["observed_domains"] == [
+        "local_network",
+        "internet",
+        "application",
+    ]
+    assert episode["scope"] == "cross_layer"
+    assert result.summary["status"] == "observed"
+
+
+def test_parallel_dns_and_internet_degradation_remains_one_cross_layer_episode() -> None:
+    metrics = [
+        *stable("wifi.rssi_dbm", -55.0),
+        *stable("network.gateway_latency_ms", 3.0),
+        *series("network.dns_latency_ms", 3.0, 90.0),
+        *series("network.internet_latency_ms", 20.0, 90.0),
+        *series("network.https_total_ms", 50.0, 220.0),
+    ]
+
+    result = analyze(metrics)
+
+    assert result.summary["degraded_windows"] == []
+    episode = result.summary["cross_layer_episodes"][0]
+    assert episode["trigger_domain"] == "dns"
+    assert episode["observed_domains"] == ["dns", "internet", "application"]
+    assert episode["scope"] == "cross_layer"
+    assert result.summary["status"] == "observed"

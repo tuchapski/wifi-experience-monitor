@@ -291,6 +291,8 @@ def analyze_recording(
     episodes, episode_summary = _cross_layer_episodes(metrics, started_at)
     summary["cross_layer_episodes"] = episodes
     summary["cross_layer_episode_summary"] = episode_summary
+    if episodes and summary["status"] == "clear":
+        summary["status"] = "observed"
 
     limitations = list(summary.get("limitations", []))
     if episode_summary["unavailable_baseline_metrics"]:
@@ -329,6 +331,10 @@ def analyze_recording(
         (
             "Episode trigger_domain is the earliest monitored degraded domain after the "
             "fixed initial baseline and is not a causal attribution."
+        ),
+        (
+            "A cross-layer episode upgrades a clear recording assessment to observed; "
+            "v8 does not assign warning or critical severity to episodes."
         ),
     ]
     return RecordingAnalysisResult(summary=summary, findings=base.findings, policy=policy)
