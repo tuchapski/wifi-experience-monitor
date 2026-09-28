@@ -47,6 +47,9 @@ def test_correlation_classifies_events_around_window_without_claiming_causality(
 
     assert len(result.findings) == 1
     assert result.findings[0].metric == "wifi.rssi_dbm"
+    assert result.findings[0].evidence_domain == "wifi_rf"
+    assert result.evidence_domains[0].domain == "wifi_rf"
+    assert result.evidence_domains[0].status == "degraded"
     assert [event.phase for event in result.events] == ["before", "during", "after"]
     assert [event.distance_seconds for event in result.events] == [3.0, 0.0, 12.0]
     assert [event.seconds_from_window_start for event in result.events] == [-3.0, 8.0, 42.0]
@@ -73,6 +76,7 @@ def test_correlation_uses_recording_bounds_for_context_query() -> None:
     )
 
     assert result.findings == []
+    assert all(item.status == "unavailable" for item in result.evidence_domains)
     assert result.events == []
     statement = session.scalars.call_args.args[0]
     compiled = str(statement.compile(compile_kwargs={"literal_binds": True}))

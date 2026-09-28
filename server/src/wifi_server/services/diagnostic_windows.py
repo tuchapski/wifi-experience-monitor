@@ -30,10 +30,12 @@ from wifi_server.metric_names import (
     WIFI_TX_RETRIES_PER_100_PACKETS,
 )
 from wifi_server.recording_schemas import (
+    DiagnosticEvidenceDomainSummary,
     DiagnosticFinding,
     DiagnosticMetricComparison,
     DiagnosticMetricStatistics,
     DiagnosticWindowComparison,
+    EvidenceDomain,
 )
 
 
@@ -101,6 +103,52 @@ _FINDING_RULES: dict[str, tuple[float, str]] = {
     NETWORK_HTTPS_TOTAL_MS: (100.0, "increase"),
 }
 
+_EVIDENCE_DOMAIN_ORDER: tuple[EvidenceDomain, ...] = (
+    "wifi_rf",
+    "local_network",
+    "dns",
+    "internet",
+    "application",
+)
+
+_EVIDENCE_DOMAIN_METRICS: dict[EvidenceDomain, frozenset[str]] = {
+    "wifi_rf": frozenset(
+        {
+            WIFI_RSSI_DBM,
+            WIFI_SIGNAL_AVG_DBM,
+            WIFI_SNR_DB,
+            WIFI_TX_RATE_MBPS,
+            WIFI_RX_RATE_MBPS,
+            WIFI_TX_RETRIES_PER_100_PACKETS,
+            WIFI_TX_FAILED_PERCENT,
+            WIFI_CHANNEL_UTILIZATION_PERCENT,
+            WIFI_CHANNEL_RX_PERCENT,
+            WIFI_CHANNEL_TX_PERCENT,
+            WIFI_NOISE_DBM,
+        }
+    ),
+    "local_network": frozenset(
+        {
+            NETWORK_GATEWAY_LATENCY_MS,
+            NETWORK_GATEWAY_PACKET_LOSS_PERCENT,
+            NETWORK_GATEWAY_JITTER_MS,
+        }
+    ),
+    "dns": frozenset({NETWORK_DNS_LATENCY_MS}),
+    "internet": frozenset(
+        {
+            NETWORK_INTERNET_LATENCY_MS,
+            NETWORK_INTERNET_PACKET_LOSS_PERCENT,
+            NETWORK_INTERNET_JITTER_MS,
+        }
+    ),
+    "application": frozenset({NETWORK_HTTPS_TOTAL_MS}),
+}
+
+_METRIC_EVIDENCE_DOMAIN: dict[str, EvidenceDomain] = {
+    metric: domain for domain, metrics in _EVIDENCE_DOMAIN_METRICS.items() for metric in metrics
+}
+
 
 def _recovery_state(
     baseline: float,
@@ -121,9 +169,10 @@ def _recovery_state(
 
 def _finding_for_comparison(comparison: DiagnosticMetricComparison) -> DiagnosticFinding | None:
     rule = _FINDING_RULES.get(comparison.metric)
+    evidence_domain = _METRIC_EVIDENCE_DOMAIN.get(comparison.metric)
     baseline = comparison.before.average
     during = comparison.during.average
-    if rule is None or baseline is None or during is None:
+    if rule is None or evidence_domain is None or baseline is None or during is None:
         return None
 
     threshold, deteriorating_direction = rule
@@ -136,6 +185,7 @@ def _finding_for_comparison(comparison: DiagnosticMetricComparison) -> Diagnosti
 
     return DiagnosticFinding(
         metric=comparison.metric,
+        evidence_domain=evidence_domain,
         direction="decreased" if delta < 0 else "increased",
         baseline=baseline,
         during=during,
@@ -154,6 +204,41 @@ def _findings(comparisons: list[DiagnosticMetricComparison]) -> list[DiagnosticF
     return [
         finding for comparison in comparisons if (finding := _finding_for_comparison(comparison))
     ]
+
+
+def _evidence_domains(
+    comparisons: list[DiagnosticMetricComparison],
+    findings: list[DiagnosticFinding],
+) -> list[DiagnosticEvidenceDomainSummary]:
+    summaries: list[DiagnosticEvidenceDomainSummary] = []
+    for domain in _EVIDENCE_DOMAIN_ORDER:
+        evaluated_metrics = [
+            comparison.metric
+            for comparison in comparisons
+            if _METRIC_EVIDENCE_DOMAIN.get(comparison.metric) == domain
+            and comparison.before.sample_count > 0
+            and comparison.before.average is not None
+            and comparison.during.sample_count > 0
+            and comparison.during.average is not None
+        ]
+        finding_metrics = [
+            finding.metric for finding in findings if finding.evidence_domain == domain
+        ]
+        if finding_metrics:
+            domain_status = "degraded"
+        elif evaluated_metrics:
+            domain_status = "no_significant_change"
+        else:
+            domain_status = "unavailable"
+        summaries.append(
+            DiagnosticEvidenceDomainSummary(
+                domain=domain,
+                status=domain_status,
+                evaluated_metrics=evaluated_metrics,
+                finding_metrics=finding_metrics,
+            )
+        )
+    return summaries
 
 
 def compare_diagnostic_window(
@@ -192,6 +277,7 @@ def compare_diagnostic_window(
         )
         for metric in metrics
     ]
+    findings = _findings(comparisons)
     return DiagnosticWindowComparison(
         window_start=window_start,
         window_end=window_end,
@@ -199,5 +285,6 @@ def compare_diagnostic_window(
         before_start=before_start,
         after_end=after_end,
         metrics=comparisons,
-        findings=_findings(comparisons),
+        findings=findings,
+        evidence_domains=_evidence_domains(comparisons, findings),
     )

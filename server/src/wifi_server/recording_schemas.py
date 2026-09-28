@@ -143,8 +143,20 @@ class DiagnosticMetricComparison(BaseModel):
     after: DiagnosticMetricStatistics
 
 
+EvidenceDomain = Literal["wifi_rf", "local_network", "dns", "internet", "application"]
+EvidenceDomainStatus = Literal["degraded", "no_significant_change", "unavailable"]
+
+
+class DiagnosticEvidenceDomainSummary(BaseModel):
+    domain: EvidenceDomain
+    status: EvidenceDomainStatus
+    evaluated_metrics: list[str] = Field(default_factory=list)
+    finding_metrics: list[str] = Field(default_factory=list)
+
+
 class DiagnosticFinding(BaseModel):
     metric: str
+    evidence_domain: EvidenceDomain
     direction: str
     baseline: float
     during: float
@@ -161,6 +173,7 @@ class DiagnosticWindowComparison(BaseModel):
     after_end: datetime
     metrics: list[DiagnosticMetricComparison]
     findings: list[DiagnosticFinding] = Field(default_factory=list)
+    evidence_domains: list[DiagnosticEvidenceDomainSummary] = Field(default_factory=list)
 
 
 class CorrelatedRecordingEvent(BaseModel):
@@ -178,4 +191,5 @@ class DiagnosticEvidenceCorrelation(BaseModel):
     window_end: datetime
     context_seconds: int
     findings: list[DiagnosticFinding] = Field(default_factory=list)
+    evidence_domains: list[DiagnosticEvidenceDomainSummary] = Field(default_factory=list)
     events: list[CorrelatedRecordingEvent] = Field(default_factory=list)

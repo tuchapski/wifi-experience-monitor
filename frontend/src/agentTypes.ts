@@ -199,8 +199,28 @@ export interface DiagnosticMetricComparison {
   after: DiagnosticMetricStatistics;
 }
 
+export type DiagnosticEvidenceDomain =
+  | "wifi_rf"
+  | "local_network"
+  | "dns"
+  | "internet"
+  | "application";
+
+export type DiagnosticEvidenceDomainStatus =
+  | "degraded"
+  | "no_significant_change"
+  | "unavailable";
+
+export interface DiagnosticEvidenceDomainSummary {
+  domain: DiagnosticEvidenceDomain;
+  status: DiagnosticEvidenceDomainStatus;
+  evaluated_metrics: string[];
+  finding_metrics: string[];
+}
+
 export interface DiagnosticFinding {
   metric: string;
+  evidence_domain: DiagnosticEvidenceDomain;
   direction: string;
   baseline: number;
   during: number;
@@ -217,6 +237,7 @@ export interface DiagnosticWindowComparison {
   after_end: string;
   metrics: DiagnosticMetricComparison[];
   findings: DiagnosticFinding[];
+  evidence_domains: DiagnosticEvidenceDomainSummary[];
 }
 
 export interface CorrelatedRecordingEvent {
@@ -234,6 +255,7 @@ export interface DiagnosticEvidenceCorrelation {
   window_end: string;
   context_seconds: number;
   findings: DiagnosticFinding[];
+  evidence_domains: DiagnosticEvidenceDomainSummary[];
   events: CorrelatedRecordingEvent[];
 }
 

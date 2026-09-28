@@ -75,5 +75,6 @@ def correlate_diagnostic_evidence(
         window_end=window_end,
         context_seconds=context_seconds,
         findings=comparison.findings,
+        evidence_domains=comparison.evidence_domains,
         events=[_correlated_event(event, window_start, window_end) for event in events],
     )

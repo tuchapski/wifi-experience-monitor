@@ -79,6 +79,7 @@ def test_findings_detect_meaningful_deterioration_and_recovery() -> None:
     assert len(result.findings) == 1
     finding = result.findings[0]
     assert finding.metric == "wifi.rssi_dbm"
+    assert finding.evidence_domain == "wifi_rf"
     assert finding.direction == "decreased"
     assert finding.baseline == -52.0
     assert finding.during == -70.0
@@ -123,16 +124,16 @@ def test_findings_ignore_noise_and_preserve_unknown_recovery() -> None:
 
 
 @pytest.mark.parametrize(
-    ("metric", "baseline", "during", "after", "expected_delta"),
+    ("metric", "baseline", "during", "after", "expected_delta", "expected_domain"),
     [
-        ("network.gateway_latency_ms", 3.0, 30.0, 4.0, 27.0),
-        ("network.gateway_packet_loss_percent", 0.0, 3.0, 0.0, 3.0),
-        ("network.gateway_jitter_ms", 1.0, 15.0, 1.5, 14.0),
-        ("network.dns_latency_ms", 3.0, 80.0, 4.0, 77.0),
-        ("network.internet_latency_ms", 20.0, 90.0, 22.0, 70.0),
-        ("network.internet_packet_loss_percent", 0.0, 4.0, 0.0, 4.0),
-        ("network.internet_jitter_ms", 3.0, 20.0, 4.0, 17.0),
-        ("network.https_total_ms", 50.0, 250.0, 60.0, 200.0),
+        ("network.gateway_latency_ms", 3.0, 30.0, 4.0, 27.0, "local_network"),
+        ("network.gateway_packet_loss_percent", 0.0, 3.0, 0.0, 3.0, "local_network"),
+        ("network.gateway_jitter_ms", 1.0, 15.0, 1.5, 14.0, "local_network"),
+        ("network.dns_latency_ms", 3.0, 80.0, 4.0, 77.0, "dns"),
+        ("network.internet_latency_ms", 20.0, 90.0, 22.0, 70.0, "internet"),
+        ("network.internet_packet_loss_percent", 0.0, 4.0, 0.0, 4.0, "internet"),
+        ("network.internet_jitter_ms", 3.0, 20.0, 4.0, 17.0, "internet"),
+        ("network.https_total_ms", 50.0, 250.0, 60.0, 200.0, "application"),
     ],
 )
 def test_network_service_findings_detect_meaningful_deterioration(
@@ -141,6 +142,7 @@ def test_network_service_findings_detect_meaningful_deterioration(
     during: float,
     after: float,
     expected_delta: float,
+    expected_domain: str,
 ) -> None:
     session = Mock(spec=Session)
     start = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
@@ -163,6 +165,7 @@ def test_network_service_findings_detect_meaningful_deterioration(
     assert len(result.findings) == 1
     finding = result.findings[0]
     assert finding.metric == metric
+    assert finding.evidence_domain == expected_domain
     assert finding.direction == "increased"
     assert finding.delta == pytest.approx(expected_delta)
     assert finding.recovery == "recovered"
@@ -188,6 +191,60 @@ def test_network_service_findings_ignore_small_dns_variation() -> None:
     )
 
     assert result.findings == []
+    dns_domain = next(item for item in result.evidence_domains if item.domain == "dns")
+    assert dns_domain.status == "no_significant_change"
+    assert dns_domain.evaluated_metrics == ["network.dns_latency_ms"]
+    assert dns_domain.finding_metrics == []
+
+
+def test_evidence_domains_separate_degradation_from_unavailable_data() -> None:
+    session = Mock(spec=Session)
+    start = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
+    metrics = [
+        "wifi.rssi_dbm",
+        "network.gateway_latency_ms",
+        "network.dns_latency_ms",
+        "network.internet_latency_ms",
+        "network.https_total_ms",
+    ]
+    session.get.return_value = Mock(started_at=start, ended_at=start + timedelta(minutes=10))
+    session.execute.side_effect = [
+        iter(
+            [
+                ("wifi.rssi_dbm", 5, -56.0, -55.0, -54.0),
+                ("network.gateway_latency_ms", 5, 2.0, 3.0, 4.0),
+                ("network.dns_latency_ms", 5, 2.0, 3.0, 4.0),
+                ("network.internet_latency_ms", 5, 18.0, 20.0, 22.0),
+            ]
+        ),
+        iter(
+            [
+                ("wifi.rssi_dbm", 5, -81.0, -80.0, -79.0),
+                ("network.gateway_latency_ms", 5, 25.0, 30.0, 35.0),
+                ("network.dns_latency_ms", 5, 2.5, 3.5, 4.5),
+                ("network.internet_latency_ms", 5, 80.0, 90.0, 100.0),
+            ]
+        ),
+        iter([]),
+    ]
+
+    result = compare_diagnostic_window(
+        session,
+        "rec_test",
+        metrics,
+        start + timedelta(seconds=60),
+        start + timedelta(seconds=90),
+        30,
+    )
+
+    domains = {item.domain: item for item in result.evidence_domains}
+    assert domains["wifi_rf"].status == "degraded"
+    assert domains["local_network"].status == "degraded"
+    assert domains["dns"].status == "no_significant_change"
+    assert domains["internet"].status == "degraded"
+    assert domains["application"].status == "unavailable"
+    assert domains["application"].evaluated_metrics == []
+    assert domains["application"].finding_metrics == []
 
 
 @pytest.mark.parametrize(
@@ -228,6 +285,7 @@ def test_findings_use_canonical_recorded_metric_names(
     assert len(result.findings) == 1
     finding = result.findings[0]
     assert finding.metric == metric
+    assert finding.evidence_domain == "wifi_rf"
     assert finding.direction == "increased"
     assert finding.delta == expected_delta
     assert finding.recovery == "recovered"

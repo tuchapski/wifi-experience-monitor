@@ -13,6 +13,7 @@ import type {
   AnalysisDegradedWindow,
   AgentSummary,
   DiagnosticEvidenceCorrelation,
+  DiagnosticEvidenceDomain,
   DiagnosticRecording,
   DiagnosticWindowComparison,
   RecordingEvent,
@@ -67,6 +68,14 @@ const DIAGNOSTIC_COMPARISON_METRICS = [
   "network.internet_jitter_ms",
   "network.https_total_ms",
 ] as const;
+
+const EVIDENCE_DOMAIN_LABELS: Record<DiagnosticEvidenceDomain, string> = {
+  wifi_rf: "Wi-Fi / RF",
+  local_network: "Local network",
+  dns: "DNS",
+  internet: "Internet / upstream",
+  application: "Application",
+};
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
@@ -343,6 +352,13 @@ function DiagnosticEvidencePanel({
 
   const correlatedEvents = correlation?.events ?? [];
   const findings = correlation?.findings ?? comparison?.findings ?? [];
+  const evidenceDomains = comparison?.evidence_domains ?? correlation?.evidence_domains ?? [];
+  const findingsByDomain = evidenceDomains
+    .map((domain) => ({
+      ...domain,
+      findings: findings.filter((finding) => finding.evidence_domain === domain.domain),
+    }))
+    .filter((domain) => domain.findings.length > 0);
   const metrics = [
     { label: "Minimum RSSI", value: selectedWindow.minimum_rssi_dbm, unit: "dBm" },
     {
@@ -391,7 +407,7 @@ function DiagnosticEvidencePanel({
           <strong>{selectedWindow.duration_seconds.toFixed(1)}s</strong>
         </div>
         <div>
-          <span>Domains</span>
+          <span>Wi-Fi domains</span>
           <strong>{selectedWindow.domains.join(" + ") || "—"}</strong>
         </div>
       </div>
@@ -463,6 +479,50 @@ function DiagnosticEvidencePanel({
           </p>
         </article>
 
+        <article className="recording-evidence-domains">
+          <div className="recording-evidence-events-heading">
+            <h3>Evidence domains</h3>
+            <small>Descriptive grouping · no causal attribution</small>
+          </div>
+          {comparisonLoading ? (
+            <p className="recording-evidence-empty">Classifying evidence domains…</p>
+          ) : evidenceDomains.length === 0 ? (
+            <p className="recording-evidence-empty">Evidence-domain summary is unavailable.</p>
+          ) : (
+            <div className="recording-evidence-domain-grid">
+              {evidenceDomains.map((domain) => (
+                <div key={domain.domain}>
+                  <div>
+                    <strong>{EVIDENCE_DOMAIN_LABELS[domain.domain]}</strong>
+                    <span className={`recording-evidence-domain-status status-${domain.status}`}>
+                      {domain.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <small>
+                    {domain.evaluated_metrics.length} comparable metric(s) ·{" "}
+                    {domain.finding_metrics.length} finding(s)
+                  </small>
+                  <span>
+                    {domain.finding_metrics.length > 0
+                      ? domain.finding_metrics
+                        .map((metric) =>
+                          METRIC_DEFINITIONS.find((item) => item.key === metric)?.label ?? metric
+                        )
+                        .join(", ")
+                      : domain.status === "no_significant_change"
+                        ? "No threshold-qualified deterioration."
+                        : "No comparable evidence."}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="recording-evidence-comparison-note">
+            A degraded evidence domain means one or more metrics changed beyond the comparison
+            threshold. It does not identify the cause of the degradation.
+          </p>
+        </article>
+
         <article className="recording-evidence-findings">
           <div className="recording-evidence-events-heading">
             <h3>Quantitative findings</h3>
@@ -476,24 +536,32 @@ function DiagnosticEvidencePanel({
             </p>
           ) : (
             <div className="recording-evidence-finding-list">
-              {findings.map((finding) => {
-                const definition = RECORDING_METRICS.find((item) => item.key === finding.metric);
-                const unit = definition?.unit ?? "";
-                return (
-                  <div key={finding.metric}>
-                    <strong>{definition?.label ?? finding.metric}</strong>
-                    <span>
-                      {formatNumber(finding.baseline, unit)} → {formatNumber(finding.during, unit)}
-                    </span>
-                    <span className="recording-evidence-delta">
-                      Δ {finding.delta > 0 ? "+" : ""}{finding.delta.toFixed(1)} {unit}
-                    </span>
-                    <span className="recording-evidence-recovery">
-                      {finding.recovery.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                );
-              })}
+              {findingsByDomain.map((group) => (
+                <section className="recording-evidence-finding-group" key={group.domain}>
+                  <h4>{EVIDENCE_DOMAIN_LABELS[group.domain]}</h4>
+                  {group.findings.map((finding) => {
+                    const definition = METRIC_DEFINITIONS.find(
+                      (item) => item.key === finding.metric,
+                    );
+                    const unit = definition?.unit ?? "";
+                    return (
+                      <div className="recording-evidence-finding-row" key={finding.metric}>
+                        <strong>{definition?.label ?? finding.metric}</strong>
+                        <span>
+                          {formatNumber(finding.baseline, unit)} →{" "}
+                          {formatNumber(finding.during, unit)}
+                        </span>
+                        <span className="recording-evidence-delta">
+                          Δ {finding.delta > 0 ? "+" : ""}{finding.delta.toFixed(1)} {unit}
+                        </span>
+                        <span className="recording-evidence-recovery">
+                          {finding.recovery.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </section>
+              ))}
             </div>
           )}
         </article>

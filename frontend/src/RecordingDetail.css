@@ -815,16 +815,72 @@
   color: var(--muted-color, #64748b);
 }
 
+.recording-evidence-domains,
 .recording-evidence-findings {
   grid-column: 1 / -1;
 }
 
-.recording-evidence-finding-list {
+.recording-evidence-domain-grid {
   display: grid;
-  gap: 0.4rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
-.recording-evidence-finding-list > div {
+.recording-evidence-domain-grid > div {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #dbe3ec);
+  border-radius: 0.65rem;
+}
+
+.recording-evidence-domain-grid > div > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.recording-evidence-domain-grid small,
+.recording-evidence-domain-grid > div > span {
+  color: var(--muted-color, #64748b);
+  font-size: 0.75rem;
+}
+
+.recording-evidence-domain-status {
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.12);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.recording-evidence-domain-status.status-degraded {
+  background: rgba(185, 28, 28, 0.1);
+  color: #991b1b;
+}
+
+.recording-evidence-finding-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.recording-evidence-finding-group {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.recording-evidence-finding-group h4 {
+  margin: 0.25rem 0;
+  color: #5f7085;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.recording-evidence-finding-row {
   display: grid;
   grid-template-columns: minmax(9rem, 1.2fr) minmax(11rem, 1.4fr) minmax(7rem, 0.8fr) auto;
   align-items: center;
@@ -833,11 +889,11 @@
   border-top: 1px solid var(--border-color, #dbe3ec);
 }
 
-.recording-evidence-finding-list strong {
+.recording-evidence-finding-row strong {
   color: #2c4058;
 }
 
-.recording-evidence-finding-list span {
+.recording-evidence-finding-row span {
   font-variant-numeric: tabular-nums;
 }
 
@@ -856,11 +912,16 @@
 }
 
 @media (max-width: 820px) {
+  .recording-evidence-domains,
   .recording-evidence-findings {
     grid-column: auto;
   }
 
-  .recording-evidence-finding-list > div {
+  .recording-evidence-domain-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recording-evidence-finding-row {
     grid-template-columns: 1fr 1fr;
   }
 }
