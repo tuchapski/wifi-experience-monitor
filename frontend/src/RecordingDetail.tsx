@@ -246,15 +246,21 @@ function RawMetricChart({
 function InvestigationTimeline({
   timeline,
   degradedWindows,
+  crossLayerEpisodes,
   events,
   selectedWindow,
+  selectedEpisode,
   onSelectWindow,
+  onSelectEpisode,
 }: {
   timeline: TimelineBounds | null;
   degradedWindows: AnalysisDegradedWindow[];
+  crossLayerEpisodes: CrossLayerDiagnosticEpisode[];
   events: RecordingEvent[];
   selectedWindow: AnalysisDegradedWindow | null;
+  selectedEpisode: CrossLayerDiagnosticEpisode | null;
   onSelectWindow: (window: AnalysisDegradedWindow) => void;
+  onSelectEpisode: (episode: CrossLayerDiagnosticEpisode) => void;
 }) {
   if (timeline === null) return null;
 
@@ -272,13 +278,17 @@ function InvestigationTimeline({
     return "state";
   };
   const lanes = [
-    { key: "degraded", label: "Degraded windows" },
+    { key: "episodes", label: "Diagnostic episodes" },
+    { key: "degraded", label: "Wi-Fi degraded windows" },
     { key: "bssid", label: "BSSID changes" },
     { key: "channel", label: "Channel changes" },
     { key: "state", label: "Other state" },
   ] as const;
-  const selectedKey = selectedWindow
+  const selectedWindowKey = selectedWindow
     ? `${selectedWindow.started_at}:${selectedWindow.ended_at}`
+    : null;
+  const selectedEpisodeKey = selectedEpisode
+    ? `${selectedEpisode.started_at}:${selectedEpisode.ended_at}`
     : null;
 
   return (
@@ -286,8 +296,11 @@ function InvestigationTimeline({
       <div className="recording-detail-section-heading">
         <div>
           <span className="agent-eyebrow">Investigation timeline</span>
-          <h2>Wi-Fi evidence on one clock</h2>
-          <p>Compare degraded periods with observed state changes across the recording.</p>
+          <h2>Cross-layer evidence on one clock</h2>
+          <p>
+            Compare diagnostic episodes, Wi-Fi degraded periods and observed state changes
+            across the recording.
+          </p>
         </div>
         <small>Temporal proximity is context for investigation, not proof of causality.</small>
       </div>
@@ -301,6 +314,30 @@ function InvestigationTimeline({
             <strong>{lane.label}</strong>
             <div className="recording-investigation-track">
               <i className="recording-investigation-baseline" aria-hidden="true" />
+              {lane.key === "episodes" && crossLayerEpisodes.map((episode) => {
+                const start = positionForTime(episode.started_at);
+                const end = positionForTime(episode.ended_at);
+                if (start === null || end === null) return null;
+                const key = `${episode.started_at}:${episode.ended_at}`;
+                const domains = episode.observed_domains
+                  .map((domain) => EVIDENCE_DOMAIN_LABELS[domain])
+                  .join(" · ");
+                return (
+                  <button
+                    type="button"
+                    key={key}
+                    className={[
+                      "recording-investigation-episode",
+                      `episode-${episode.scope.replaceAll("_", "-")}`,
+                      selectedEpisodeKey === key ? "is-selected" : "",
+                    ].join(" ")}
+                    style={{ left: `${start}%`, width: `${Math.max(0.35, end - start)}%` }}
+                    title={`${episode.scope.replaceAll("_", " ")}: ${formatClock(episode.started_at)} → ${formatClock(episode.ended_at)} · earliest ${EVIDENCE_DOMAIN_LABELS[episode.trigger_domain]} · ${domains}`}
+                    aria-label={`Focus diagnostic episode from ${formatClock(episode.started_at)} to ${formatClock(episode.ended_at)}`}
+                    onClick={() => onSelectEpisode(episode)}
+                  />
+                );
+              })}
               {lane.key === "degraded" && degradedWindows.map((window) => {
                 const start = positionForTime(window.started_at);
                 const end = positionForTime(window.ended_at);
@@ -313,7 +350,7 @@ function InvestigationTimeline({
                     className={[
                       "recording-investigation-window",
                       `window-${window.severity}`,
-                      selectedKey === key ? "is-selected" : "",
+                      selectedWindowKey === key ? "is-selected" : "",
                     ].join(" ")}
                     style={{ left: `${start}%`, width: `${Math.max(0.35, end - start)}%` }}
                     title={`${window.severity}: ${formatClock(window.started_at)} → ${formatClock(window.ended_at)} · ${window.domains.join(" + ")}`}
@@ -322,7 +359,7 @@ function InvestigationTimeline({
                   />
                 );
               })}
-              {lane.key !== "degraded" && events.map((event, index) => {
+              {lane.key !== "episodes" && lane.key !== "degraded" && events.map((event, index) => {
                 if (eventLane(event) !== lane.key) return null;
                 const left = positionForTime(event.observed_at);
                 if (left === null) return null;
@@ -344,8 +381,9 @@ function InvestigationTimeline({
           </div>
         ))}
         <div className="recording-investigation-legend">
-          <span><i className="legend-window legend-warning" />Warning degradation</span>
-          <span><i className="legend-window legend-critical" />Critical degradation</span>
+          <span><i className="legend-window legend-episode" />Diagnostic episode</span>
+          <span><i className="legend-window legend-warning" />Wi-Fi warning</span>
+          <span><i className="legend-window legend-critical" />Wi-Fi critical</span>
           <span><i className="legend-marker" />Observed state change</span>
         </div>
       </div>
@@ -793,6 +831,8 @@ export default function RecordingDetail({
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [degradedWindows, setDegradedWindows] = useState<AnalysisDegradedWindow[]>([]);
+  const [crossLayerEpisodes, setCrossLayerEpisodes] =
+    useState<CrossLayerDiagnosticEpisode[]>([]);
   const [selectedFocus, setSelectedFocus] =
     useState<DiagnosticInvestigationFocus | null>(null);
   const selectedWindow = selectedFocus?.source === "wifi_window"
@@ -848,6 +888,20 @@ export default function RecordingDetail({
         (window) =>
           window.started_at === current.window.started_at
           && window.ended_at === current.window.ended_at,
+      )
+        ? current
+        : null;
+    });
+  }, []);
+
+  const handleEpisodesChange = useCallback((episodes: CrossLayerDiagnosticEpisode[]) => {
+    setCrossLayerEpisodes(episodes);
+    setSelectedFocus((current) => {
+      if (current?.source !== "cross_layer_episode") return current;
+      return episodes.some(
+        (episode) =>
+          episode.started_at === current.episode.started_at
+          && episode.ended_at === current.episode.ended_at,
       )
         ? current
         : null;
@@ -1097,14 +1151,18 @@ export default function RecordingDetail({
         onSelectWindow={handleSelectWindow}
         onSelectEpisode={handleSelectEpisode}
         onWindowsChange={handleWindowsChange}
+        onEpisodesChange={handleEpisodesChange}
       />
 
       <InvestigationTimeline
         timeline={timeline}
         degradedWindows={degradedWindows}
+        crossLayerEpisodes={crossLayerEpisodes}
         events={events}
         selectedWindow={selectedWindow}
+        selectedEpisode={selectedEpisode}
         onSelectWindow={handleSelectWindow}
+        onSelectEpisode={handleSelectEpisode}
       />
 
       <DiagnosticEvidencePanel

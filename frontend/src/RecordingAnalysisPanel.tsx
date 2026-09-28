@@ -61,6 +61,7 @@ export default function RecordingAnalysisPanel({
   onSelectWindow,
   onSelectEpisode,
   onWindowsChange,
+  onEpisodesChange,
 }: {
   recording: DiagnosticRecording;
   selectedWindow: AnalysisDegradedWindow | null;
@@ -68,6 +69,7 @@ export default function RecordingAnalysisPanel({
   onSelectWindow: (window: AnalysisDegradedWindow) => void;
   onSelectEpisode: (episode: CrossLayerDiagnosticEpisode) => void;
   onWindowsChange: (windows: AnalysisDegradedWindow[]) => void;
+  onEpisodesChange: (episodes: CrossLayerDiagnosticEpisode[]) => void;
 }) {
   const [analysis, setAnalysis] = useState<RecordingAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,7 @@ export default function RecordingAnalysisPanel({
         if (active) {
           setAnalysis(result);
           onWindowsChange(result?.summary.degraded_windows ?? []);
+          onEpisodesChange(result?.summary.cross_layer_episodes ?? []);
           setError(null);
           setLoading(false);
         }
@@ -102,7 +105,7 @@ export default function RecordingAnalysisPanel({
       active = false;
       if (timer !== null) window.clearInterval(timer);
     };
-  }, [onWindowsChange, recording.id, waitingForAutomaticAnalysis]);
+  }, [onEpisodesChange, onWindowsChange, recording.id, waitingForAutomaticAnalysis]);
 
   async function handleRun(): Promise<void> {
     if (!canAnalyze || running) return;
@@ -112,6 +115,7 @@ export default function RecordingAnalysisPanel({
       const result = await runRecordingAnalysis(recording.id);
       setAnalysis(result);
       onWindowsChange(result.summary.degraded_windows ?? []);
+      onEpisodesChange(result.summary.cross_layer_episodes ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to run analysis");
     } finally {

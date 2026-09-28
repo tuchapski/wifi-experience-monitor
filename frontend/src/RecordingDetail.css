@@ -590,7 +590,8 @@
   background: #dfe6ee;
 }
 
-.recording-investigation-window {
+.recording-investigation-window,
+.recording-investigation-episode {
   position: absolute;
   top: 5px;
   z-index: 1;
@@ -603,6 +604,14 @@
   opacity: 0.7;
 }
 
+.recording-investigation-episode {
+  background: #4d7fb7;
+}
+
+.recording-investigation-episode.episode-single-domain {
+  background: #7a94b2;
+}
+
 .recording-investigation-window.window-warning {
   background: #d49627;
 }
@@ -612,11 +621,14 @@
 }
 
 .recording-investigation-window:hover,
-.recording-investigation-window.is-selected {
+.recording-investigation-window.is-selected,
+.recording-investigation-episode:hover,
+.recording-investigation-episode.is-selected {
   opacity: 1;
 }
 
-.recording-investigation-window.is-selected {
+.recording-investigation-window.is-selected,
+.recording-investigation-episode.is-selected {
   outline: 2px solid #334b68;
   outline-offset: 2px;
 }
@@ -668,6 +680,10 @@
   width: 14px;
   height: 7px;
   border-radius: 2px;
+}
+
+.legend-episode {
+  background: #4d7fb7;
 }
 
 .legend-warning {
