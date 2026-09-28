@@ -79,6 +79,39 @@ const EVIDENCE_DOMAIN_LABELS: Record<DiagnosticEvidenceDomain, string> = {
   application: "Application",
 };
 
+const METRIC_DOMAIN_GROUPS = [
+  {
+    domain: "wifi_rf",
+    label: EVIDENCE_DOMAIN_LABELS.wifi_rf,
+    description: "Client radio, link quality, retries, failures and airtime observations.",
+    metrics: RECORDING_METRICS,
+  },
+  {
+    domain: "local_network",
+    label: EVIDENCE_DOMAIN_LABELS.local_network,
+    description: "First-hop gateway reachability, latency, loss and jitter.",
+    metrics: NETWORK_SERVICE_METRICS.slice(0, 3),
+  },
+  {
+    domain: "dns",
+    label: EVIDENCE_DOMAIN_LABELS.dns,
+    description: "Resolver response latency measured by the synthetic DNS probe.",
+    metrics: NETWORK_SERVICE_METRICS.slice(3, 4),
+  },
+  {
+    domain: "internet",
+    label: EVIDENCE_DOMAIN_LABELS.internet,
+    description: "Upstream reachability, latency, loss and jitter beyond the local gateway.",
+    metrics: NETWORK_SERVICE_METRICS.slice(4, 7),
+  },
+  {
+    domain: "application",
+    label: EVIDENCE_DOMAIN_LABELS.application,
+    description: "End-to-end HTTPS milestones, cumulative from transaction start.",
+    metrics: NETWORK_SERVICE_METRICS.slice(7),
+  },
+] as const;
+
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
 function backToDiagnostics(agentId: string): void {
@@ -1180,10 +1213,15 @@ export default function RecordingDetail({
         <div className="recording-detail-section-heading">
           <div>
             <span className="agent-eyebrow">Metric overview</span>
-            <h2>Wi-Fi telemetry across the full recording</h2>
-            <p>Charts retain interval extremes; statistics use every captured observation.</p>
+            <h2>Cross-layer telemetry across the full recording</h2>
+            <p>
+              Evidence domains share the same recording clock so degradation can be compared
+              from Wi-Fi through local network, DNS, Internet and application experience.
+            </p>
           </div>
-          <small>Original measurements remain available for analysis.</small>
+          <small>
+            Charts retain interval extremes; statistics use every captured observation.
+          </small>
         </div>
         {selectedFocus && (
           <div className="recording-detail-focus">
@@ -1214,49 +1252,42 @@ export default function RecordingDetail({
             </button>
           </div>
         )}
-        <div className="recording-detail-chart-grid">
-          {RECORDING_METRICS.map((metric) => (
-            <RawMetricChart
-              key={metric.key}
-              label={metric.label}
-              unit={metric.unit}
-              overview={series[metric.key]}
-              timeline={timeline}
-              degradedWindows={degradedWindows}
-              selectedWindow={selectedWindow}
-              selectedEpisode={selectedEpisode}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="agent-panel recording-detail-data">
-        <div className="recording-detail-section-heading">
-          <div>
-            <span className="agent-eyebrow">Network / service experience</span>
-            <h2>Path and service telemetry across the full recording</h2>
-            <p>
-              Synthetic probes quantify whether Wi-Fi degradation propagated into
-              gateway, DNS, Internet or HTTPS experience.
-            </p>
-          </div>
-          <small>
-            HTTPS timings are cumulative milestones measured from transaction start.
-          </small>
-        </div>
-        <div className="recording-detail-chart-grid">
-          {NETWORK_SERVICE_METRICS.map((metric) => (
-            <RawMetricChart
-              key={metric.key}
-              label={metric.label}
-              unit={metric.unit}
-              overview={series[metric.key]}
-              timeline={timeline}
-              degradedWindows={degradedWindows}
-              selectedWindow={selectedWindow}
-              selectedEpisode={selectedEpisode}
-            />
-          ))}
+        <div className="recording-domain-stack">
+          {METRIC_DOMAIN_GROUPS.map((group) => {
+            const capturedMetrics = group.metrics.filter(
+              (metric) => (series[metric.key]?.sample_count ?? 0) > 0,
+            ).length;
+            return (
+              <section
+                className="recording-domain-group"
+                key={group.domain}
+                aria-labelledby={`recording-domain-${group.domain}`}
+              >
+                <header className="recording-domain-heading">
+                  <div>
+                    <span className="agent-eyebrow">Evidence domain</span>
+                    <h3 id={`recording-domain-${group.domain}`}>{group.label}</h3>
+                    <p>{group.description}</p>
+                  </div>
+                  <small>{capturedMetrics}/{group.metrics.length} metrics captured</small>
+                </header>
+                <div className="recording-detail-chart-grid">
+                  {group.metrics.map((metric) => (
+                    <RawMetricChart
+                      key={metric.key}
+                      label={metric.label}
+                      unit={metric.unit}
+                      overview={series[metric.key]}
+                      timeline={timeline}
+                      degradedWindows={degradedWindows}
+                      selectedWindow={selectedWindow}
+                      selectedEpisode={selectedEpisode}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </section>
 
