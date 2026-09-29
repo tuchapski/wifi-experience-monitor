@@ -1,69 +1,304 @@
 # Wi-Fi Experience Monitor
 
-Linux-based Wi-Fi and Digital Experience Monitoring platform.
+Wi-Fi Experience Monitor is a Linux-based Network and Digital Experience
+Monitoring platform. V1 separates the sensor from the control plane: autonomous
+Agents observe the network from the end-user perspective, a central Server stores
+telemetry and diagnostic recordings, and the web Frontend presents realtime state
+and evidence-based investigations.
 
-The project monitors the network from the perspective of an end user and
-collects Wi-Fi, RF, connectivity, performance and application experience
-metrics.
+This README is the canonical entry point for the V1 runtime. Detailed architecture
+and terminology are documented in [`docs/V1_ARCHITECTURE.md`](docs/V1_ARCHITECTURE.md).
+Persistent Agent deployment is documented in
+[`agent/deploy/README.md`](agent/deploy/README.md).
 
-## Initial scope
+## V1 architecture
 
-- Linux sensor health
-- Wi-Fi metrics
-- RF metrics
-- Network connectivity tests
-- DNS tests
-- Internet tests
-- HTTP/HTTPS synthetic tests
-- Historical metrics
-- Incident detection
-- Diagnostic engine
-- Web dashboard
+```text
+Linux sensor
+┌────────────────────────────────────┐
+│ Autonomous Agent                   │
+│ Wi-Fi/RF + synthetic observations  │
+│ local identity/spool/recording     │
+└─────────────────┬──────────────────┘
+                  │ heartbeat / state / telemetry / recording batches
+                  ▼
+┌────────────────────────────────────┐
+│ Server                             │
+│ Agent registry                     │
+│ PostgreSQL + recording storage     │
+│ recording orchestration            │
+│ deterministic diagnostic analysis  │
+└─────────────────┬──────────────────┘
+                  │ API
+                  ▼
+┌────────────────────────────────────┐
+│ Frontend                           │
+│ Agents · Realtime Experience Path  │
+│ Collections · Datasets             │
+│ Diagnostics · Reports              │
+└────────────────────────────────────┘
+```
+
+The active Frontend entry point is `AgentWorkspace`. The older monolithic
+`sensor/dashboard` implementation remains in the repository for compatibility
+tests and historical reference, but it is not the V1 launch path.
+
+## V1 capabilities
+
+- autonomous Linux Agent with persistent identity and telemetry spool;
+- realtime Wi-Fi state, link score, Sensor Readiness and Experience Path;
+- Wi-Fi/RF observations plus gateway, DNS, Internet and HTTPS synthetic probes;
+- rolling Server telemetry for short-term context;
+- individual and multi-Agent diagnostic collections;
+- immutable recording datasets with state events and raw observations;
+- deterministic recording analysis with threshold findings, degraded windows,
+  diagnostic episodes and evidence-domain correlation;
+- compact diagnostic metrics with focused Before/During/After comparison;
+- standalone HTML recording reports;
+- `systemd` deployment for unattended Agent operation;
+- one-command V1 Release Gate.
 
 ## Supported environment
 
-Initial development target:
+The current V1 sensor target is Linux with NetworkManager/nl80211-compatible
+wireless networking. Collection uses standard Linux tools such as `iw`, `ip`,
+`ping`, `getent` and `curl`. Some RF observations depend on what the wireless
+driver exposes at runtime; unavailable measurements remain explicitly unavailable
+instead of being synthesized.
 
-- Linux
-- NetworkManager
-- nl80211 / iw
-- Intel iwlwifi
-- Wi-Fi as primary network connection
+Development currently targets Python 3.11+ and Node.js 24 (`.nvmrc`). PostgreSQL
+is the Server database used by the current architecture.
 
-## Development
+## Terminology
 
-Create the environment:
+| Term | Meaning in V1 |
+| --- | --- |
+| **Agent** | Autonomous Linux sensor registered with the Server. |
+| **Current State** | Latest direct observations published by an Agent for realtime visualization. |
+| **Rolling telemetry** | Bounded Server-side time series used for recent operational context. |
+| **Collection** | Operational start/stop activity that tells one or more Agents to capture diagnostic evidence. |
+| **Recording** | Persisted technical capture object. It may be waiting, recording, stopping, completed or failed. |
+| **Dataset** | A completed/historical recording presented for investigation in Diagnostics. |
+| **Threshold finding** | Versioned rule/heuristic result produced by the recording analysis engine. |
+| **Degraded window** | Sustained Wi-Fi interval where configured evidence conditions overlap. |
+| **Diagnostic episode** | Sustained relative deterioration grouped across one or more evidence domains. |
+| **Evidence domain** | `wifi_rf`, `local_network`, `dns`, `internet` or `application`. |
+| **Probable domain** | Deterministic evidence assessment for a focused interval. It is not a root-cause conclusion. |
+| **Project** | Coordinated diagnostic collection across multiple Agents/positions. |
+
+Threshold findings, degraded windows and diagnostic episodes are separate
+analysis products. The absence of a threshold finding does not mean no episode
+was observed and does not prove that the WLAN is fault-free.
+
+## Local development setup
+
+Create the Python environment and install the current Server and Agent packages.
+The root package is also installed because legacy compatibility tests are still
+part of the Release Gate.
 
 ```bash
+cd ~/wifi-experience-monitor
+
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
 
+python -m pip install --upgrade pip
+python -m pip install -e . -e "server[dev]" -e "agent[dev]"
+
+cp -n .env.example .env
 ```
 
-## Start the application
+Install Frontend dependencies:
 
 ```bash
-source .venv/bin/activate
-python -m wem.main --database data/wem.db
-```
-
-This starts the API on 127.0.0.1:8000 with monitoring stopped. Do not launch
-an additional console collector or a second API process against the same database.
-The former `--interface` and `--interval` CLI arguments are replaced by the dashboard controls.
-
-In another terminal:
-
-```bash
-cd frontend
+cd ~/wifi-experience-monitor/frontend
+nvm use
 npm ci
+```
+
+### 1. PostgreSQL and Server
+
+From the repository root:
+
+```bash
+cd ~/wifi-experience-monitor
+source .venv/bin/activate
+
+set -a
+source .env
+set +a
+
+docker compose up -d postgres
+(cd server && alembic upgrade head)
+
+wifi-server
+```
+
+The Server binds to `127.0.0.1:8000` by default. Verify it with:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+### 2. Agent
+
+For interactive development, load the same environment and run:
+
+```bash
+cd ~/wifi-experience-monitor
+source .venv/bin/activate
+
+set -a
+source .env
+set +a
+
+wifi-agent run
+```
+
+`wifi-agent run` enrolls automatically when no local identity exists. The identity,
+token, telemetry spool and recording state are persisted under
+`WEM_AGENT_DATA_DIR`.
+
+For unattended operation, use the V1 `systemd` deployment instead of an
+interactive process:
+
+```bash
+sudo ./agent/install.sh   --server-url http://127.0.0.1:8000   --interface wlp0s20f3   --enrollment-token wifi-dev-enrollment   --name sensor-local-01
+```
+
+To preserve an existing development Agent ID, use `--import-data-dir` as documented
+in [`agent/deploy/README.md`](agent/deploy/README.md). Do not run the interactive
+Agent and the system service against the same local Agent state at the same time.
+
+### 3. Frontend
+
+```bash
+cd ~/wifi-experience-monitor/frontend
 npm run dev
 ```
 
-Open http://localhost:5173, select a wireless interface and click Start Monitoring.
-The backend rechecks that the interface is available before starting. Stop ends
-collection; each new Start creates a new runtime and resets metric deltas.
-Historical samples remain stored but are not displayed as a current session.
+Open `http://localhost:5173`. The primary V1 navigation is:
+
+```text
+Agents
+  └─ Agent detail
+     ├─ Realtime Experience Path
+     ├─ Link score
+     ├─ Current Wi-Fi / network state
+     ├─ Rolling telemetry
+     └─ Sensor Readiness
+
+Diagnostics
+  ├─ Now collecting
+  ├─ Individual datasets
+  ├─ Diagnostic projects
+  └─ Recording analysis
+```
+
+## Collection and diagnostic flow
+
+A collection is initiated in the Frontend. The Server creates the Recording and
+delivers the command through the Agent heartbeat. The Agent captures raw
+observations and state events locally, uploads recording batches, then sends the
+manifest when the collection ends. A completed and fully synchronized Recording
+becomes an investigation Dataset.
+
+When synchronization completes, the Server schedules deterministic recording
+analysis. Recording Detail combines the analysis summary, Investigation Timeline,
+focused Diagnostic Evidence, compact cross-layer metrics and the complete raw
+telemetry disclosure. Selecting a degraded window or diagnostic episode focuses
+the same interval across the evidence views.
+
+Multi-Agent Projects use the same per-Agent recording model. Project views
+coordinate collections and compare status/evidence across members; they do not
+produce a combined root-cause verdict.
+
+## Diagnostic semantics
+
+The V1 engine is evidence-first and deterministic. Measurement and interpretation
+are deliberately separate:
+
+```text
+Measurement
+   ↓
+Comparison / thresholds
+   ↓
+Finding or degraded interval
+   ↓
+Evidence domain
+   ↓
+Probable domain assessment
+```
+
+Temporal correlation is investigation context, not proof of causality. The UI and
+reports must not convert `Probable domain`, the earliest observed domain or a
+correlated state change into a root-cause statement.
+
+Realtime Current State is also intentionally lighter than a diagnostic Dataset.
+It answers what the Agent is observing now; deep correlation and recording
+analysis happen only against persisted collection evidence.
+
+## Persistence
+
+The Server uses PostgreSQL for control-plane and diagnostic metadata. Recording
+storage is rooted at `WEM_RECORDING_STORAGE_ROOT`.
+
+The autonomous Agent uses `/var/lib/wifi-experience-agent/agent.db` by default in
+the system service deployment. That SQLite database contains the Agent identity,
+local telemetry spool and recording state needed to survive process and host
+restarts.
+
+## V1 Release Gate
+
+Run the complete local quality gate from the repository root:
+
+```bash
+./scripts/release-gate.sh
+```
+
+The gate validates deployment shell syntax, Server/Agent Ruff checks and formatting,
+Server tests, Agent tests, legacy compatibility tests, Frontend tests/lint/build,
+and Git whitespace checks. A V1 release candidate should not be cut from a commit
+that does not pass this command.
+
+## Repository layout
+
+```text
+agent/        autonomous Agent package and systemd deployment
+server/       central API, persistence, recording orchestration and analysis
+frontend/     active React/Vite V1 user interface
+docs/         canonical architecture documentation
+scripts/      release/development validation helpers
+src/wem/      legacy monolith retained for compatibility
+tests/        legacy compatibility test suite
+```
+
+## Current V1 boundaries
+
+V1 is intended for a trusted/local deployment model. Agent-originated write paths
+use the enrolled Agent token, but the current application is not documented as a
+hardened multi-tenant control plane.
+
+Driver-dependent RF capabilities are reported from runtime evidence. Missing survey
+data, noise or derived channel utilization remain unavailable and do not become
+synthetic zero values.
+
+The product reports deterministic diagnostic evidence and investigation context;
+it does not claim a proven root cause.
+
+<details>
+<summary>Historical implementation notes (non-canonical)</summary>
+
+The sections below preserve implementation history accumulated before and during
+the V1 architecture transition. They may describe the previous monolithic sensor,
+old dashboard navigation or intermediate behavior. They are not the source of
+truth for starting or deploying the current V1 runtime.
 
 ## Versioned test profiles
 
@@ -672,3 +907,5 @@ with the default 300 intervals; sample counts and min/average/max statistics
 use all recorded values. Active chart data refreshes every 30 seconds while
 recording status and events still update every four seconds. Raw metrics and
 analysis inputs remain stored without this reduction. No migration is needed.
+
+</details>
