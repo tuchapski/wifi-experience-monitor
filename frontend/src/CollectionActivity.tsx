@@ -114,10 +114,12 @@ export function DatasetCollectionControls({
   agent,
   recording,
   hasActiveCollection,
+  onStarted,
 }: {
   agent: AgentSummary;
   recording: DiagnosticRecording;
   hasActiveCollection: boolean;
+  onStarted: (recording: DiagnosticRecording) => void;
 }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +131,7 @@ export function DatasetCollectionControls({
     setStarting(true);
     setError(null);
     try {
-      await startAgentRecording(agent.id, {
+      const started = await startAgentRecording(agent.id, {
         name: recording.name,
         description: recording.description,
         site: recording.site,
@@ -137,6 +139,8 @@ export function DatasetCollectionControls({
         profile_id: recording.profile_id ?? "wifi-deep-dive",
         max_duration_minutes: recording.max_duration_minutes ?? 60,
       });
+      onStarted(started);
+      setStarting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to start collection");
       setStarting(false);

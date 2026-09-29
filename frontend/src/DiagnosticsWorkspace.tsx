@@ -447,6 +447,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                                 recording={recording}
                                 hasActiveCollection={(recordingsByAgent[agent.id] ?? [])
                                   .some((item) => ACTIVE_STATUSES.has(item.status))}
+                                onStarted={(started) => handleCollectionStarted(agent, started)}
                               />
                               <button
                                 type="button"
