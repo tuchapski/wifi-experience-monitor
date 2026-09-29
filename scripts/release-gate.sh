@@ -7,7 +7,7 @@ PYTHON_BIN="${PYTHON:-${ROOT_DIR}/.venv/bin/python}"
 STARTED_AT="${SECONDS}"
 
 step_number=0
-step_total=10
+step_total=11
 
 die() {
   printf '\n[release-gate] ERROR: %s\n' "$*" >&2
@@ -39,6 +39,9 @@ printf '[release-gate] Wi-Fi Experience Monitor V1\n'
 printf '[release-gate] Python: %s\n' "$("${PYTHON_BIN}" --version 2>&1)"
 printf '[release-gate] Node:   %s\n' "$(node --version)"
 printf '[release-gate] Commit: %s\n' "$(git rev-parse --short HEAD)"
+
+step "Shell deployment syntax" \
+  bash -n "${ROOT_DIR}/scripts/release-gate.sh" "${ROOT_DIR}/agent/install.sh"
 
 step "Python lint — Server + Agent" \
   "${PYTHON_BIN}" -m ruff check server agent
