@@ -123,6 +123,26 @@ export default function RecordingAnalysisPanel({
     }
   }
 
+  const episodes = analysis?.summary.cross_layer_episodes ?? [];
+  const degradedWindows = analysis?.summary.degraded_windows ?? [];
+  const firstEpisode = [...episodes].sort(
+    (left, right) => Date.parse(left.started_at) - Date.parse(right.started_at),
+  )[0] ?? null;
+  const firstWindow = [...degradedWindows].sort(
+    (left, right) => Date.parse(left.started_at) - Date.parse(right.started_at),
+  )[0] ?? null;
+  const firstInterval = firstEpisode ?? firstWindow;
+  const observedDomain = firstEpisode
+    ? evidenceDomainLabel(firstEpisode.trigger_domain)
+    : firstWindow
+      ? "Wi-Fi / RF"
+      : "No degraded domain observed";
+  const findingCount = analysis
+    ? analysis.summary.finding_counts.critical
+      + analysis.summary.finding_counts.warning
+      + analysis.summary.finding_counts.info
+    : 0;
+
   return (
     <section className="agent-panel recording-analysis-panel">
       <div className="recording-analysis-heading">
@@ -157,6 +177,59 @@ export default function RecordingAnalysisPanel({
         </div>
       ) : (
         <>
+          <div className="recording-diagnostic-overview">
+            <article className={`overview-assessment analysis-${analysis.summary.status}`}>
+              <span>Assessment</span>
+              <strong>{analysis.summary.status}</strong>
+              <small>{findingCount} threshold finding{findingCount === 1 ? "" : "s"}</small>
+            </article>
+            <article>
+              <span>Evidence reliability</span>
+              <strong>{analysis.summary.evidence_status}</strong>
+              <small>
+                {analysis.summary.collection_integrity
+                  ? `Collection ${analysis.summary.collection_integrity.status}`
+                  : "Collection continuity unavailable"}
+              </small>
+            </article>
+            <article>
+              <span>Earliest observed domain</span>
+              <strong>{observedDomain}</strong>
+              <small>Observation order only; not causal attribution</small>
+            </article>
+            <article>
+              <span>First diagnostic interval</span>
+              <strong>{firstInterval ? formatClock(firstInterval.started_at) : "None observed"}</strong>
+              <small>
+                {firstInterval
+                  ? `${firstInterval.duration_seconds.toFixed(1)}s duration`
+                  : "No sustained degraded interval detected"}
+              </small>
+            </article>
+            <article>
+              <span>Detected activity</span>
+              <strong>{episodes.length} episode{episodes.length === 1 ? "" : "s"}</strong>
+              <small>
+                {degradedWindows.length} Wi-Fi window{degradedWindows.length === 1 ? "" : "s"}
+              </small>
+            </article>
+          </div>
+          <p className="recording-diagnostic-overview-note">
+            This summary describes observed evidence. “Earliest observed domain” is temporal
+            context and is not a root-cause conclusion.
+          </p>
+          <details className="recording-analysis-details">
+            <summary>
+              <div>
+                <strong>Technical analysis details</strong>
+                <span>
+                  Signal statistics, collection continuity, diagnostic episodes, transitions,
+                  findings and engine metadata.
+                </span>
+              </div>
+              <span>Show details</span>
+            </summary>
+            <div className="recording-analysis-details-body">
           <div className="recording-analysis-summary">
             <article>
               <span>Assessment</span>
@@ -519,6 +592,8 @@ export default function RecordingAnalysisPanel({
               </ul>
             </div>
           )}
+            </div>
+          </details>
         </>
       )}
     </section>

@@ -477,7 +477,10 @@ function DiagnosticEvidencePanel({
     : [];
 
   return (
-    <section className="agent-panel recording-evidence">
+    <section
+      id="recording-diagnostic-evidence"
+      className="agent-panel recording-evidence"
+    >
       <div className="recording-detail-section-heading">
         <div>
           <span className="agent-eyebrow">Diagnostic evidence</span>
@@ -941,12 +944,14 @@ export default function RecordingDetail({
     });
   }, []);
 
-  const scrollToFocusedMetrics = useCallback(() => {
+  const scrollToFocusedEvidence = useCallback(() => {
     window.requestAnimationFrame(() => {
-      document.getElementById("recording-raw-metrics")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      window.setTimeout(() => {
+        document.getElementById("recording-diagnostic-evidence")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 0);
     });
   }, []);
 
@@ -958,8 +963,8 @@ export default function RecordingDetail({
       duration_seconds: selected.duration_seconds,
       window: selected,
     });
-    scrollToFocusedMetrics();
-  }, [scrollToFocusedMetrics]);
+    scrollToFocusedEvidence();
+  }, [scrollToFocusedEvidence]);
 
   const handleSelectEpisode = useCallback((selected: CrossLayerDiagnosticEpisode) => {
     setSelectedFocus({
@@ -969,8 +974,8 @@ export default function RecordingDetail({
       duration_seconds: selected.duration_seconds,
       episode: selected,
     });
-    scrollToFocusedMetrics();
-  }, [scrollToFocusedMetrics]);
+    scrollToFocusedEvidence();
+  }, [scrollToFocusedEvidence]);
 
   useEffect(() => {
     let active = true;
@@ -1138,34 +1143,45 @@ export default function RecordingDetail({
       )}
 
       {(recording.project_id || recording.site || recording.location || recording.description) && (
-        <section className="recording-detail-context" aria-label="Recording context">
-          {recording.project_id && (
+        <details className="recording-detail-disclosure recording-detail-context-disclosure">
+          <summary>
             <div>
-              <span>Project</span>
-              <strong>{recording.project_name ?? recording.project_id}</strong>
-              <a href="#diagnostics">View project runs</a>
+              <span className="agent-eyebrow">Session context</span>
+              <strong>Project, location and notes</strong>
             </div>
-          )}
-          {recording.site && <div><span>Site</span><strong>{recording.site}</strong></div>}
-          {recording.location && (
-            <div><span>Location</span><strong>{recording.location}</strong></div>
-          )}
-          {recording.description && (
-            <div className="recording-detail-notes">
-              <span>Session notes</span>
-              <p>{recording.description}</p>
-            </div>
-          )}
-        </section>
+            <span>Show context</span>
+          </summary>
+          <section className="recording-detail-context" aria-label="Recording context">
+            {recording.project_id && (
+              <div>
+                <span>Project</span>
+                <strong>{recording.project_name ?? recording.project_id}</strong>
+                <a href="#diagnostics">View project runs</a>
+              </div>
+            )}
+            {recording.site && <div><span>Site</span><strong>{recording.site}</strong></div>}
+            {recording.location && (
+              <div><span>Location</span><strong>{recording.location}</strong></div>
+            )}
+            {recording.description && (
+              <div className="recording-detail-notes">
+                <span>Session notes</span>
+                <p>{recording.description}</p>
+              </div>
+            )}
+          </section>
+        </details>
       )}
 
       <section className="recording-detail-summary">
         <article><span>Started</span><strong>{formatDate(recording.started_at)}</strong></article>
         <article><span>Duration</span><strong>{formatDuration(recording.started_at, recording.ended_at)}</strong></article>
-        <article><span>Raw metrics</span><strong>{recording.metrics_count.toLocaleString()}</strong></article>
-        <article><span>State events</span><strong>{recording.events_count.toLocaleString()}</strong></article>
+        <article>
+          <span>Captured evidence</span>
+          <strong>{recording.metrics_count.toLocaleString()} metrics</strong>
+          <small>{recording.events_count.toLocaleString()} state events</small>
+        </article>
         <article><span>Profile</span><strong>{recording.profile_id ?? "—"}</strong></article>
-        <article><span>Max duration</span><strong>{recording.max_duration_minutes == null ? "—" : `${recording.max_duration_minutes} min`}</strong></article>
       </section>
 
       {recording.sync_status !== "complete" && (
@@ -1206,10 +1222,19 @@ export default function RecordingDetail({
         comparisonError={comparisonError}
       />
 
-      <section
+      <details
         id="recording-raw-metrics"
-        className="agent-panel recording-detail-data"
+        className="recording-detail-disclosure recording-detail-technical"
       >
+        <summary>
+          <div>
+            <span className="agent-eyebrow">Full telemetry</span>
+            <strong>Cross-layer metric charts</strong>
+            <small>All captured Wi-Fi, gateway, DNS, Internet and application metrics.</small>
+          </div>
+          <span>Show telemetry</span>
+        </summary>
+        <section className="agent-panel recording-detail-data">
         <div className="recording-detail-section-heading">
           <div>
             <span className="agent-eyebrow">Metric overview</span>
@@ -1289,9 +1314,19 @@ export default function RecordingDetail({
             );
           })}
         </div>
-      </section>
+        </section>
+      </details>
 
-      <section className="agent-panel recording-detail-events">
+      <details className="recording-detail-disclosure">
+        <summary>
+          <div>
+            <span className="agent-eyebrow">State timeline</span>
+            <strong>Observed state changes</strong>
+            <small>{events.length.toLocaleString()} events captured</small>
+          </div>
+          <span>Show events</span>
+        </summary>
+        <section className="agent-panel recording-detail-events">
         <div className="recording-detail-section-heading">
           <div>
             <span className="agent-eyebrow">State timeline</span>
@@ -1330,9 +1365,19 @@ export default function RecordingDetail({
             })}
           </div>
         )}
-      </section>
+        </section>
+      </details>
 
-      <section className="agent-panel recording-detail-metadata">
+      <details className="recording-detail-disclosure">
+        <summary>
+          <div>
+            <span className="agent-eyebrow">Dataset</span>
+            <strong>Recording metadata</strong>
+            <small>Identifiers, schema and capture lifecycle details.</small>
+          </div>
+          <span>Show metadata</span>
+        </summary>
+        <section className="agent-panel recording-detail-metadata">
         <div className="recording-detail-section-heading">
           <div>
             <span className="agent-eyebrow">Dataset</span>
@@ -1346,8 +1391,15 @@ export default function RecordingDetail({
           <dt>Schema version</dt><dd>{recording.schema_version}</dd>
           <dt>Created</dt><dd>{formatDate(recording.created_at)}</dd>
           <dt>Ended</dt><dd>{formatDate(recording.ended_at)}</dd>
+          <dt>Max duration</dt>
+          <dd>
+            {recording.max_duration_minutes == null
+              ? "—"
+              : `${recording.max_duration_minutes} min`}
+          </dd>
         </dl>
-      </section>
+        </section>
+      </details>
     </>
   );
 }
