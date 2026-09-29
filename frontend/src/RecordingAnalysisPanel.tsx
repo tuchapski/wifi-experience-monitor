@@ -54,6 +54,31 @@ function evidenceDomainLabel(domain: string): string {
   return EVIDENCE_DOMAIN_LABELS[domain] ?? domain.replaceAll("_", " ");
 }
 
+const ASSESSMENT_LABELS: Record<string, string> = {
+  critical: "Critical findings",
+  warning: "Warning findings",
+  observed: "Observed degradation",
+  clear: "No threshold degradation",
+  limited: "Limited evidence",
+};
+
+function assessmentDetail(
+  status: string,
+  findingCount: number,
+  episodeCount: number,
+): string {
+  if (status === "observed") {
+    return `${episodeCount} diagnostic episode${episodeCount === 1 ? "" : "s"} observed`;
+  }
+  if (status === "clear") {
+    return "No threshold finding or sustained diagnostic episode";
+  }
+  if (status === "limited") {
+    return "Evidence limitations constrain the assessment";
+  }
+  return `${findingCount} threshold finding${findingCount === 1 ? "" : "s"}`;
+}
+
 export default function RecordingAnalysisPanel({
   recording,
   selectedWindow,
@@ -148,9 +173,10 @@ export default function RecordingAnalysisPanel({
       <div className="recording-analysis-heading">
         <div>
           <span className="agent-eyebrow">Analysis</span>
-          <h2>Explainable diagnostic findings</h2>
+          <h2>Explainable diagnostic analysis</h2>
           <p>
             Versioned heuristics derived from the immutable recording dataset.
+            Threshold findings and diagnostic episodes are evaluated separately.
           </p>
         </div>
         <button
@@ -180,8 +206,12 @@ export default function RecordingAnalysisPanel({
           <div className="recording-diagnostic-overview">
             <article className={`overview-assessment analysis-${analysis.summary.status}`}>
               <span>Assessment</span>
-              <strong>{analysis.summary.status}</strong>
-              <small>{findingCount} threshold finding{findingCount === 1 ? "" : "s"}</small>
+              <strong>
+                {ASSESSMENT_LABELS[analysis.summary.status] ?? analysis.summary.status}
+              </strong>
+              <small>
+                {assessmentDetail(analysis.summary.status, findingCount, episodes.length)}
+              </small>
             </article>
             <article>
               <span>Evidence reliability</span>
@@ -232,7 +262,7 @@ export default function RecordingAnalysisPanel({
             <div className="recording-analysis-details-body">
           <div className="recording-analysis-summary">
             <article>
-              <span>Assessment</span>
+              <span>Engine status</span>
               <strong className={`analysis-${analysis.summary.status}`}>
                 {analysis.summary.status}
               </strong>
@@ -556,10 +586,11 @@ export default function RecordingAnalysisPanel({
 
           {analysis.findings.length === 0 ? (
             <div className="recording-analysis-clear">
-              <strong>No findings were triggered by this engine version.</strong>
+              <strong>No threshold findings were triggered by this engine version.</strong>
               <span>
-                This means the available evidence did not cross the configured
-                heuristics; it is not proof that the WLAN is fault-free.
+                Threshold findings are separate from diagnostic episodes, degraded windows,
+                association changes and collection-integrity evidence shown above. Their absence
+                is not proof that the WLAN is fault-free.
               </span>
             </div>
           ) : (
