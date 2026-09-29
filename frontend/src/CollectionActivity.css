@@ -36,14 +36,14 @@
 .collection-activity-row {
   position: relative;
   display: grid;
-  grid-template-columns: 24px minmax(260px, 1.5fr) minmax(260px, 1fr) auto;
+  grid-template-columns: 24px minmax(280px, 1.6fr) minmax(220px, .85fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 15px 16px;
-  border: 1px solid #d8e3ef;
+  padding: 14px 16px;
+  border: 1px solid #cfddea;
   border-radius: 11px;
-  background: #fff;
-  box-shadow: 0 2px 7px rgba(25, 42, 70, 0.04);
+  background: linear-gradient(90deg, #fbfdff 0%, #fff 58%);
+  box-shadow: 0 2px 8px rgba(25, 42, 70, 0.05);
 }
 
 .collection-activity-live {
@@ -178,6 +178,20 @@
 .collection-activity-actions button:disabled {
   cursor: not-allowed;
   opacity: .55;
+}
+
+.collection-activity-managed {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid #d9e1eb;
+  border-radius: 7px;
+  background: #f7f9fc;
+  color: #6c798b;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .collection-activity-error {

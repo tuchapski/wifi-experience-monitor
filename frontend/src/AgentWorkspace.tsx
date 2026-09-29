@@ -8,6 +8,7 @@ import {
   renameAgent,
 } from "./agentApi";
 import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
+import GlobalCollectionIndicator from "./GlobalCollectionIndicator";
 import ManagedAgentCard from "./ManagedAgentCard";
 import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
 import RecordingDetail from "./RecordingDetail";
@@ -780,10 +781,13 @@ export default function AgentWorkspace() {
           <div className="agent-brand-mark">WX</div>
           <div><strong>Wi-Fi Experience</strong><span>Network assurance</span></div>
         </div>
-        <nav aria-label="Primary navigation">
-          <button type="button" className={route.section === "agents" ? "active" : ""} onClick={navigateToAgents}>Agents</button>
-          <button type="button" className={route.section === "diagnostics" ? "active" : ""} onClick={() => { window.location.hash = "#diagnostics"; }}>Diagnostics</button>
-        </nav>
+        <div className="agent-appbar-actions">
+          <nav aria-label="Primary navigation">
+            <button type="button" className={route.section === "agents" ? "active" : ""} onClick={navigateToAgents}>Agents</button>
+            <button type="button" className={route.section === "diagnostics" ? "active" : ""} onClick={() => { window.location.hash = "#diagnostics"; }}>Diagnostics</button>
+          </nav>
+          <GlobalCollectionIndicator />
+        </div>
       </header>
 
       <div className="agent-content">

@@ -157,9 +157,12 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     };
   }, [agentIdsKey, loading]);
 
-  const activeDatasets = useMemo(
-    () => datasets.filter(({ recording }) => ACTIVE_STATUSES.has(recording.status)),
-    [datasets],
+  const activeCollections = useMemo(
+    () => agents.flatMap((agent) =>
+      (recordingsByAgent[agent.id] ?? [])
+        .filter((recording) => ACTIVE_STATUSES.has(recording.status))
+        .map((recording) => ({ agent, recording }))),
+    [agents, recordingsByAgent],
   );
   const historicalDatasets = useMemo(
     () => datasets.filter(({ recording }) => !ACTIVE_STATUSES.has(recording.status)),
@@ -314,7 +317,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         />
       )}
 
-      {activeDatasets.length > 0 && (
+      {activeCollections.length > 0 && (
         <section
           id="diagnostics-now-collecting"
           className="diagnostics-now-collecting"
@@ -324,12 +327,12 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
             <div>
               <span className="agent-eyebrow">Live activity</span>
               <h2 id="now-collecting-title">Now collecting</h2>
-              <p>Active individual collections stay visible here regardless of where they were started.</p>
+              <p>Active collections stay visible here regardless of where they were started.</p>
             </div>
-            <span>{activeDatasets.length} active</span>
+            <span>{activeCollections.length} active</span>
           </div>
           <div className="collection-activity-list">
-            {activeDatasets.map(({ agent, recording }) => (
+            {activeCollections.map(({ agent, recording }) => (
               <CollectionActivityRow
                 key={recording.id}
                 agent={agent}

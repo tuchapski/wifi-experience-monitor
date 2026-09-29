@@ -139,18 +139,15 @@ export default function ManagedAgentCard({
         </div>
       </div>
 
-      {activeProjectRecording && (
-        <div className="managed-agent-notice">
-          This Agent is collecting for a diagnostic project. Individual collection is unavailable.
-        </div>
-      )}
       {error && <div className="managed-agent-error" role="alert">{error}</div>}
 
       {activeCollection ? (
         <div className="managed-agent-expanded">
           <div className="managed-agent-active-collection">
             <div>
-              <span className="agent-eyebrow">Now collecting</span>
+              <span className="agent-eyebrow">
+                {activeProjectRecording ? "Project collecting" : "Now collecting"}
+              </span>
               <strong>{activeCollection.name}</strong>
               <small>
                 {activeProjectRecording
@@ -160,7 +157,6 @@ export default function ManagedAgentCard({
               </small>
             </div>
             <dl>
-              <div><dt>Status</dt><dd>{activeCollection.status}</dd></div>
               <div><dt>Elapsed</dt><dd>{formatDuration(activeCollection.started_at, activeCollection.ended_at, now)}</dd></div>
               <div><dt>Metrics</dt><dd>{activeCollection.metrics_count.toLocaleString()}</dd></div>
               <div><dt>Events</dt><dd>{activeCollection.events_count.toLocaleString()}</dd></div>

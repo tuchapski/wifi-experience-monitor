@@ -44,9 +44,10 @@ export function CollectionActivityRow({
   const progress = maximumSeconds == null || maximumSeconds <= 0
     ? null
     : Math.min(100, (elapsed / maximumSeconds) * 100);
+  const projectCollection = Boolean(recording.project_run_id);
 
   async function handleStop(): Promise<void> {
-    if (recording.status !== "recording" || stopping) return;
+    if (projectCollection || recording.status !== "recording" || stopping) return;
     setStopping(true);
     setError(null);
     try {
@@ -62,9 +63,12 @@ export function CollectionActivityRow({
       <div className="collection-activity-live" aria-hidden="true"><i /></div>
       <div className="collection-activity-main">
         <div className="collection-activity-title">
-          <span>Now collecting</span>
+          <span>{projectCollection ? "Project collecting" : "Now collecting"}</span>
           <strong>{recording.name}</strong>
-          <small>{agent.name} · {agent.hostname}</small>
+          <small>
+            {agent.name} · {agent.hostname}
+            {projectCollection && recording.project_name ? ` · ${recording.project_name}` : ""}
+          </small>
         </div>
         <div className="collection-activity-progress">
           <div>
@@ -85,17 +89,21 @@ export function CollectionActivityRow({
       </dl>
       <div className="collection-activity-actions">
         <a href={`#agents/${encodeURIComponent(agent.id)}`}>View Agent</a>
-        <button
-          type="button"
-          onClick={() => void handleStop()}
-          disabled={recording.status !== "recording" || stopping}
-        >
-          {stopping || recording.status === "stopping"
-            ? "Stopping…"
-            : recording.status === "created"
-              ? "Waiting for Agent"
-              : "Stop"}
-        </button>
+        {projectCollection ? (
+          <span className="collection-activity-managed">Managed by project</span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleStop()}
+            disabled={recording.status !== "recording" || stopping}
+          >
+            {stopping || recording.status === "stopping"
+              ? "Stopping…"
+              : recording.status === "created"
+                ? "Waiting for Agent"
+                : "Stop"}
+          </button>
+        )}
       </div>
       {error && <small className="collection-activity-error">{error}</small>}
     </article>

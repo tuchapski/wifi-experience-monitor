@@ -1,0 +1,54 @@
+.agent-appbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-collection-indicator {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid #efc7c4;
+  border-radius: 999px;
+  background: #fff7f6;
+  color: #963b35;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.global-collection-indicator:hover {
+  border-color: #dfa6a2;
+  background: #fff1f0;
+}
+
+.global-collection-indicator i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bd433c;
+  box-shadow: 0 0 0 4px #feeceb;
+}
+
+@media (max-width: 760px) {
+  .agent-appbar-actions {
+    gap: 6px;
+  }
+
+  .global-collection-indicator {
+    padding: 7px 9px;
+  }
+
+  .global-collection-indicator span {
+    font-size: 0;
+  }
+
+  .global-collection-indicator span::after {
+    content: "Collecting";
+    font-size: 11px;
+  }
+}
