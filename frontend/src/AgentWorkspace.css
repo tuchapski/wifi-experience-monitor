@@ -171,13 +171,28 @@
 .agent-rename-form button { min-height: 35px; padding: 6px 11px; border: 1px solid #dbe3ed; border-radius: 7px; background: #fff; color: #315f98; font: inherit; cursor: pointer; }
 .agent-rename-form button[type="submit"] { border-color: #245f9f; background: #245f9f; color: #fff; }
 .agent-rename-form button:disabled { opacity: 0.55; cursor: not-allowed; }
+.agent-heading-actions { display: flex; align-items: center; gap: 14px; }
 .agent-heading-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .agent-heading-meta span, .agent-heading-meta small { color: #7a8798; font-size: 11px; }
 .agent-heading-meta strong { font-size: 17px; }
+.agent-primary-action {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid #245f9f;
+  border-radius: 9px;
+  background: #245f9f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.agent-primary-action:hover { background: #1f548e; }
 
 .agent-current-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -246,6 +261,10 @@
 .readiness-available { background: #f0f2f5; color: #657184; }
 .readiness-degraded { background: #fff4dc; color: #875e10; }
 .readiness-unavailable { background: #fff0ef; color: #9b342d; }
+.agent-readiness-health { width: fit-content; padding: 5px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.health-ready { background: #eaf8f0; color: #186b45; }
+.health-limited { background: #fff4dc; color: #875e10; }
+.health-attention, .health-stale { background: #fff0ef; color: #9b342d; }
 
 .agent-link-score-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px; padding: 20px 22px; }
 .agent-link-score-value { display: flex; align-items: baseline; flex-wrap: wrap; align-content: center; gap: 4px; padding: 14px; border-radius: 12px; background: #edf4fb; }
@@ -351,6 +370,7 @@
   .agent-appbar nav button { padding: 9px 8px; font-size: 12px; }
   .agent-content { width: min(100% - 28px, 1440px); padding-top: 24px; }
   .agent-page-heading, .agent-detail-heading, .agent-telemetry-toolbar { align-items: stretch; flex-direction: column; }
+  .agent-heading-actions { align-items: flex-start; flex-direction: column; }
   .agent-heading-meta { align-items: flex-start; }
   .agent-fleet-summary { width: 100%; }
   .agent-fleet-summary div { flex: 1; min-width: 0; }
@@ -401,7 +421,7 @@
 .managed-agent-identity strong { overflow: hidden; color: #1c3453; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .managed-agent-identity small { margin-top: 4px; overflow: hidden; color: #7a8798; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
-.managed-agent-live { display: grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); gap: 8px; }
+.managed-agent-live { display: grid; grid-template-columns: repeat(5, minmax(72px, 1fr)); gap: 8px; }
 .managed-agent-live span { min-width: 0; padding-left: 12px; border-left: 1px solid #edf1f5; }
 .managed-agent-live small, .managed-agent-live strong { display: block; }
 .managed-agent-live small { color: #8792a2; font-size: 9px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }

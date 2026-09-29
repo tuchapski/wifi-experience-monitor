@@ -19,6 +19,7 @@ import type {
   LinkScore,
   TelemetryPoint,
 } from "./agentTypes";
+import { describeWifiConnection } from "./wifiPresentation";
 import "./AgentWorkspace.css";
 
 const TELEMETRY_METRICS = [
@@ -291,7 +292,7 @@ function SensorReadiness({
   const rows: { label: string; status: ReadinessStatus; detail: string }[] = [
     {
       label: "Wi-Fi association",
-      status: wifi?.connected == null ? "unavailable" : "producing",
+      status: wifi?.connected === true ? "producing" : "unavailable",
       detail: wifi?.connected === true
         ? `Associated to ${wifi.ssid ?? "unknown SSID"}`
         : wifi?.connected === false
@@ -339,25 +340,60 @@ function SensorReadiness({
     },
   ];
 
+  const coreIssue = rows.slice(0, 2).some(
+    (row) => row.status === "degraded" || row.status === "unavailable",
+  );
+  const optionalLimitations = rows.slice(2).some(
+    (row) => row.status === "degraded" || row.status === "unavailable",
+  );
+  const healthTone = !fresh
+    ? "stale"
+    : coreIssue
+      ? "attention"
+      : optionalLimitations
+        ? "limited"
+        : "ready";
+  const healthLabel = !fresh
+    ? "Stale"
+    : coreIssue
+      ? "Attention"
+      : optionalLimitations
+        ? "Ready with limitations"
+        : "Ready";
+  const healthDetail = !fresh
+    ? "Current State is stale or the Agent is offline."
+    : coreIssue
+      ? "Association or station evidence needs attention."
+      : optionalLimitations
+        ? "Core measurements are available; optional RF evidence is limited."
+        : "Core runtime measurements are available.";
+
   return (
     <section className="agent-panel agent-readiness-panel">
-      <div className="agent-panel-heading">
-        <div>
-          <span className="agent-eyebrow">Sensor</span>
-          <h2>Sensor readiness</h2>
-          <p>Runtime evidence is separated from capabilities merely advertised at enrollment.</p>
-        </div>
-        <small>{fresh ? "Runtime validation active" : "Current State is stale"}</small>
-      </div>
-      <div className="agent-readiness-list">
-        {rows.map((row) => (
-          <div className="agent-readiness-row" key={row.label}>
-            <strong>{row.label}</strong>
-            <span className={`agent-readiness-status readiness-${row.status}`}>{row.status.replaceAll("_", " ")}</span>
-            <small>{row.detail}</small>
+      <details className="agent-capability-details agent-readiness-details">
+        <summary>
+          <div className="agent-capability-summary-main">
+            <span className="agent-eyebrow">Sensor</span>
+            <strong>Sensor health</strong>
+            <small>{healthDetail}</small>
           </div>
-        ))}
-      </div>
+          <div className="agent-capability-summary-meta">
+            <span className={`agent-readiness-health health-${healthTone}`}>{healthLabel}</span>
+            <i aria-hidden="true">⌄</i>
+          </div>
+        </summary>
+        <div className="agent-readiness-list">
+          {rows.map((row) => (
+            <div className="agent-readiness-row" key={row.label}>
+              <strong>{row.label}</strong>
+              <span className={`agent-readiness-status readiness-${row.status}`}>
+                {row.status.replaceAll("_", " ")}
+              </span>
+              <small>{row.detail}</small>
+            </div>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }
@@ -583,6 +619,8 @@ function AgentDetail({ agentId }: { agentId: string }) {
 
   const wifi = state?.wifi;
   const network = state?.network;
+  const currentStateFresh = isCurrentState(agent, state);
+  const wifiPresentation = describeWifiConnection(wifi);
 
   return (
     <>
@@ -620,37 +658,63 @@ function AgentDetail({ agentId }: { agentId: string }) {
             </form>
           )}
         </div>
-        <div className="agent-heading-meta">
-          <span>Last seen</span>
-          <strong>{formatRelativeTime(agent.last_seen_at)}</strong>
-          <small>{formatDate(agent.last_seen_at)}</small>
+        <div className="agent-heading-actions">
+          <div className="agent-heading-meta">
+            <span>Last seen</span>
+            <strong>{formatRelativeTime(agent.last_seen_at)}</strong>
+            <small>{formatDate(agent.last_seen_at)}</small>
+          </div>
+          <a className="agent-primary-action" href={diagnosticsAgentHash(agent.id)}>
+            Start collection
+          </a>
         </div>
       </section>
 
       {error && <div className="agent-error" role="alert">{error}</div>}
       {nameError && <div className="agent-error" role="alert">{nameError}</div>}
 
-      <section className="agent-current-strip" aria-label="Current Wi-Fi summary">
-        <article><span>SSID</span><strong>{wifi?.ssid ?? "—"}</strong><small>{wifi?.connected === false ? "Disconnected" : wifi?.bssid ?? "No BSSID"}</small></article>
-        <article><span>RSSI</span><strong>{formatMetric(wifi?.rssi_dbm, "dBm")}</strong><small>Current signal</small></article>
-        <article><span>SNR</span><strong>{formatMetric(wifi?.snr_db, "dB")}</strong><small>{wifi?.noise_dbm != null ? `Noise ${formatMetric(wifi.noise_dbm, "dBm")}` : "Noise unavailable"}</small></article>
-        <article><span>Channel</span><strong>{wifi?.channel ?? "—"}</strong><small>{wifi?.frequency_mhz ? `${wifi.frequency_mhz} MHz · ${wifi.channel_width_mhz ?? "—"} MHz` : "Frequency unavailable"}</small></article>
-        <article><span>TX / RX</span><strong>{formatMetric(wifi?.tx_rate_mbps, "Mbps")}</strong><small>RX {formatMetric(wifi?.rx_rate_mbps, "Mbps")}</small></article>
+      <section className="agent-current-strip" aria-label="Current wireless connection">
+        <article>
+          <span>Network</span>
+          <strong>{wifi?.ssid ?? "—"}</strong>
+          <small>{wifi?.connected === false ? "Disconnected" : wifi?.bssid ?? "No BSSID"}</small>
+        </article>
+        <article>
+          <span>Radio</span>
+          <strong>{wifiPresentation.band}</strong>
+          <small>{wifiPresentation.frequency}</small>
+        </article>
+        <article>
+          <span>Channel</span>
+          <strong>{wifi?.channel ?? "—"}</strong>
+          <small>{wifi?.channel_width_mhz != null ? `${wifi.channel_width_mhz} MHz width` : "Width unavailable"}</small>
+        </article>
+        <article>
+          <span>Wi-Fi</span>
+          <strong>{wifiPresentation.generation}</strong>
+          <small>{wifiPresentation.ieee} · {wifiPresentation.phy}</small>
+        </article>
+        <article>
+          <span>Signal</span>
+          <strong>{formatMetric(wifi?.rssi_dbm, "dBm")}</strong>
+          <small>{wifi?.snr_db != null ? `SNR ${formatMetric(wifi.snr_db, "dB")}` : "SNR unavailable"}</small>
+        </article>
+        <article>
+          <span>TX / RX</span>
+          <strong>{formatMetric(wifi?.tx_rate_mbps, "Mbps")}</strong>
+          <small>RX {formatMetric(wifi?.rx_rate_mbps, "Mbps")}</small>
+        </article>
       </section>
 
       <ExperiencePath
         state={state}
-        fresh={isCurrentState(agent, state)}
+        fresh={currentStateFresh}
       />
 
       <LinkScorePanel
         score={state?.wifi.link_score ?? null}
-        fresh={isCurrentState(agent, state)}
+        fresh={currentStateFresh}
       />
-
-      <a className="agent-diagnostics-link" href={diagnosticsAgentHash(agent.id)}>
-        Open collections and analyses for this Agent →
-      </a>
 
       <div className="agent-detail-grid">
         <section className="agent-panel">
@@ -660,8 +724,10 @@ function AgentDetail({ agentId }: { agentId: string }) {
               <dt>Interface</dt><dd>{wifi?.interface ?? "—"}</dd>
               <dt>SSID</dt><dd>{wifi?.ssid ?? "—"}</dd>
               <dt>BSSID</dt><dd>{wifi?.bssid ?? "—"}</dd>
-              <dt>Radio</dt><dd>{wifi?.frequency_mhz ? `${wifi.frequency_mhz} MHz · ch ${wifi.channel ?? "—"} · ${wifi.channel_width_mhz ?? "—"} MHz` : "—"}</dd>
-              <dt>PHY</dt><dd>TX {wifi?.tx_phy ?? "—"} / RX {wifi?.rx_phy ?? "—"}</dd>
+              <dt>Band / frequency</dt><dd>{wifiPresentation.band} · {wifiPresentation.frequency}</dd>
+              <dt>Channel / width</dt><dd>{wifi?.channel ?? "—"} · {wifi?.channel_width_mhz != null ? `${wifi.channel_width_mhz} MHz` : "—"}</dd>
+              <dt>Wi-Fi standard</dt><dd>{wifiPresentation.generation} · {wifiPresentation.ieee} · {wifiPresentation.shorthand}</dd>
+              <dt>PHY</dt><dd>{wifiPresentation.phy}</dd>
               <dt>MCS / NSS</dt><dd>TX {wifi?.tx_mcs ?? "—"}/{wifi?.tx_nss ?? "—"} · RX {wifi?.rx_mcs ?? "—"}/{wifi?.rx_nss ?? "—"}</dd>
             </dl>
           ) : <div className="agent-empty agent-empty-compact">No Current State has been published yet.</div>}
@@ -707,14 +773,17 @@ function AgentDetail({ agentId }: { agentId: string }) {
           </div>
         </div>
         <div className="agent-chart-grid">
-          {TELEMETRY_METRICS.map((metric) => (
-            <TelemetryChart
-              key={metric.key}
-              points={telemetry[metric.key] ?? []}
-              label={metric.label}
-              unit={metric.unit}
-            />
-          ))}
+          {TELEMETRY_METRICS
+            .filter((metric) => metric.key !== "wifi.channel_utilization_percent"
+              || (telemetry[metric.key]?.length ?? 0) > 0)
+            .map((metric) => (
+              <TelemetryChart
+                key={metric.key}
+                points={telemetry[metric.key] ?? []}
+                label={metric.label}
+                unit={metric.unit}
+              />
+            ))}
         </div>
       </section>
 

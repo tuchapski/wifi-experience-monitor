@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getAgentRecordings, startAgentRecording, stopRecording } from "./agentApi";
 import type { AgentCurrentState, AgentSummary, DiagnosticRecording, StartRecordingInput } from "./agentTypes";
 import CollectionStartForm from "./CollectionStartForm";
+import { describeWifiConnection } from "./wifiPresentation";
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 function formatDuration(start: string | null, end: string | null, now: number): string {
@@ -103,6 +104,7 @@ export default function ManagedAgentCard({
 
   const wifi = stateFresh ? state?.wifi : null;
   const score = wifi?.link_score?.value;
+  const wifiPresentation = describeWifiConnection(wifi);
   const collectionBlocked = Boolean(activeProjectRecording) || agent.status !== "online";
 
   return (
@@ -120,8 +122,15 @@ export default function ManagedAgentCard({
 
         <div className="managed-agent-live">
           <span><small>SSID</small><strong>{wifi?.ssid ?? "—"}</strong></span>
+          <span>
+            <small>Radio</small>
+            <strong>{wifi ? `${wifiPresentation.band} · ${wifiPresentation.frequency}` : "—"}</strong>
+          </span>
+          <span>
+            <small>Wi-Fi</small>
+            <strong>{wifi ? `${wifiPresentation.generation} · ${wifiPresentation.shorthand}` : "—"}</strong>
+          </span>
           <span><small>RSSI</small><strong>{wifi?.rssi_dbm != null ? `${wifi.rssi_dbm.toFixed(0)} dBm` : "—"}</strong></span>
-          <span><small>Channel</small><strong>{wifi?.channel ?? "—"}</strong></span>
           <span><small>Link score</small><strong>{score != null ? `${score.toFixed(0)}/100` : "—"}</strong></span>
         </div>
 
