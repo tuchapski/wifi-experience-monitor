@@ -11,6 +11,8 @@ and terminology are documented in [`docs/V1_ARCHITECTURE.md`](docs/V1_ARCHITECTU
 Persistent Agent deployment is documented in
 [`agent/deploy/README.md`](agent/deploy/README.md).
 
+Current stable release: **v1.0.0**.
+
 ## V1 architecture
 
 ```text

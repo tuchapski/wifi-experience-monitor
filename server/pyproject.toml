@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wifi-experience-server"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Central server for Wi-Fi Experience Monitor agents"
 requires-python = ">=3.11"
 dependencies = [

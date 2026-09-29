@@ -24,7 +24,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         thread.join(timeout=5)
 
 
-app = FastAPI(title="Wi-Fi Experience Monitor Server", version="1.0.0rc1", lifespan=lifespan)
+app = FastAPI(title="Wi-Fi Experience Monitor Server", version="1.0.0", lifespan=lifespan)
 app.include_router(agents_router)
 app.include_router(recordings_router)
 app.include_router(recording_deletion_router)
