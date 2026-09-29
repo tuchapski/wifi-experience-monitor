@@ -1,0 +1,28 @@
+BSS 98:7e:ca:8a:3e:0e(on wlp0s20f3) -- associated
+	freq: 5805.0
+	signal: -61.00 dBm
+	SSID: AeP
+BSS 84:01:12:5e:d1:da(on wlp0s20f3)
+	freq: 2412.0
+	signal: -68.00 dBm
+	SSID: Claro
+BSS 50:e0:39:07:e0:e1(on wlp0s20f3)
+	freq: 2422.0
+	signal: -76.00 dBm
+	SSID: Desktop_F7824671
+BSS 98:7e:ca:8a:3e:0f(on wlp0s20f3)
+	freq: 2437.0
+	signal: -64.00 dBm
+	SSID: AeP
+BSS e8:45:8b:5e:45:88(on wlp0s20f3)
+	freq: 2437.0
+	signal: -86.00 dBm
+	SSID: VIVOFIBRA-WIFI6-4588
+BSS 4c:c5:3e:ff:75:a1(on wlp0s20f3)
+	freq: 2442.0
+	signal: -76.00 dBm
+	SSID: Desktop_F5646388
+BSS 86:7e:ca:8a:3e:0e(on wlp0s20f3)
+	freq: 5805.0
+	signal: -68.00 dBm
+	SSID: AeP

@@ -1,0 +1,39 @@
+BSS aa:bb:cc:dd:ee:01(on wlan0) -- associated
+	last seen: 42 ms ago
+	freq: 5180
+	beacon interval: 100 TUs
+	capability: ESS Privacy ShortSlotTime (0x0411)
+	signal: -52.50 dBm
+	SSID: CORP
+	DS Parameter set: channel 36
+	RSN:
+		 * Version: 1
+	BSS Load:
+		 * station count: 12
+		 * channel utilisation: 64/255
+	HT capabilities:
+		Capabilities: 0x19ef
+	HT operation:
+		 * primary channel: 36
+		 * secondary channel offset: above
+	VHT capabilities:
+		VHT Capabilities (0x338001b2)
+	VHT operation:
+		 * channel width: 1 (80 MHz)
+	HE capabilities:
+		HE MAC Capabilities (0x000000000000)
+BSS aa:bb:cc:dd:ee:02(on wlan0)
+	last seen: 115 ms ago
+	freq: 5975
+	beacon interval: 100 TUs
+	capability: ESS Privacy (0x0011)
+	signal: -71.00 dBm
+	SSID:
+	RSN:
+		 * Version: 1
+	HE operation:
+		 * primary channel: 5
+	EHT capabilities:
+		EHT MAC Capabilities
+	EHT operation:
+		 * channel width: 3 (160 MHz)
