@@ -197,6 +197,56 @@
 .agent-current-strip strong { margin-top: 8px; overflow: hidden; color: #15243a; font-size: 22px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-current-strip small { margin-top: 5px; overflow: hidden; color: #7b8798; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
+.agent-experience-path .agent-panel-heading p,
+.agent-readiness-panel .agent-panel-heading p {
+  margin: 4px 0 0;
+  color: #758194;
+  font-size: 12px;
+}
+
+.agent-experience-path-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  padding: 18px 22px 12px;
+}
+
+.agent-path-step {
+  position: relative;
+  min-width: 0;
+  padding: 14px 18px;
+  border: 1px solid #e4eaf1;
+  border-right: 0;
+  background: #fbfcfe;
+}
+
+.agent-path-step:first-child { border-radius: 10px 0 0 10px; }
+.agent-path-step:nth-last-child(1) { border-right: 1px solid #e4eaf1; border-radius: 0 10px 10px 0; }
+
+.agent-path-step header { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.agent-path-step header > span { color: #66768a; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.agent-path-step header small { display: inline-flex; align-items: center; gap: 5px; color: #7b8798; font-size: 9px; white-space: nowrap; }
+.agent-path-step header small i { width: 6px; height: 6px; border-radius: 50%; background: #929cab; }
+.agent-path-step.path-success header small i { background: #2e9c69; }
+.agent-path-step.path-failure header small { color: #963a33; }
+.agent-path-step.path-failure header small i { background: #bd433c; }
+.agent-path-step > strong { display: block; margin-top: 10px; color: #1f344d; font-size: 20px; }
+.agent-path-step > p { min-height: 30px; margin: 5px 0 0; color: #788597; font-size: 10px; line-height: 1.45; }
+.agent-path-step > b { position: absolute; z-index: 1; top: 50%; right: -10px; width: 19px; height: 19px; border: 1px solid #dbe4ee; border-radius: 50%; background: #fff; color: #607991; font-size: 11px; line-height: 17px; text-align: center; transform: translateY(-50%); }
+.agent-experience-path-note { margin: 0; padding: 0 22px 18px; color: #8a95a4; font-size: 10px; }
+
+.agent-readiness-list { display: grid; padding: 8px 22px 14px; }
+.agent-readiness-row { display: grid; grid-template-columns: 180px 100px minmax(0, 1fr); align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #edf1f5; }
+.agent-readiness-row:last-child { border-bottom: 0; }
+.agent-readiness-row > strong { color: #34485f; font-size: 12px; }
+.agent-readiness-row > small { color: #788597; font-size: 11px; line-height: 1.45; }
+.agent-readiness-status { width: fit-content; padding: 4px 7px; border-radius: 999px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.readiness-producing { background: #eaf8f0; color: #186b45; }
+.readiness-verified { background: #edf3fb; color: #315f98; }
+.readiness-available { background: #f0f2f5; color: #657184; }
+.readiness-degraded { background: #fff4dc; color: #875e10; }
+.readiness-unavailable { background: #fff0ef; color: #9b342d; }
+
 .agent-link-score-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px; padding: 20px 22px; }
 .agent-link-score-value { display: flex; align-items: baseline; flex-wrap: wrap; align-content: center; gap: 4px; padding: 14px; border-radius: 12px; background: #edf4fb; }
 .agent-link-score-value strong { color: #1b4f83; font-size: 44px; line-height: 1; }
@@ -245,6 +295,44 @@
 .agent-chart-axis { display: flex; justify-content: space-between; gap: 10px; color: #8a95a4; font-size: 10px; }
 .agent-chart-empty { display: grid; height: 186px; place-items: center; color: #919cab; font-size: 12px; }
 
+.agent-advertised-capabilities { overflow: hidden; }
+.agent-capability-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+  cursor: pointer;
+  list-style: none;
+}
+.agent-capability-details > summary::-webkit-details-marker { display: none; }
+.agent-capability-summary-main { min-width: 0; }
+.agent-capability-summary-main > strong,
+.agent-capability-summary-main > small { display: block; }
+.agent-capability-summary-main > strong { margin-top: 3px; color: #263c55; font-size: 17px; }
+.agent-capability-summary-main > small { margin-top: 4px; color: #7a8798; font-size: 11px; font-weight: 500; }
+.agent-capability-summary-meta { display: flex; align-items: center; gap: 10px; color: #7a8798; font-size: 11px; white-space: nowrap; }
+.agent-capability-summary-meta i {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #dbe3ed;
+  border-radius: 7px;
+  color: #536a84;
+  font-style: normal;
+  transition: transform 140ms ease;
+}
+.agent-capability-details[open] .agent-capability-summary-meta i { transform: rotate(180deg); }
+.agent-capability-details[open] > summary { border-bottom: 1px solid #edf1f5; }
+.agent-capability-details-body > p {
+  margin: 0;
+  padding: 16px 22px 0;
+  color: #6e7c8f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .agent-capabilities { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 22px; }
 .agent-capabilities span { padding: 6px 9px; border: 1px solid #d9e4f1; border-radius: 7px; background: #f3f7fc; color: #365d8a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 .agent-capabilities span.disabled { opacity: 0.45; }
@@ -267,6 +355,12 @@
   .agent-fleet-summary { width: 100%; }
   .agent-fleet-summary div { flex: 1; min-width: 0; }
   .agent-current-strip, .agent-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-experience-path-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .agent-path-step,
+  .agent-path-step:first-child,
+  .agent-path-step:nth-last-child(1) { border: 1px solid #e4eaf1; border-radius: 9px; }
+  .agent-path-step > b { display: none; }
+  .agent-readiness-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .agent-link-score-body { grid-template-columns: minmax(0, 1fr); }
   .agent-link-score-component { grid-template-columns: minmax(0, 1fr) 90px 70px; gap: 6px; }
   .agent-chart-grid { padding: 12px; }

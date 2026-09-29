@@ -11,6 +11,7 @@ from wifi_agent.api import AgentApiClient, HeartbeatResult
 from wifi_agent.capabilities import discover_capabilities
 from wifi_agent.collectors import resolve_interface
 from wifi_agent.config import AgentSettings
+from wifi_agent.core import Observation
 from wifi_agent.processors import CurrentStateSnapshot, TelemetryAggregator
 from wifi_agent.recording import RecordingController
 from wifi_agent.runtime import CurrentStateRuntime, TelemetrySyncEngine
@@ -123,6 +124,44 @@ def _publish_state(
     _publish_snapshot(settings, identity, runtime, runtime.collect())
 
 
+_PROBE_PREFIXES = (
+    "network.gateway_",
+    "network.dns_",
+    "network.internet_",
+    "network.https_",
+)
+
+
+def _update_probe_cache(
+    cache: dict[str, Observation],
+    observations: list[Observation],
+) -> None:
+    refreshed_prefixes = {
+        prefix
+        for observation in observations
+        for prefix in _PROBE_PREFIXES
+        if observation.metric.startswith(prefix)
+    }
+    for metric in list(cache):
+        if any(metric.startswith(prefix) for prefix in refreshed_prefixes):
+            cache.pop(metric)
+    for observation in observations:
+        cache[observation.metric] = observation
+
+
+def _fresh_probe_observations(
+    cache: dict[str, Observation],
+    max_age_seconds: float,
+    now: datetime | None = None,
+) -> list[Observation]:
+    now = now or datetime.now(UTC)
+    return [
+        observation
+        for observation in cache.values()
+        if 0 <= (now - observation.observed_at).total_seconds() <= max_age_seconds
+    ]
+
+
 def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     identity = _enroll(settings, store)
     if identity.server_url != settings.server_url:
@@ -162,8 +201,13 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         if interface
         else None
     )
-    pending_probe_observations = []
+    pending_probe_observations: list[Observation] = []
     pending_probe_errors: list[str] = []
+    probe_cache: dict[str, Observation] = {}
+    probe_cache_ttl_seconds = max(
+        settings.synthetic_probe_interval_seconds * 3,
+        settings.synthetic_probe_timeout_seconds * 2,
+    )
     last_gateway: str | None = None
     last_ipv4_address: str | None = None
 
@@ -180,6 +224,7 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         if probe_runtime is not None:
             probe_batch = probe_runtime.poll()
             if probe_batch is not None:
+                _update_probe_cache(probe_cache, probe_batch.observations)
                 pending_probe_observations.extend(probe_batch.observations)
                 pending_probe_errors.extend(probe_batch.errors)
 
@@ -196,21 +241,29 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             next_heartbeat = now + settings.heartbeat_interval_seconds
 
         if runtime is not None and now >= next_collection:
-            cycle = runtime.collect_cycle()
+            cycle = runtime.collect_cycle(
+                extra_observations=_fresh_probe_observations(
+                    probe_cache,
+                    probe_cache_ttl_seconds,
+                ),
+                extra_collector_errors=pending_probe_errors,
+            )
             gateway = cycle.snapshot.network.get("gateway")
             last_gateway = gateway if isinstance(gateway, str) else None
             ipv4_address = cycle.snapshot.network.get("ipv4_address")
             last_ipv4_address = ipv4_address if isinstance(ipv4_address, str) else None
-            observations = [*cycle.observations, *pending_probe_observations]
-            collector_errors = [
-                *cycle.snapshot.collector_errors,
-                *pending_probe_errors,
+            recording_observations = [*cycle.observations, *pending_probe_observations]
+            telemetry_observations = [
+                *cycle.observations,
+                *cycle.derived_observations,
+                *pending_probe_observations,
             ]
+            collector_errors = list(cycle.snapshot.collector_errors)
             pending_probe_observations.clear()
             pending_probe_errors.clear()
-            aggregator.consume(observations)
+            aggregator.consume(telemetry_observations)
             recording_controller.consume(
-                observations,
+                recording_observations,
                 observed_at=cycle.snapshot.observed_at,
                 collector_errors=collector_errors,
             )

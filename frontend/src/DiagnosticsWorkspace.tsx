@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { deleteRecording, getAgentRecordings, getAgents } from "./agentApi";
 import type { AgentSummary, DiagnosticRecording } from "./agentTypes";
-import { diagnosticsRecordingHash } from "./diagnosticRoutes";
+import { CollectionActivityRow, DatasetCollectionControls } from "./CollectionActivity";
 import DiagnosticCollectionLauncher from "./DiagnosticCollectionLauncher";
 import DiagnosticProjectsPanel from "./DiagnosticProjectsPanel";
 import "./DiagnosticsWorkspace.css";
@@ -157,13 +157,21 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     };
   }, [agentIdsKey, loading]);
 
-  const statuses = useMemo(
-    () => [...new Set(datasets.map(({ recording }) => recording.status))].sort(),
+  const activeDatasets = useMemo(
+    () => datasets.filter(({ recording }) => ACTIVE_STATUSES.has(recording.status)),
     [datasets],
+  );
+  const historicalDatasets = useMemo(
+    () => datasets.filter(({ recording }) => !ACTIVE_STATUSES.has(recording.status)),
+    [datasets],
+  );
+  const statuses = useMemo(
+    () => [...new Set(historicalDatasets.map(({ recording }) => recording.status))].sort(),
+    [historicalDatasets],
   );
   const filteredDatasets = useMemo(() => {
     const search = datasetSearch.trim().toLowerCase();
-    return datasets
+    return historicalDatasets
       .filter(({ agent }) => !datasetAgentFilter || agent.id === datasetAgentFilter)
       .filter(({ recording }) => !datasetStatusFilter || recording.status === datasetStatusFilter)
       .filter(({ agent, recording }) => !search || [
@@ -306,6 +314,32 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         />
       )}
 
+      {activeDatasets.length > 0 && (
+        <section
+          id="diagnostics-now-collecting"
+          className="diagnostics-now-collecting"
+          aria-labelledby="now-collecting-title"
+        >
+          <div className="diagnostics-now-collecting-heading">
+            <div>
+              <span className="agent-eyebrow">Live activity</span>
+              <h2 id="now-collecting-title">Now collecting</h2>
+              <p>Active individual collections stay visible here regardless of where they were started.</p>
+            </div>
+            <span>{activeDatasets.length} active</span>
+          </div>
+          <div className="collection-activity-list">
+            {activeDatasets.map(({ agent, recording }) => (
+              <CollectionActivityRow
+                key={recording.id}
+                agent={agent}
+                recording={recording}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="diagnostics-datasets" aria-labelledby="datasets-title">
         <div className="diagnostics-datasets-heading">
           <div>
@@ -405,9 +439,12 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                           <td>{recording.metrics_count.toLocaleString()} metrics · {recording.events_count.toLocaleString()} events</td>
                           <td>
                             <div className="diagnostics-row-actions">
-                              {recording.status === "completed" && recording.sync_status === "complete" && (
-                                <button type="button" onClick={() => { window.location.hash = diagnosticsRecordingHash(agent.id, recording.id); }}>View analysis</button>
-                              )}
+                              <DatasetCollectionControls
+                                agent={agent}
+                                recording={recording}
+                                hasActiveCollection={(recordingsByAgent[agent.id] ?? [])
+                                  .some((item) => ACTIVE_STATUSES.has(item.status))}
+                              />
                               <button
                                 type="button"
                                 className="diagnostics-delete-button"

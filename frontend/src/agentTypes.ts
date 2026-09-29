@@ -45,6 +45,15 @@ export interface WifiCurrentState {
   rx_drop_misc?: number | null;
   tx_retries_per_100_packets?: number | null;
   tx_failed_percent?: number | null;
+  survey_active_ms?: number | null;
+  survey_busy_ms?: number | null;
+  survey_rx_ms?: number | null;
+  survey_tx_ms?: number | null;
+  survey_status?: string | null;
+  survey_reason?: string | null;
+  channel_utilization_percent?: number | null;
+  channel_rx_percent?: number | null;
+  channel_tx_percent?: number | null;
   link_score?: LinkScore | null;
 }
 
@@ -70,9 +79,24 @@ export interface NetworkCurrentState {
   ipv4_address?: string | null;
   prefix_length?: number | null;
   gateway?: string | null;
+  gateway_reachable?: boolean | null;
   gateway_latency_ms?: number | null;
+  gateway_packet_loss_percent?: number | null;
+  gateway_jitter_ms?: number | null;
+  dns_success?: boolean | null;
   dns_latency_ms?: number | null;
+  internet_reachable?: boolean | null;
   internet_latency_ms?: number | null;
+  internet_packet_loss_percent?: number | null;
+  internet_jitter_ms?: number | null;
+  https_success?: boolean | null;
+  https_status_code?: number | null;
+  https_dns_ms?: number | null;
+  https_tcp_connect_ms?: number | null;
+  https_tls_handshake_ms?: number | null;
+  https_ttfb_ms?: number | null;
+  https_total_ms?: number | null;
+  https_failure_elapsed_ms?: number | null;
 }
 
 export interface AgentCurrentState {

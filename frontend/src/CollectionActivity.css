@@ -1,0 +1,251 @@
+.diagnostics-now-collecting {
+  margin-bottom: 24px;
+}
+
+.diagnostics-now-collecting-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.diagnostics-now-collecting-heading h2 {
+  margin: 3px 0 4px;
+  color: #223b58;
+  font-size: 20px;
+}
+
+.diagnostics-now-collecting-heading p {
+  margin: 0;
+  color: #69778b;
+  font-size: 12px;
+}
+
+.diagnostics-now-collecting-heading > span {
+  color: #9a332d;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.collection-activity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.collection-activity-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px minmax(260px, 1.5fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 16px;
+  border: 1px solid #d8e3ef;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(25, 42, 70, 0.04);
+}
+
+.collection-activity-live {
+  display: grid;
+  place-items: center;
+}
+
+.collection-activity-live i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #bd433c;
+  box-shadow: 0 0 0 5px #feeceb;
+}
+
+.collection-activity-main {
+  min-width: 0;
+}
+
+.collection-activity-title > span,
+.collection-activity-title > strong,
+.collection-activity-title > small {
+  display: block;
+}
+
+.collection-activity-title > span {
+  color: #a13d36;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.collection-activity-title > strong {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #243d5a;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-activity-title > small {
+  margin-top: 3px;
+  color: #7d899a;
+  font-size: 10px;
+}
+
+.collection-activity-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 9px;
+}
+
+.collection-activity-progress > div {
+  position: relative;
+  width: min(330px, 100%);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e8edf3;
+}
+
+.collection-activity-progress > div > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #497db6;
+}
+
+.collection-activity-progress > small {
+  color: #718095;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.collection-activity-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(65px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.collection-activity-stats div {
+  padding-left: 10px;
+  border-left: 1px solid #e5eaf0;
+}
+
+.collection-activity-stats dt {
+  color: #8792a2;
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.collection-activity-stats dd {
+  margin: 4px 0 0;
+  color: #34485f;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.collection-activity-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-activity-actions a,
+.collection-activity-actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #d9e1eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #315f98;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.collection-activity-actions button {
+  border-color: #bd4d46;
+  background: #bd4d46;
+  color: #fff;
+}
+
+.collection-activity-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.collection-activity-error {
+  grid-column: 2 / -1;
+  color: #9b342d;
+  font-size: 10px;
+}
+
+.dataset-collection-controls {
+  display: grid;
+  gap: 4px;
+}
+
+.dataset-collection-controls > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.diagnostics-dataset-table .dataset-collection-controls button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.diagnostics-dataset-table .dataset-collection-controls .dataset-collect-again {
+  border-color: #d9e1eb;
+  background: #fff;
+  color: #315f98;
+}
+
+.diagnostics-dataset-table .dataset-collection-controls button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+  text-decoration: none;
+}
+
+.dataset-collection-controls > small {
+  color: #9b342d;
+  font-size: 9px;
+  text-align: right;
+  white-space: normal;
+}
+
+@media (max-width: 900px) {
+  .collection-activity-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .collection-activity-stats,
+  .collection-activity-actions {
+    grid-column: 2;
+  }
+
+  .collection-activity-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .diagnostics-now-collecting-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .collection-activity-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

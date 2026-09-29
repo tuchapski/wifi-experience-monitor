@@ -25,6 +25,7 @@ const TELEMETRY_METRICS = [
   { key: "wifi.snr_db", label: "SNR", unit: "dB" },
   { key: "wifi.tx_rate_mbps", label: "TX rate", unit: "Mbps" },
   { key: "wifi.rx_rate_mbps", label: "RX rate", unit: "Mbps" },
+  { key: "wifi.channel_utilization_percent", label: "Channel utilization", unit: "%" },
 ] as const;
 
 const RANGE_OPTIONS = [
@@ -160,6 +161,203 @@ function TelemetryChart({
         <span>{new Date(lastTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
     </article>
+  );
+}
+
+type ExperiencePathStatus = "success" | "failure" | "unavailable";
+
+function experienceStatus(
+  outcome: boolean | null | undefined,
+  hasMeasurement: boolean,
+): ExperiencePathStatus {
+  if (outcome === false) return "failure";
+  if (outcome === true || hasMeasurement) return "success";
+  return "unavailable";
+}
+
+function ExperiencePath({
+  state,
+  fresh,
+}: {
+  state: AgentCurrentState | null;
+  fresh: boolean;
+}) {
+  const wifi = fresh ? state?.wifi : null;
+  const network = fresh ? state?.network : null;
+  const steps = [
+    {
+      key: "wifi",
+      label: "Wi-Fi / RF",
+      status: experienceStatus(wifi?.connected, wifi?.rssi_dbm != null),
+      statusLabel: wifi?.connected === false ? "Disconnected" : wifi?.connected ? "Connected" : "Unavailable",
+      primary: formatMetric(wifi?.rssi_dbm, "dBm"),
+      secondary: `SNR ${formatMetric(wifi?.snr_db, "dB")} · Util ${formatMetric(wifi?.channel_utilization_percent, "%")}`,
+    },
+    {
+      key: "gateway",
+      label: "Gateway",
+      status: experienceStatus(network?.gateway_reachable, network?.gateway_latency_ms != null),
+      statusLabel: network?.gateway_reachable === false ? "Unreachable" : network?.gateway_reachable ? "Reachable" : "Unavailable",
+      primary: network?.gateway_reachable === false ? "Failed" : formatMetric(network?.gateway_latency_ms, "ms"),
+      secondary: `Loss ${formatMetric(network?.gateway_packet_loss_percent, "%")} · Jitter ${formatMetric(network?.gateway_jitter_ms, "ms")}`,
+    },
+    {
+      key: "dns",
+      label: "DNS",
+      status: experienceStatus(network?.dns_success, network?.dns_latency_ms != null),
+      statusLabel: network?.dns_success === false ? "Failed" : network?.dns_success ? "Success" : "Unavailable",
+      primary: network?.dns_success === false ? "Failed" : formatMetric(network?.dns_latency_ms, "ms"),
+      secondary: network?.dns_success === true ? "Resolver completed" : "Resolver result unavailable",
+    },
+    {
+      key: "internet",
+      label: "Internet",
+      status: experienceStatus(network?.internet_reachable, network?.internet_latency_ms != null),
+      statusLabel: network?.internet_reachable === false ? "Unreachable" : network?.internet_reachable ? "Reachable" : "Unavailable",
+      primary: network?.internet_reachable === false ? "Failed" : formatMetric(network?.internet_latency_ms, "ms"),
+      secondary: `Loss ${formatMetric(network?.internet_packet_loss_percent, "%")} · Jitter ${formatMetric(network?.internet_jitter_ms, "ms")}`,
+    },
+    {
+      key: "application",
+      label: "Application",
+      status: experienceStatus(network?.https_success, network?.https_total_ms != null),
+      statusLabel: network?.https_success === false ? "Failed" : network?.https_success ? "Success" : "Unavailable",
+      primary: network?.https_success === false ? "Failed" : formatMetric(network?.https_total_ms, "ms"),
+      secondary: network?.https_success === false
+        ? `Observed for ${formatMetric(network?.https_failure_elapsed_ms, "ms")}`
+        : `TTFB ${formatMetric(network?.https_ttfb_ms, "ms")} · HTTP ${network?.https_status_code ?? "—"}`,
+    },
+  ] as const;
+
+  return (
+    <section className="agent-panel agent-experience-path">
+      <div className="agent-panel-heading">
+        <div>
+          <span className="agent-eyebrow">Realtime experience</span>
+          <h2>Experience Path</h2>
+          <p>Current measured path from the Wi-Fi link to the configured application target.</p>
+        </div>
+        <small>{fresh ? "Fresh Current State" : "Waiting for fresh data"}</small>
+      </div>
+      <div className="agent-experience-path-grid">
+        {steps.map((step, index) => (
+          <article className={`agent-path-step path-${step.status}`} key={step.key}>
+            <header>
+              <span>{step.label}</span>
+              <small><i />{step.statusLabel}</small>
+            </header>
+            <strong>{step.primary}</strong>
+            <p>{step.secondary}</p>
+            {index < steps.length - 1 && <b aria-hidden="true">→</b>}
+          </article>
+        ))}
+      </div>
+      <p className="agent-experience-path-note">
+        Values are direct observations from the latest Agent state; this view does not assign root cause.
+      </p>
+    </section>
+  );
+}
+
+type ReadinessStatus = "producing" | "verified" | "available" | "degraded" | "unavailable";
+
+function SensorReadiness({
+  agent,
+  state,
+  fresh,
+}: {
+  agent: AgentSummary;
+  state: AgentCurrentState | null;
+  fresh: boolean;
+}) {
+  const wifi = fresh ? state?.wifi : null;
+  const declared = new Set(
+    agent.capabilities
+      .filter((capability) => capability.enabled)
+      .map((capability) => capability.capability),
+  );
+  const surveyStatus = wifi?.survey_status;
+  const channelStatus: ReadinessStatus = wifi?.channel_utilization_percent != null
+    ? "producing"
+    : surveyStatus === "verified"
+      ? "verified"
+      : surveyStatus === "degraded"
+        ? "degraded"
+        : surveyStatus === "unavailable"
+          ? "unavailable"
+          : "available";
+
+  const rows: { label: string; status: ReadinessStatus; detail: string }[] = [
+    {
+      label: "Wi-Fi association",
+      status: wifi?.connected == null ? "unavailable" : "producing",
+      detail: wifi?.connected === true
+        ? `Associated to ${wifi.ssid ?? "unknown SSID"}`
+        : wifi?.connected === false
+          ? "The interface is currently disconnected."
+          : "No fresh association observation.",
+    },
+    {
+      label: "Station statistics",
+      status: wifi?.signal_avg_dbm != null || wifi?.tx_packets != null
+        ? "producing"
+        : declared.has("wifi.station_stats") ? "available" : "unavailable",
+      detail: wifi?.signal_avg_dbm != null || wifi?.tx_packets != null
+        ? "The driver is producing station/link statistics."
+        : declared.has("wifi.station_stats")
+          ? "Prerequisites are present, but no fresh station statistics were observed."
+          : "This capability was not advertised at enrollment.",
+    },
+    {
+      label: "RF survey",
+      status: surveyStatus === "verified"
+        ? "verified"
+        : surveyStatus === "degraded"
+          ? "degraded"
+          : surveyStatus === "unavailable"
+            ? "unavailable"
+            : "available",
+      detail: wifi?.survey_reason
+        ?? "RF survey has not yet been verified in the current association.",
+    },
+    {
+      label: "Channel utilization",
+      status: channelStatus,
+      detail: wifi?.channel_utilization_percent != null
+        ? `Producing ${formatMetric(wifi.channel_utilization_percent, "%")} from active/busy survey deltas.`
+        : surveyStatus === "verified"
+          ? "Survey counters are verified; waiting for a second comparable sample."
+          : "No validated channel-utilization observation is currently available.",
+    },
+    {
+      label: "Wi-Fi scan",
+      status: declared.has("wifi.scan") ? "available" : "unavailable",
+      detail: declared.has("wifi.scan")
+        ? "Prerequisites are available; active scan is intentionally not exercised automatically."
+        : "This capability was not advertised at enrollment.",
+    },
+  ];
+
+  return (
+    <section className="agent-panel agent-readiness-panel">
+      <div className="agent-panel-heading">
+        <div>
+          <span className="agent-eyebrow">Sensor</span>
+          <h2>Sensor readiness</h2>
+          <p>Runtime evidence is separated from capabilities merely advertised at enrollment.</p>
+        </div>
+        <small>{fresh ? "Runtime validation active" : "Current State is stale"}</small>
+      </div>
+      <div className="agent-readiness-list">
+        {rows.map((row) => (
+          <div className="agent-readiness-row" key={row.label}>
+            <strong>{row.label}</strong>
+            <span className={`agent-readiness-status readiness-${row.status}`}>{row.status.replaceAll("_", " ")}</span>
+            <small>{row.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -439,6 +637,11 @@ function AgentDetail({ agentId }: { agentId: string }) {
         <article><span>TX / RX</span><strong>{formatMetric(wifi?.tx_rate_mbps, "Mbps")}</strong><small>RX {formatMetric(wifi?.rx_rate_mbps, "Mbps")}</small></article>
       </section>
 
+      <ExperiencePath
+        state={state}
+        fresh={isCurrentState(agent, state)}
+      />
+
       <LinkScorePanel
         score={state?.wifi.link_score ?? null}
         fresh={isCurrentState(agent, state)}
@@ -514,23 +717,45 @@ function AgentDetail({ agentId }: { agentId: string }) {
         </div>
       </section>
 
-      <section className="agent-panel">
-        <div className="agent-panel-heading">
-          <div><span className="agent-eyebrow">Agent</span><h2>Capabilities</h2></div>
-          <small>{agent.capabilities.filter((capability) => capability.enabled).length} enabled</small>
-        </div>
-        <div className="agent-capabilities">
-          {agent.capabilities.map((capability) => (
-            <span key={capability.capability} className={capability.enabled ? "" : "disabled"}>
-              {capability.capability}
-            </span>
-          ))}
-        </div>
-        <div className="agent-platform-meta">
-          <span><strong>OS</strong>{[agent.os_name, agent.os_version].filter(Boolean).join(" ") || "—"}</span>
-          <span><strong>First seen</strong>{formatDate(agent.first_seen_at)}</span>
-          <span><strong>Agent ID</strong><code>{agent.id}</code></span>
-        </div>
+      <SensorReadiness
+        agent={agent}
+        state={state}
+        fresh={isCurrentState(agent, state)}
+      />
+
+      <section className="agent-panel agent-advertised-capabilities">
+        <details className="agent-capability-details">
+          <summary>
+            <div className="agent-capability-summary-main">
+              <span className="agent-eyebrow">Agent inventory</span>
+              <strong>Advertised capabilities</strong>
+              <small>Enrollment prerequisites, not runtime validation</small>
+            </div>
+            <div className="agent-capability-summary-meta">
+              <span>{agent.capabilities.length} advertised</span>
+              <i aria-hidden="true">⌄</i>
+            </div>
+          </summary>
+          <div className="agent-capability-details-body">
+            <p>
+              These entries describe tools and runtime prerequisites advertised when the Agent
+              enrolled. Use Sensor readiness above to see what is currently verified and producing
+              measurements.
+            </p>
+            <div className="agent-capabilities">
+              {agent.capabilities.map((capability) => (
+                <span key={capability.capability} className={capability.enabled ? "" : "disabled"}>
+                  {capability.capability}
+                </span>
+              ))}
+            </div>
+            <div className="agent-platform-meta">
+              <span><strong>OS</strong>{[agent.os_name, agent.os_version].filter(Boolean).join(" ") || "—"}</span>
+              <span><strong>First seen</strong>{formatDate(agent.first_seen_at)}</span>
+              <span><strong>Agent ID</strong><code>{agent.id}</code></span>
+            </div>
+          </div>
+        </details>
       </section>
     </>
   );

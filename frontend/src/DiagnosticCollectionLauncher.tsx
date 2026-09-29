@@ -57,7 +57,7 @@ export default function DiagnosticCollectionLauncher({
         <div>
           <span className="agent-eyebrow">Start collection</span>
           <h2 id="collection-title">Individual diagnostic collection</h2>
-          <p>Use this as a secondary launcher. Ongoing collection control remains with the Agent.</p>
+          <p>Start here or from the Agent. Active collections remain visible in Diagnostics.</p>
         </div>
         <label htmlFor="diagnostics-agent-picker" className="diagnostics-agent-picker">
           Collection Agent
@@ -103,9 +103,9 @@ export default function DiagnosticCollectionLauncher({
                     ? "This Agent is collecting for a diagnostic project."
                     : "This Agent already has an active individual collection."}
                 </strong>
-                <span>Use the Managed Agent card to monitor or stop the active collection.</span>
+                <span>Monitor progress or stop it from the Now collecting section.</span>
               </div>
-              <a href={`#agents/${encodeURIComponent(selected.id)}`}>Manage Agent</a>
+              <a href="#diagnostics-now-collecting">View active collection</a>
             </div>
           ) : (
             <CollectionStartForm

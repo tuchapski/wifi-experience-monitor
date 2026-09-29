@@ -41,6 +41,7 @@ export default function ManagedAgentCard({
     () => recordings.find((recording) => recording.project_run_id && ACTIVE_STATUSES.has(recording.status)) ?? null,
     [recordings],
   );
+  const activeCollection = activeRecording ?? activeProjectRecording;
 
   useEffect(() => {
     let active = true;
@@ -64,10 +65,10 @@ export default function ManagedAgentCard({
   }, [agent.id]);
 
   useEffect(() => {
-    if (!activeRecording) return;
+    if (!activeCollection) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [activeRecording]);
+  }, [activeCollection]);
 
   async function handleStart(input: StartRecordingInput): Promise<boolean> {
     if (busy || activeRecording || activeProjectRecording || agent.status !== "online") return false;
@@ -105,7 +106,7 @@ export default function ManagedAgentCard({
   const collectionBlocked = Boolean(activeProjectRecording) || agent.status !== "online";
 
   return (
-    <article className={`managed-agent-card${activeRecording ? " managed-agent-recording" : ""}`}>
+    <article className={`managed-agent-card${activeCollection ? " managed-agent-recording" : ""}`}>
       <div className="managed-agent-card-main">
         <div className="managed-agent-identity">
           <div>
@@ -126,9 +127,15 @@ export default function ManagedAgentCard({
 
         <div className="managed-agent-actions">
           <button type="button" className="managed-agent-secondary" onClick={onOpen}>View details</button>
-          <button type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
-            {expanded ? "Close" : activeRecording ? "Collection details" : "Start collection"}
-          </button>
+          {activeCollection ? (
+            <button type="button" onClick={() => { window.location.hash = "#diagnostics"; }}>
+              Open collection
+            </button>
+          ) : (
+            <button type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
+              {expanded ? "Close" : "Start collection"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -139,37 +146,44 @@ export default function ManagedAgentCard({
       )}
       {error && <div className="managed-agent-error" role="alert">{error}</div>}
 
-      {expanded && (
+      {activeCollection ? (
         <div className="managed-agent-expanded">
-          {activeRecording ? (
-            <div className="managed-agent-active-collection">
-              <div>
-                <span className="agent-eyebrow">Active collection</span>
-                <strong>{activeRecording.name}</strong>
-                <small>{[activeRecording.site, activeRecording.location].filter(Boolean).join(" · ") || "No location metadata"}</small>
-              </div>
-              <dl>
-                <div><dt>Status</dt><dd>{activeRecording.status}</dd></div>
-                <div><dt>Elapsed</dt><dd>{formatDuration(activeRecording.started_at, activeRecording.ended_at, now)}</dd></div>
-                <div><dt>Metrics</dt><dd>{activeRecording.metrics_count.toLocaleString()}</dd></div>
-                <div><dt>Events</dt><dd>{activeRecording.events_count.toLocaleString()}</dd></div>
-              </dl>
+          <div className="managed-agent-active-collection">
+            <div>
+              <span className="agent-eyebrow">Now collecting</span>
+              <strong>{activeCollection.name}</strong>
+              <small>
+                {activeProjectRecording
+                  ? activeProjectRecording.project_name ?? "Diagnostic project"
+                  : [activeCollection.site, activeCollection.location].filter(Boolean).join(" · ")
+                    || "No location metadata"}
+              </small>
+            </div>
+            <dl>
+              <div><dt>Status</dt><dd>{activeCollection.status}</dd></div>
+              <div><dt>Elapsed</dt><dd>{formatDuration(activeCollection.started_at, activeCollection.ended_at, now)}</dd></div>
+              <div><dt>Metrics</dt><dd>{activeCollection.metrics_count.toLocaleString()}</dd></div>
+              <div><dt>Events</dt><dd>{activeCollection.events_count.toLocaleString()}</dd></div>
+            </dl>
+            {activeRecording && (
               <button type="button" className="managed-agent-stop" onClick={() => void handleStop()}
                 disabled={activeRecording.status !== "recording" || busy !== null}>
                 {busy === "stop" || activeRecording.status === "stopping"
                   ? "Stopping…"
                   : activeRecording.status === "created" ? "Waiting for Agent" : "Stop collection"}
               </button>
-            </div>
-          ) : (
-            <CollectionStartForm
-              disabled={collectionBlocked}
-              busy={busy === "start"}
-              onSubmit={handleStart}
-            />
-          )}
+            )}
+          </div>
         </div>
-      )}
+      ) : expanded ? (
+        <div className="managed-agent-expanded">
+          <CollectionStartForm
+            disabled={collectionBlocked}
+            busy={busy === "start"}
+            onSubmit={handleStart}
+          />
+        </div>
+      ) : null}
     </article>
   );
 }
