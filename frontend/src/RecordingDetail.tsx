@@ -68,8 +68,23 @@ const DIAGNOSTIC_COMPARISON_METRICS = [
   "network.internet_latency_ms",
   "network.internet_packet_loss_percent",
   "network.internet_jitter_ms",
+  "network.https_ttfb_ms",
   "network.https_total_ms",
 ] as const;
+
+const COMPACT_DIAGNOSTIC_METRIC_KEYS = new Set<string>([
+  "wifi.rssi_dbm",
+  "wifi.tx_retries_per_100_packets",
+  "wifi.tx_failed_percent",
+  "wifi.channel_utilization_percent",
+  "network.gateway_latency_ms",
+  "network.gateway_packet_loss_percent",
+  "network.dns_latency_ms",
+  "network.internet_latency_ms",
+  "network.internet_packet_loss_percent",
+  "network.https_total_ms",
+  "network.https_ttfb_ms",
+]);
 
 const EVIDENCE_DOMAIN_LABELS: Record<DiagnosticEvidenceDomain, string> = {
   wifi_rf: "Wi-Fi / RF",
@@ -273,6 +288,234 @@ function RawMetricChart({
         <span>Max <strong>{formatNumber(overview?.maximum ?? null, unit)}</strong></span>
       </div>
     </article>
+  );
+}
+
+function CompactMetricCard({
+  metric,
+  overview,
+  timeline,
+  selectedFocus,
+  comparison,
+}: {
+  metric: { key: string; label: string; unit: string };
+  overview: RecordingMetricOverview | undefined;
+  timeline: TimelineBounds | null;
+  selectedFocus: DiagnosticInvestigationFocus | null;
+  comparison: DiagnosticWindowComparison | null;
+}) {
+  const points = overview?.points ?? [];
+  const latest = points.at(-1)?.value ?? null;
+  const metricComparison = comparison?.metrics.find((item) => item.metric === metric.key) ?? null;
+
+  const phaseValue = (
+    phase: { sample_count: number; average: number | null } | undefined,
+  ): string => {
+    if (!phase || phase.sample_count === 0 || phase.average === null) return "—";
+    return formatNumber(phase.average, metric.unit);
+  };
+
+  const delta = metricComparison?.before.average != null
+    && metricComparison.before.sample_count > 0
+    && metricComparison.during.average != null
+    && metricComparison.during.sample_count > 0
+    ? metricComparison.during.average - metricComparison.before.average
+    : null;
+
+  let sparkline: string | null = null;
+  let focusBand: { x: number; width: number } | null = null;
+
+  if (points.length > 0 && timeline !== null) {
+    let minimum = overview?.minimum ?? Math.min(...points.map((point) => point.value));
+    let maximum = overview?.maximum ?? Math.max(...points.map((point) => point.value));
+    if (minimum === maximum) {
+      minimum -= 1;
+      maximum += 1;
+    }
+    const valueSpan = maximum - minimum;
+    const timeSpan = Math.max(1, timeline.end - timeline.start);
+    const xForTime = (time: number) => {
+      const clamped = Math.min(timeline.end, Math.max(timeline.start, time));
+      return 8 + ((clamped - timeline.start) / timeSpan) * 304;
+    };
+    const yForValue = (value: number) => 76 - ((value - minimum) / valueSpan) * 64;
+    sparkline = points
+      .map((point) => `${xForTime(Date.parse(point.observed_at))},${yForValue(point.value)}`)
+      .join(" ");
+
+    if (selectedFocus) {
+      const start = xForTime(Date.parse(selectedFocus.started_at));
+      const end = xForTime(Date.parse(selectedFocus.ended_at));
+      focusBand = { x: start, width: Math.max(2, end - start) };
+    }
+  }
+
+  return (
+    <article className="recording-compact-card">
+      <header>
+        <div>
+          <span>{metric.label}</span>
+          <strong>{formatNumber(latest, metric.unit)}</strong>
+        </div>
+        <small>{(overview?.sample_count ?? 0).toLocaleString()} samples</small>
+      </header>
+
+      {sparkline === null ? (
+        <div className="recording-compact-empty">Unavailable</div>
+      ) : (
+        <svg
+          viewBox="0 0 320 88"
+          role="img"
+          aria-label={`${metric.label} compact recording chart`}
+        >
+          {focusBand && (
+            <rect
+              x={focusBand.x}
+              y="8"
+              width={focusBand.width}
+              height="68"
+              className="recording-compact-focus-band"
+              aria-hidden="true"
+            />
+          )}
+          <line x1="8" x2="312" y1="76" y2="76" className="recording-compact-gridline" />
+          <polyline points={sparkline} className="recording-compact-line" />
+        </svg>
+      )}
+
+      {selectedFocus ? (
+        metricComparison ? (
+          <>
+            <div className="recording-compact-phases">
+              <span><small>Before</small><strong>{phaseValue(metricComparison.before)}</strong></span>
+              <span className="is-during">
+                <small>During</small><strong>{phaseValue(metricComparison.during)}</strong>
+              </span>
+              <span><small>After</small><strong>{phaseValue(metricComparison.after)}</strong></span>
+            </div>
+            <div className="recording-compact-delta">
+              Δ {delta === null ? "—" : `${delta > 0 ? "+" : ""}${formatNumber(delta, metric.unit)}`}
+            </div>
+          </>
+        ) : (
+          <div className="recording-compact-stats">
+            <span>Min <strong>{formatNumber(overview?.minimum ?? null, metric.unit)}</strong></span>
+            <span>Avg <strong>{formatNumber(overview?.average ?? null, metric.unit)}</strong></span>
+            <span>Max <strong>{formatNumber(overview?.maximum ?? null, metric.unit)}</strong></span>
+          </div>
+        )
+      ) : (
+        <div className="recording-compact-stats">
+          <span>Min <strong>{formatNumber(overview?.minimum ?? null, metric.unit)}</strong></span>
+          <span>Avg <strong>{formatNumber(overview?.average ?? null, metric.unit)}</strong></span>
+          <span>Max <strong>{formatNumber(overview?.maximum ?? null, metric.unit)}</strong></span>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function CompactDiagnosticMetrics({
+  series,
+  timeline,
+  selectedFocus,
+  comparison,
+  comparisonLoading,
+  comparisonError,
+}: {
+  series: Record<string, RecordingMetricOverview>;
+  timeline: TimelineBounds | null;
+  selectedFocus: DiagnosticInvestigationFocus | null;
+  comparison: DiagnosticWindowComparison | null;
+  comparisonLoading: boolean;
+  comparisonError: string | null;
+}) {
+  const [showAllMetrics, setShowAllMetrics] = useState(false);
+  const groups = METRIC_DOMAIN_GROUPS
+    .map((group) => ({
+      domain: group.domain,
+      label: group.label,
+      metrics: group.metrics.filter(
+        (metric) => showAllMetrics || COMPACT_DIAGNOSTIC_METRIC_KEYS.has(metric.key),
+      ),
+    }))
+    .filter((group) => group.metrics.length > 0);
+
+  const primaryCaptured = METRIC_DEFINITIONS.filter(
+    (metric) =>
+      COMPACT_DIAGNOSTIC_METRIC_KEYS.has(metric.key)
+      && (series[metric.key]?.sample_count ?? 0) > 0,
+  ).length;
+
+  return (
+    <section className="agent-panel recording-compact-metrics">
+      <div className="recording-detail-section-heading recording-compact-heading">
+        <div>
+          <span className="agent-eyebrow">Diagnostic metrics</span>
+          <h2>Compact cross-layer evidence</h2>
+          <p>
+            Prioritized measurements for rapid investigation. Full-resolution telemetry remains
+            available below.
+          </p>
+        </div>
+        <div className="recording-compact-controls">
+          <small>
+            {primaryCaptured}/{COMPACT_DIAGNOSTIC_METRIC_KEYS.size} diagnostic metrics captured
+          </small>
+          <button type="button" onClick={() => setShowAllMetrics((current) => !current)}>
+            {showAllMetrics ? "Show diagnostic metrics" : "Show all metrics"}
+          </button>
+        </div>
+      </div>
+
+      {selectedFocus && (
+        <div className="recording-compact-focus">
+          <span>Focused interval</span>
+          <strong>
+            {formatClock(selectedFocus.started_at)} → {formatClock(selectedFocus.ended_at)}
+          </strong>
+          <small>
+            Before / During / After values use the same raw comparison window as Diagnostic Evidence.
+          </small>
+        </div>
+      )}
+
+      {selectedFocus && comparisonLoading && (
+        <p className="recording-compact-message">Loading focused metric comparison…</p>
+      )}
+      {selectedFocus && comparisonError && (
+        <p className="recording-compact-message recording-compact-message-error">
+          Focused comparison unavailable: {comparisonError}
+        </p>
+      )}
+
+      <div className="recording-compact-domain-stack">
+        {groups.map((group) => (
+          <section className="recording-compact-domain" key={group.domain}>
+            <header>
+              <strong>{group.label}</strong>
+              <small>
+                {group.metrics.filter(
+                  (metric) => (series[metric.key]?.sample_count ?? 0) > 0,
+                ).length}/{group.metrics.length} captured
+              </small>
+            </header>
+            <div className="recording-compact-grid">
+              {group.metrics.map((metric) => (
+                <CompactMetricCard
+                  key={metric.key}
+                  metric={metric}
+                  overview={series[metric.key]}
+                  timeline={timeline}
+                  selectedFocus={selectedFocus}
+                  comparison={comparison}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1218,6 +1461,15 @@ export default function RecordingDetail({
         selectedFocus={selectedFocus}
         comparison={windowComparison}
         correlation={evidenceCorrelation}
+        comparisonLoading={comparisonLoading}
+        comparisonError={comparisonError}
+      />
+
+      <CompactDiagnosticMetrics
+        series={series}
+        timeline={timeline}
+        selectedFocus={selectedFocus}
+        comparison={windowComparison}
         comparisonLoading={comparisonLoading}
         comparisonError={comparisonError}
       />
