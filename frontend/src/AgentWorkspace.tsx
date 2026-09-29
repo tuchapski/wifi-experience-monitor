@@ -279,6 +279,7 @@ function SensorReadiness({
       .map((capability) => capability.capability),
   );
   const surveyStatus = wifi?.survey_status;
+  const scanStatus = wifi?.scan_status;
   const channelStatus: ReadinessStatus = wifi?.channel_utilization_percent != null
     ? "producing"
     : surveyStatus === "verified"
@@ -333,10 +334,17 @@ function SensorReadiness({
     },
     {
       label: "Wi-Fi scan",
-      status: declared.has("wifi.scan") ? "available" : "unavailable",
-      detail: declared.has("wifi.scan")
-        ? "Prerequisites are available; active scan is intentionally not exercised automatically."
-        : "This capability was not advertised at enrollment.",
+      status: scanStatus === "verified"
+        ? "verified"
+        : scanStatus === "degraded"
+          ? "degraded"
+          : scanStatus === "unavailable"
+            ? "unavailable"
+            : declared.has("wifi.scan") ? "available" : "unavailable",
+      detail: wifi?.scan_reason
+        ?? (declared.has("wifi.scan")
+          ? "Prerequisites are available; waiting for runtime scan verification."
+          : "This capability was not advertised at enrollment."),
     },
   ];
 

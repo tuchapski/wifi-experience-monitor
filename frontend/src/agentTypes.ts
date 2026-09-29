@@ -54,6 +54,13 @@ export interface WifiCurrentState {
   channel_utilization_percent?: number | null;
   channel_rx_percent?: number | null;
   channel_tx_percent?: number | null;
+  scan_status?: string | null;
+  scan_reason?: string | null;
+  scan_running?: boolean | null;
+  scan_last_completed_at?: string | null;
+  scan_duration_ms?: number | null;
+  scan_bss_count?: number | null;
+  scan_associated_seen?: boolean | null;
   link_score?: LinkScore | null;
 }
 

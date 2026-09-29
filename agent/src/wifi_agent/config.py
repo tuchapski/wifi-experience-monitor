@@ -4,6 +4,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _environment_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be one of: true, false, 1, 0, yes, no, on, off")
+
+
 @dataclass(frozen=True, slots=True)
 class AgentSettings:
     server_url: str
@@ -19,6 +31,9 @@ class AgentSettings:
     telemetry_retention_hours: int
     request_timeout_seconds: float
     interface: str | None
+    rf_scan_enabled: bool = True
+    rf_scan_interval_seconds: float = 60.0
+    rf_scan_timeout_seconds: float = 15.0
     synthetic_probe_interval_seconds: float = 5.0
     synthetic_probe_timeout_seconds: float = 6.0
     dns_probe_query: str = "example.com"
@@ -42,6 +57,9 @@ class AgentSettings:
         telemetry_retention_hours = int(os.getenv("WEM_AGENT_TELEMETRY_RETENTION_HOURS", "24"))
         request_timeout = float(os.getenv("WEM_AGENT_REQUEST_TIMEOUT_SECONDS", "10"))
         interface = os.getenv("WEM_AGENT_INTERFACE") or None
+        rf_scan_enabled = _environment_bool("WEM_AGENT_RF_SCAN_ENABLED", True)
+        rf_scan_interval = float(os.getenv("WEM_AGENT_RF_SCAN_INTERVAL_SECONDS", "60"))
+        rf_scan_timeout = float(os.getenv("WEM_AGENT_RF_SCAN_TIMEOUT_SECONDS", "15"))
         synthetic_probe_interval = float(
             os.getenv("WEM_AGENT_SYNTHETIC_PROBE_INTERVAL_SECONDS", "5")
         )
@@ -57,6 +75,8 @@ class AgentSettings:
             "WEM_AGENT_TELEMETRY_WINDOW_SECONDS": telemetry_window,
             "WEM_AGENT_TELEMETRY_SYNC_INTERVAL_SECONDS": telemetry_sync_interval,
             "WEM_AGENT_REQUEST_TIMEOUT_SECONDS": request_timeout,
+            "WEM_AGENT_RF_SCAN_INTERVAL_SECONDS": rf_scan_interval,
+            "WEM_AGENT_RF_SCAN_TIMEOUT_SECONDS": rf_scan_timeout,
             "WEM_AGENT_SYNTHETIC_PROBE_INTERVAL_SECONDS": synthetic_probe_interval,
             "WEM_AGENT_SYNTHETIC_PROBE_TIMEOUT_SECONDS": synthetic_probe_timeout,
         }
@@ -87,6 +107,9 @@ class AgentSettings:
             telemetry_retention_hours=telemetry_retention_hours,
             request_timeout_seconds=request_timeout,
             interface=interface,
+            rf_scan_enabled=rf_scan_enabled,
+            rf_scan_interval_seconds=rf_scan_interval,
+            rf_scan_timeout_seconds=rf_scan_timeout,
             synthetic_probe_interval_seconds=synthetic_probe_interval,
             synthetic_probe_timeout_seconds=synthetic_probe_timeout,
             dns_probe_query=dns_probe_query,
