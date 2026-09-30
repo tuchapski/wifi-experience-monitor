@@ -15,6 +15,8 @@ from wifi_server.schemas import (
     AgentHeartbeatResponse,
     AgentResponse,
     RenameAgentRequest,
+    RfScanRequest,
+    RfScanResponse,
     TelemetryBatchRequest,
     TelemetryBatchResponse,
     TelemetryPointResponse,
@@ -25,6 +27,7 @@ from wifi_server.services.agents import (
     get_agent,
     get_agent_telemetry,
     get_current_state,
+    ingest_rf_scan,
     ingest_telemetry_batch,
     list_agents,
     process_heartbeat,
@@ -120,6 +123,22 @@ def publish_telemetry_batch(
     token = _bearer_token(authorization)
     agent = authenticate_agent(session, agent_id, token)
     return ingest_telemetry_batch(session, settings, agent, payload)
+
+
+@router.post(
+    "/{agent_id}/rf/scans",
+    response_model=RfScanResponse,
+)
+def publish_rf_scan(
+    agent_id: str,
+    payload: RfScanRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> RfScanResponse:
+    token = _bearer_token(authorization)
+    agent = authenticate_agent(session, agent_id, token)
+    return ingest_rf_scan(session, settings, agent, payload)
 
 
 @router.get(

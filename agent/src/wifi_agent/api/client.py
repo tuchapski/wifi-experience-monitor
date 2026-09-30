@@ -8,7 +8,7 @@ from wifi_agent import __version__
 from wifi_agent.capabilities import Capability
 from wifi_agent.config import AgentSettings
 from wifi_agent.processors import CurrentStateSnapshot
-from wifi_agent.storage import AgentIdentity, PendingTelemetryBatch
+from wifi_agent.storage import AgentIdentity, PendingRfScan, PendingTelemetryBatch
 from wifi_agent.system_info import SystemInfo
 
 
@@ -123,6 +123,20 @@ class AgentApiClient:
             f"{self.settings.server_url}/api/v1/agents/{identity.agent_id}/telemetry/batches",
             headers={"Authorization": f"Bearer {identity.agent_token}"},
             json=batch.to_payload(),
+            timeout=self.settings.request_timeout_seconds,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def publish_rf_scan(
+        self,
+        identity: AgentIdentity,
+        scan: PendingRfScan,
+    ) -> dict[str, Any]:
+        response = httpx.post(
+            f"{self.settings.server_url}/api/v1/agents/{identity.agent_id}/rf/scans",
+            headers={"Authorization": f"Bearer {identity.agent_token}"},
+            json=scan.to_payload(),
             timeout=self.settings.request_timeout_seconds,
         )
         response.raise_for_status()

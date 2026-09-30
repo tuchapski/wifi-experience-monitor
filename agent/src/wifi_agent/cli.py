@@ -14,9 +14,14 @@ from wifi_agent.config import AgentSettings
 from wifi_agent.core import Observation
 from wifi_agent.processors import CurrentStateSnapshot, TelemetryAggregator
 from wifi_agent.recording import RecordingController
-from wifi_agent.runtime import CurrentStateRuntime, TelemetrySyncEngine
+from wifi_agent.runtime import (
+    CurrentStateRuntime,
+    RfScanRuntime,
+    RfScanSyncEngine,
+    TelemetrySyncEngine,
+)
 from wifi_agent.runtime.synthetic import SyntheticProbeRuntime
-from wifi_agent.storage import AgentIdentity, AgentIdentityStore, TelemetrySpool
+from wifi_agent.storage import AgentIdentity, AgentIdentityStore, RfScanSpool, TelemetrySpool
 from wifi_agent.system_info import collect_system_info
 
 LOGGER = logging.getLogger("wifi_agent")
@@ -34,6 +39,12 @@ def _store(settings: AgentSettings) -> AgentIdentityStore:
 
 def _telemetry_spool(settings: AgentSettings) -> TelemetrySpool:
     spool = TelemetrySpool(_database_path(settings))
+    spool.initialize()
+    return spool
+
+
+def _rf_scan_spool(settings: AgentSettings) -> RfScanSpool:
+    spool = RfScanSpool(_database_path(settings))
     spool.initialize()
     return spool
 
@@ -67,6 +78,7 @@ def _print_status(
     settings: AgentSettings,
     store: AgentIdentityStore,
     spool: TelemetrySpool,
+    rf_spool: RfScanSpool,
 ) -> None:
     identity = store.load()
     capabilities = discover_capabilities()
@@ -78,6 +90,7 @@ def _print_status(
     print(f"Agent ID: {identity.agent_id if identity else 'not enrolled'}")
     print(f"Wi-Fi interface: {interface or 'not detected'}")
     print(f"Pending telemetry batches: {spool.pending_count()}")
+    print(f"Pending RF scans: {rf_spool.pending_count()}")
     print("Capabilities:")
     for capability in capabilities:
         print(f"  - {capability.name}")
@@ -162,6 +175,28 @@ def _fresh_probe_observations(
     ]
 
 
+def _service_rf_scan(
+    runtime: RfScanRuntime,
+    spool: RfScanSpool,
+    now: float,
+) -> None:
+    completed = runtime.poll()
+    if completed is not None:
+        if completed.success:
+            queued = spool.enqueue(completed)
+            LOGGER.info(
+                "RF scan completed interface=%s bsses=%d duration_ms=%.1f scan_id=%s sequence=%s",
+                runtime.interface,
+                len(completed.bsses),
+                completed.duration_ms,
+                queued.scan_id if queued else None,
+                queued.sequence if queued else None,
+            )
+        else:
+            LOGGER.warning("RF scan failed: %s", completed.error)
+    runtime.maybe_start(now)
+
+
 def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     identity = _enroll(settings, store)
     if identity.server_url != settings.server_url:
@@ -181,14 +216,33 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             "no wireless interface detected; state and telemetry collection are disabled"
         )
 
+    scan_runtime = (
+        RfScanRuntime(
+            interface,
+            interval_seconds=settings.rf_scan_interval_seconds,
+            timeout_seconds=settings.rf_scan_timeout_seconds,
+        )
+        if interface and settings.rf_scan_enabled
+        else None
+    )
+    if interface and not settings.rf_scan_enabled:
+        LOGGER.info("active RF scanning is disabled by configuration")
+
     spool = _telemetry_spool(settings)
     cutoff = datetime.now(UTC) - timedelta(hours=settings.telemetry_retention_hours)
     pruned = spool.prune_before(cutoff)
     if pruned:
         LOGGER.info("pruned %d expired local telemetry batches", pruned)
 
+    rf_spool = _rf_scan_spool(settings)
+    rf_cutoff = datetime.now(UTC) - timedelta(hours=settings.rf_scan_retention_hours)
+    rf_pruned = rf_spool.prune_before(rf_cutoff)
+    if rf_pruned:
+        LOGGER.info("pruned %d expired local RF scans", rf_pruned)
+
     aggregator = TelemetryAggregator(settings.telemetry_window_seconds)
     sync_engine = TelemetrySyncEngine(settings, identity, spool)
+    rf_sync_engine = RfScanSyncEngine(settings, identity, rf_spool)
     recording_controller = RecordingController(settings, identity, _database_path(settings))
     probe_runtime = (
         SyntheticProbeRuntime(
@@ -221,6 +275,9 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     while True:
         recording_controller.stop_if_due()
         now = time.monotonic()
+        if scan_runtime is not None:
+            _service_rf_scan(scan_runtime, rf_spool, now)
+
         if probe_runtime is not None:
             probe_batch = probe_runtime.poll()
             if probe_batch is not None:
@@ -241,11 +298,15 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             next_heartbeat = now + settings.heartbeat_interval_seconds
 
         if runtime is not None and now >= next_collection:
+            extra_observations = _fresh_probe_observations(
+                probe_cache,
+                probe_cache_ttl_seconds,
+            )
+            if scan_runtime is not None:
+                extra_observations.extend(scan_runtime.readiness_observations())
+
             cycle = runtime.collect_cycle(
-                extra_observations=_fresh_probe_observations(
-                    probe_cache,
-                    probe_cache_ttl_seconds,
-                ),
+                extra_observations=extra_observations,
                 extra_collector_errors=pending_probe_errors,
             )
             gateway = cycle.snapshot.network.get("gateway")
@@ -294,6 +355,9 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             synced = sync_engine.sync_pending()
             if synced:
                 LOGGER.info("telemetry batches synchronized count=%d", synced)
+            rf_synced = rf_sync_engine.sync_pending()
+            if rf_synced:
+                LOGGER.info("RF scans synchronized count=%d", rf_synced)
             recording_synced = recording_controller.sync_pending()
             if recording_synced:
                 LOGGER.info("recording batches synchronized count=%d", recording_synced)
@@ -334,6 +398,7 @@ def main() -> None:
     settings = AgentSettings.from_environment()
     store = _store(settings)
     spool = _telemetry_spool(settings)
+    rf_spool = _rf_scan_spool(settings)
 
     if args.command == "enroll":
         identity = _enroll(settings, store, force=args.force)
@@ -341,7 +406,7 @@ def main() -> None:
         return
 
     if args.command == "status":
-        _print_status(settings, store, spool)
+        _print_status(settings, store, spool, rf_spool)
         return
 
     if args.command == "run":

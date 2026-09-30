@@ -10,6 +10,7 @@ class ServerSettings:
     enrollment_token: str | None
     agent_offline_after_seconds: float
     telemetry_retention_hours: int
+    rf_scan_retention_hours: int = 168
 
     @classmethod
     def from_environment(cls) -> "ServerSettings":
@@ -23,11 +24,14 @@ class ServerSettings:
         enrollment_token = os.getenv("SERVER_ENROLLMENT_TOKEN")
         offline_after = float(os.getenv("SERVER_AGENT_OFFLINE_AFTER_SECONDS", "15"))
         telemetry_retention_hours = int(os.getenv("SERVER_TELEMETRY_RETENTION_HOURS", "24"))
+        rf_scan_retention_hours = int(os.getenv("SERVER_RF_SCAN_RETENTION_HOURS", "168"))
 
         if offline_after <= 0:
             raise ValueError("SERVER_AGENT_OFFLINE_AFTER_SECONDS must be greater than zero")
         if telemetry_retention_hours <= 0:
             raise ValueError("SERVER_TELEMETRY_RETENTION_HOURS must be greater than zero")
+        if rf_scan_retention_hours <= 0:
+            raise ValueError("SERVER_RF_SCAN_RETENTION_HOURS must be greater than zero")
 
         return cls(
             database_url=database_url,
@@ -35,4 +39,5 @@ class ServerSettings:
             enrollment_token=enrollment_token,
             agent_offline_after_seconds=offline_after,
             telemetry_retention_hours=telemetry_retention_hours,
+            rf_scan_retention_hours=rf_scan_retention_hours,
         )

@@ -13,6 +13,8 @@ from wifi_server.db.models import (
     AgentCapability,
     AgentCredential,
     AgentCurrentState,
+    AgentRfBssObservation,
+    AgentRfScan,
     AgentSession,
     AgentTelemetry,
     AgentTelemetryBatch,
@@ -27,6 +29,8 @@ from wifi_server.schemas import (
     AgentHeartbeatResponse,
     AgentResponse,
     RenameAgentRequest,
+    RfScanRequest,
+    RfScanResponse,
     TelemetryBatchRequest,
     TelemetryBatchResponse,
     TelemetryPointResponse,
@@ -400,6 +404,92 @@ def ingest_telemetry_batch(
         sequence=request.sequence,
         status="accepted",
         items_received=len(request.items),
+    )
+
+
+def ingest_rf_scan(
+    session: Session,
+    settings: ServerSettings,
+    agent: Agent,
+    request: RfScanRequest,
+) -> RfScanResponse:
+    existing = session.scalar(
+        select(AgentRfScan).where(
+            AgentRfScan.agent_id == agent.id,
+            AgentRfScan.scan_id == request.scan_id,
+        )
+    )
+    if existing is not None:
+        return RfScanResponse(
+            scan_id=existing.scan_id,
+            sequence=existing.sequence,
+            status="already_accepted",
+            bsses_received=existing.bss_count,
+        )
+
+    sequence_owner = session.scalar(
+        select(AgentRfScan).where(
+            AgentRfScan.agent_id == agent.id,
+            AgentRfScan.sequence == request.sequence,
+        )
+    )
+    if sequence_owner is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="RF scan sequence already belongs to another scan",
+        )
+
+    now = datetime.now(UTC)
+    scan = AgentRfScan(
+        agent_id=agent.id,
+        scan_id=request.scan_id,
+        sequence=request.sequence,
+        observed_at=request.observed_at,
+        interface=request.interface,
+        duration_ms=request.duration_ms,
+        bss_count=len(request.bsses),
+        received_at=now,
+    )
+    session.add(scan)
+    session.flush()
+
+    for bss in request.bsses:
+        session.add(
+            AgentRfBssObservation(
+                rf_scan_id=scan.id,
+                bssid=bss.bssid.lower(),
+                ssid=bss.ssid,
+                frequency_mhz=bss.frequency_mhz,
+                channel=bss.channel,
+                band=bss.band,
+                rssi_dbm=bss.rssi_dbm,
+                associated=bss.associated,
+                channel_width_mhz=bss.channel_width_mhz,
+                beacon_interval_tu=bss.beacon_interval_tu,
+                capability=bss.capability,
+                privacy=bss.privacy,
+                security=bss.security,
+                phy_capabilities=bss.phy_capabilities,
+                bss_load_station_count=bss.bss_load_station_count,
+                bss_load_channel_utilization_raw=bss.bss_load_channel_utilization_raw,
+                last_seen_ms=bss.last_seen_ms,
+            )
+        )
+
+    cutoff = now - timedelta(hours=settings.rf_scan_retention_hours)
+    session.execute(
+        delete(AgentRfScan).where(
+            AgentRfScan.agent_id == agent.id,
+            AgentRfScan.observed_at < cutoff,
+        )
+    )
+    session.commit()
+
+    return RfScanResponse(
+        scan_id=request.scan_id,
+        sequence=request.sequence,
+        status="accepted",
+        bsses_received=len(request.bsses),
     )
 
 

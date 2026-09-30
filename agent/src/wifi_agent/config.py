@@ -34,6 +34,7 @@ class AgentSettings:
     rf_scan_enabled: bool = True
     rf_scan_interval_seconds: float = 60.0
     rf_scan_timeout_seconds: float = 15.0
+    rf_scan_retention_hours: int = 24
     synthetic_probe_interval_seconds: float = 5.0
     synthetic_probe_timeout_seconds: float = 6.0
     dns_probe_query: str = "example.com"
@@ -60,6 +61,7 @@ class AgentSettings:
         rf_scan_enabled = _environment_bool("WEM_AGENT_RF_SCAN_ENABLED", True)
         rf_scan_interval = float(os.getenv("WEM_AGENT_RF_SCAN_INTERVAL_SECONDS", "60"))
         rf_scan_timeout = float(os.getenv("WEM_AGENT_RF_SCAN_TIMEOUT_SECONDS", "15"))
+        rf_scan_retention_hours = int(os.getenv("WEM_AGENT_RF_SCAN_RETENTION_HOURS", "24"))
         synthetic_probe_interval = float(
             os.getenv("WEM_AGENT_SYNTHETIC_PROBE_INTERVAL_SECONDS", "5")
         )
@@ -85,6 +87,8 @@ class AgentSettings:
                 raise ValueError(f"{name_key} must be greater than zero")
         if telemetry_retention_hours <= 0:
             raise ValueError("WEM_AGENT_TELEMETRY_RETENTION_HOURS must be greater than zero")
+        if rf_scan_retention_hours <= 0:
+            raise ValueError("WEM_AGENT_RF_SCAN_RETENTION_HOURS must be greater than zero")
         for name_key, value in {
             "WEM_AGENT_DNS_PROBE_QUERY": dns_probe_query,
             "WEM_AGENT_INTERNET_PROBE_TARGET": internet_probe_target,
@@ -110,6 +114,7 @@ class AgentSettings:
             rf_scan_enabled=rf_scan_enabled,
             rf_scan_interval_seconds=rf_scan_interval,
             rf_scan_timeout_seconds=rf_scan_timeout,
+            rf_scan_retention_hours=rf_scan_retention_hours,
             synthetic_probe_interval_seconds=synthetic_probe_interval,
             synthetic_probe_timeout_seconds=synthetic_probe_timeout,
             dns_probe_query=dns_probe_query,

@@ -142,6 +142,65 @@ class AgentTelemetryBatch(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AgentRfScan(Base):
+    __tablename__ = "agent_rf_scans"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "scan_id", name="uq_agent_rf_scan"),
+        UniqueConstraint("agent_id", "sequence", name="uq_agent_rf_scan_sequence"),
+        Index("ix_agent_rf_scans_agent_observed", "agent_id", "observed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    agent_id: Mapped[str] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    scan_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    interface: Mapped[str] = mapped_column(String(64), nullable=False)
+    duration_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    bss_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AgentRfBssObservation(Base):
+    __tablename__ = "agent_rf_bss_observations"
+    __table_args__ = (
+        UniqueConstraint("rf_scan_id", "bssid", name="uq_agent_rf_bss_scan_bssid"),
+        CheckConstraint(
+            "bss_load_channel_utilization_raw IS NULL "
+            "OR (bss_load_channel_utilization_raw >= 0 "
+            "AND bss_load_channel_utilization_raw <= 255)",
+            name="ck_agent_rf_bss_load_utilization",
+        ),
+        Index("ix_agent_rf_bss_bssid", "bssid"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rf_scan_id: Mapped[int] = mapped_column(
+        ForeignKey("agent_rf_scans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    bssid: Mapped[str] = mapped_column(String(32), nullable=False)
+    ssid: Mapped[str | None] = mapped_column(String(128))
+    frequency_mhz: Mapped[int] = mapped_column(Integer, nullable=False)
+    channel: Mapped[int | None] = mapped_column(Integer)
+    band: Mapped[str] = mapped_column(String(16), nullable=False)
+    rssi_dbm: Mapped[float | None] = mapped_column(Float)
+    associated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    channel_width_mhz: Mapped[int | None] = mapped_column(Integer)
+    beacon_interval_tu: Mapped[int | None] = mapped_column(Integer)
+    capability: Mapped[str | None] = mapped_column(Text)
+    privacy: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    security: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    phy_capabilities: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    bss_load_station_count: Mapped[int | None] = mapped_column(Integer)
+    bss_load_channel_utilization_raw: Mapped[int | None] = mapped_column(Integer)
+    last_seen_ms: Mapped[int | None] = mapped_column(Integer)
+
+
 class AgentEvent(Base):
     __tablename__ = "agent_events"
     __table_args__ = (Index("ix_agent_events_agent_observed", "agent_id", "observed_at"),)

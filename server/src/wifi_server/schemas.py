@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -141,6 +141,45 @@ class TelemetryBatchResponse(BaseModel):
     sequence: int
     status: str
     items_received: int
+
+
+class RfBssObservationPayload(BaseModel):
+    bssid: str = Field(
+        min_length=17,
+        max_length=17,
+        pattern=r"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$",
+    )
+    ssid: str | None = Field(default=None, max_length=128)
+    frequency_mhz: int = Field(gt=0)
+    channel: int | None = Field(default=None, gt=0)
+    band: Literal["2.4ghz", "5ghz", "6ghz", "unknown"]
+    rssi_dbm: float | None = None
+    associated: bool = False
+    channel_width_mhz: int | None = Field(default=None, gt=0)
+    beacon_interval_tu: int | None = Field(default=None, gt=0)
+    capability: str | None = None
+    privacy: bool = False
+    security: list[str] = Field(default_factory=list)
+    phy_capabilities: list[str] = Field(default_factory=list)
+    bss_load_station_count: int | None = Field(default=None, ge=0)
+    bss_load_channel_utilization_raw: int | None = Field(default=None, ge=0, le=255)
+    last_seen_ms: int | None = Field(default=None, ge=0)
+
+
+class RfScanRequest(BaseModel):
+    scan_id: str = Field(min_length=1, max_length=64)
+    sequence: int = Field(ge=1)
+    observed_at: datetime
+    interface: str = Field(min_length=1, max_length=64)
+    duration_ms: float = Field(ge=0)
+    bsses: list[RfBssObservationPayload] = Field(default_factory=list, max_length=2048)
+
+
+class RfScanResponse(BaseModel):
+    scan_id: str
+    sequence: int
+    status: str
+    bsses_received: int
 
 
 class TelemetryPointResponse(BaseModel):
