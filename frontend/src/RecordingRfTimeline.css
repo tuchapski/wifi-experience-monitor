@@ -1,0 +1,203 @@
+.recording-rf-timeline {
+  margin-top: 18px;
+}
+
+.recording-rf-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 18px 22px 10px;
+}
+
+.recording-rf-summary article {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid #e5eaf1;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.recording-rf-summary span,
+.recording-rf-chart header span {
+  display: block;
+  color: #7b8798;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.recording-rf-summary strong {
+  display: block;
+  margin-top: 6px;
+  color: #213a57;
+  font-size: 22px;
+}
+
+.recording-rf-chart {
+  margin: 0 22px 16px;
+  padding: 15px 16px 12px;
+  border: 1px solid #e5eaf1;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.recording-rf-chart header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.recording-rf-chart header strong {
+  display: block;
+  margin-top: 4px;
+  color: #263c55;
+  font-size: 14px;
+}
+
+.recording-rf-chart header small,
+.recording-rf-axis,
+.recording-rf-note,
+.recording-rf-snapshots small {
+  color: #7b8798;
+  font-size: 10px;
+}
+
+.recording-rf-chart svg {
+  display: block;
+  width: 100%;
+  min-height: 170px;
+}
+
+.recording-rf-gridline {
+  stroke: #e8edf3;
+  stroke-width: 1;
+}
+
+.recording-rf-line {
+  fill: none;
+  stroke: #426f9f;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.recording-rf-point {
+  fill: #426f9f;
+  stroke: #fff;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.recording-rf-point.is-transition {
+  fill: #b76b29;
+}
+
+.recording-rf-transition-line {
+  stroke: #b76b29;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.recording-rf-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recording-rf-chart-empty,
+.recording-rf-empty {
+  padding: 26px 22px;
+  color: #7b8798;
+  font-size: 12px;
+}
+
+.recording-rf-snapshots {
+  margin: 0 22px 16px;
+  border: 1px solid #e5eaf1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.recording-rf-snapshots summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #3d5775;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recording-rf-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid #edf1f5;
+}
+
+.recording-rf-snapshots table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.recording-rf-snapshots th,
+.recording-rf-snapshots td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf1f5;
+  text-align: left;
+  vertical-align: top;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.recording-rf-snapshots th {
+  background: #f8fafc;
+  color: #788597;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.recording-rf-snapshots td strong,
+.recording-rf-snapshots td code,
+.recording-rf-snapshots td small {
+  display: block;
+}
+
+.recording-rf-snapshots td strong {
+  color: #34485f;
+}
+
+.recording-rf-snapshots td code {
+  margin-top: 3px;
+  color: #536a84;
+  font-size: 10px;
+}
+
+.recording-rf-snapshots td em {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #fff3e7;
+  color: #9a5c22;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.recording-rf-note {
+  margin: 0;
+  padding: 0 22px 18px;
+  line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+  .recording-rf-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .recording-rf-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

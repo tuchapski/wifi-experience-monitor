@@ -23,6 +23,7 @@ import type {
 } from "./agentTypes";
 import { diagnosticsAgentHash } from "./diagnosticRoutes";
 import RecordingAnalysisPanel from "./RecordingAnalysisPanel";
+import RecordingRfTimeline from "./RecordingRfTimeline";
 import "./RecordingDetail.css";
 
 const RECORDING_METRICS = [
@@ -1455,6 +1456,13 @@ export default function RecordingDetail({
         selectedEpisode={selectedEpisode}
         onSelectWindow={handleSelectWindow}
         onSelectEpisode={handleSelectEpisode}
+      />
+
+      <RecordingRfTimeline
+        recordingId={recording.id}
+        active={ACTIVE_STATUSES.has(recording.status)}
+        startedAt={recording.started_at}
+        endedAt={recording.ended_at}
       />
 
       <DiagnosticEvidencePanel

@@ -22,6 +22,7 @@ from wifi_server.recording_schemas import (
     RecordingResponse,
     StartRecordingRequest,
 )
+from wifi_server.schemas import RfLatestScanResponse
 from wifi_server.services.agents import authenticate_agent
 from wifi_server.services.analyses import ensure_recording_analysis
 from wifi_server.services.diagnostic_windows import compare_diagnostic_window
@@ -34,6 +35,7 @@ from wifi_server.services.recordings import (
     get_recording,
     get_recording_events,
     get_recording_metrics,
+    get_recording_rf_scans,
     ingest_recording_batch,
     list_recordings,
     request_stop_recording,
@@ -96,6 +98,18 @@ def recording(
     session: Annotated[Session, Depends(get_session)],
 ) -> RecordingResponse:
     return get_recording(session, recording_id)
+
+
+@router.get(
+    "/recordings/{recording_id}/rf/scans",
+    response_model=list[RfLatestScanResponse],
+)
+def recording_rf_scans(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=2000)] = 2000,
+) -> list[RfLatestScanResponse]:
+    return get_recording_rf_scans(session, recording_id, limit)
 
 
 @router.get(

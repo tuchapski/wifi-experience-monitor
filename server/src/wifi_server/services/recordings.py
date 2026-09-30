@@ -5,7 +5,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from wifi_server.db.models import Agent, DiagnosticRecording
+from wifi_server.db.models import (
+    Agent,
+    AgentRfBssObservation,
+    AgentRfScan,
+    DiagnosticRecording,
+)
 from wifi_server.db.project_models import DiagnosticProject, ProjectRun, ProjectRunRecording
 from wifi_server.db.recording_models import (
     AgentCommand,
@@ -24,6 +29,7 @@ from wifi_server.recording_schemas import (
     RecordingResponse,
     StartRecordingRequest,
 )
+from wifi_server.schemas import RfLatestScanResponse
 
 
 def create_recording(
@@ -133,6 +139,74 @@ def get_recording(session: Session, recording_id: str) -> RecordingResponse:
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
     return _response(*row)
+
+
+def get_recording_rf_scans(
+    session: Session,
+    recording_id: str,
+    limit: int,
+) -> list[RfLatestScanResponse]:
+    _get_recording(session, recording_id)
+    scans = list(
+        session.scalars(
+            select(AgentRfScan)
+            .where(AgentRfScan.recording_id == recording_id)
+            .order_by(AgentRfScan.observed_at.desc(), AgentRfScan.id.desc())
+            .limit(limit)
+        ).all()
+    )
+    scans.reverse()
+    if not scans:
+        return []
+
+    scan_ids = [scan.id for scan in scans]
+    bsses = session.scalars(
+        select(AgentRfBssObservation)
+        .where(AgentRfBssObservation.rf_scan_id.in_(scan_ids))
+        .order_by(
+            AgentRfBssObservation.rf_scan_id,
+            AgentRfBssObservation.associated.desc(),
+            AgentRfBssObservation.rssi_dbm.desc().nulls_last(),
+            AgentRfBssObservation.bssid,
+        )
+    ).all()
+
+    bsses_by_scan: dict[int, list[AgentRfBssObservation]] = {}
+    for bss in bsses:
+        bsses_by_scan.setdefault(bss.rf_scan_id, []).append(bss)
+
+    return [
+        RfLatestScanResponse(
+            scan_id=scan.scan_id,
+            sequence=scan.sequence,
+            observed_at=scan.observed_at,
+            interface=scan.interface,
+            duration_ms=scan.duration_ms,
+            received_at=scan.received_at,
+            bsses=[
+                {
+                    "bssid": bss.bssid,
+                    "ssid": bss.ssid,
+                    "frequency_mhz": bss.frequency_mhz,
+                    "channel": bss.channel,
+                    "band": bss.band,
+                    "rssi_dbm": bss.rssi_dbm,
+                    "associated": bss.associated,
+                    "channel_width_mhz": bss.channel_width_mhz,
+                    "beacon_interval_tu": bss.beacon_interval_tu,
+                    "capability": bss.capability,
+                    "privacy": bss.privacy,
+                    "security": bss.security,
+                    "phy_capabilities": bss.phy_capabilities,
+                    "bss_load_station_count": bss.bss_load_station_count,
+                    "bss_load_channel_utilization_raw": bss.bss_load_channel_utilization_raw,
+                    "last_seen_ms": bss.last_seen_ms,
+                }
+                for bss in bsses_by_scan.get(scan.id, [])
+            ],
+        )
+        for scan in scans
+    ]
 
 
 def get_recording_metrics(

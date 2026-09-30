@@ -208,6 +208,16 @@ export function getRecording(
   );
 }
 
+export function getRecordingRfScans(
+  recordingId: string,
+  limit = 2000,
+): Promise<RfScanSnapshot[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return request<RfScanSnapshot[]>(
+    `/recordings/${encodeURIComponent(recordingId)}/rf/scans?${params.toString()}`,
+  );
+}
+
 export function recordingReportUrl(recordingId: string): string {
   return `${API_ROOT}/recordings/${encodeURIComponent(recordingId)}/report/html`;
 }
