@@ -18,6 +18,7 @@ from wifi_server.db.models import (
     AgentSession,
     AgentTelemetry,
     AgentTelemetryBatch,
+    DiagnosticRecording,
 )
 from wifi_server.schemas import (
     AgentCapabilityResponse,
@@ -29,6 +30,7 @@ from wifi_server.schemas import (
     AgentHeartbeatResponse,
     AgentResponse,
     RenameAgentRequest,
+    RfLatestScanResponse,
     RfScanRequest,
     RfScanResponse,
     TelemetryBatchRequest,
@@ -420,12 +422,25 @@ def ingest_rf_scan(
         )
     )
     if existing is not None:
+        if existing.recording_id != request.recording_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="RF scan recording association does not match the accepted scan",
+            )
         return RfScanResponse(
             scan_id=existing.scan_id,
             sequence=existing.sequence,
             status="already_accepted",
             bsses_received=existing.bss_count,
         )
+
+    if request.recording_id is not None:
+        recording = session.get(DiagnosticRecording, request.recording_id)
+        if recording is None or recording.agent_id != agent.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="RF scan recording is not available for this agent",
+            )
 
     sequence_owner = session.scalar(
         select(AgentRfScan).where(
@@ -442,6 +457,7 @@ def ingest_rf_scan(
     now = datetime.now(UTC)
     scan = AgentRfScan(
         agent_id=agent.id,
+        recording_id=request.recording_id,
         scan_id=request.scan_id,
         sequence=request.sequence,
         observed_at=request.observed_at,
@@ -480,6 +496,7 @@ def ingest_rf_scan(
     session.execute(
         delete(AgentRfScan).where(
             AgentRfScan.agent_id == agent.id,
+            AgentRfScan.recording_id.is_(None),
             AgentRfScan.observed_at < cutoff,
         )
     )
@@ -490,6 +507,66 @@ def ingest_rf_scan(
         sequence=request.sequence,
         status="accepted",
         bsses_received=len(request.bsses),
+    )
+
+
+def get_latest_rf_scan(
+    session: Session,
+    agent_id: str,
+) -> RfLatestScanResponse:
+    if session.get(Agent, agent_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+
+    scan = session.scalar(
+        select(AgentRfScan)
+        .where(AgentRfScan.agent_id == agent_id)
+        .order_by(AgentRfScan.observed_at.desc())
+        .limit(1)
+    )
+    if scan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="RF scan is not available for this agent",
+        )
+
+    bsses = session.scalars(
+        select(AgentRfBssObservation)
+        .where(AgentRfBssObservation.rf_scan_id == scan.id)
+        .order_by(
+            AgentRfBssObservation.associated.desc(),
+            AgentRfBssObservation.rssi_dbm.desc().nulls_last(),
+            AgentRfBssObservation.bssid,
+        )
+    ).all()
+
+    return RfLatestScanResponse(
+        scan_id=scan.scan_id,
+        sequence=scan.sequence,
+        observed_at=scan.observed_at,
+        interface=scan.interface,
+        duration_ms=scan.duration_ms,
+        received_at=scan.received_at,
+        bsses=[
+            {
+                "bssid": bss.bssid,
+                "ssid": bss.ssid,
+                "frequency_mhz": bss.frequency_mhz,
+                "channel": bss.channel,
+                "band": bss.band,
+                "rssi_dbm": bss.rssi_dbm,
+                "associated": bss.associated,
+                "channel_width_mhz": bss.channel_width_mhz,
+                "beacon_interval_tu": bss.beacon_interval_tu,
+                "capability": bss.capability,
+                "privacy": bss.privacy,
+                "security": bss.security,
+                "phy_capabilities": bss.phy_capabilities,
+                "bss_load_station_count": bss.bss_load_station_count,
+                "bss_load_channel_utilization_raw": bss.bss_load_channel_utilization_raw,
+                "last_seen_ms": bss.last_seen_ms,
+            }
+            for bss in bsses
+        ],
     )
 
 

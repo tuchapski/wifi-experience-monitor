@@ -115,6 +115,35 @@ export interface AgentCurrentState {
   collector_errors: string[];
 }
 
+export interface RfBssObservation {
+  bssid: string;
+  ssid: string | null;
+  frequency_mhz: number;
+  channel: number | null;
+  band: "2.4ghz" | "5ghz" | "6ghz" | "unknown";
+  rssi_dbm: number | null;
+  associated: boolean;
+  channel_width_mhz: number | null;
+  beacon_interval_tu: number | null;
+  capability: string | null;
+  privacy: boolean;
+  security: string[];
+  phy_capabilities: string[];
+  bss_load_station_count: number | null;
+  bss_load_channel_utilization_raw: number | null;
+  last_seen_ms: number | null;
+}
+
+export interface RfScanSnapshot {
+  scan_id: string;
+  sequence: number;
+  observed_at: string;
+  interface: string;
+  duration_ms: number;
+  received_at: string;
+  bsses: RfBssObservation[];
+}
+
 export interface TelemetryPoint {
   observed_at: string;
   metric: string;

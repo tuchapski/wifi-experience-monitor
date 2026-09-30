@@ -169,6 +169,7 @@ class RfBssObservationPayload(BaseModel):
 class RfScanRequest(BaseModel):
     scan_id: str = Field(min_length=1, max_length=64)
     sequence: int = Field(ge=1)
+    recording_id: str | None = Field(default=None, max_length=40)
     observed_at: datetime
     interface: str = Field(min_length=1, max_length=64)
     duration_ms: float = Field(ge=0)
@@ -180,6 +181,16 @@ class RfScanResponse(BaseModel):
     sequence: int
     status: str
     bsses_received: int
+
+
+class RfLatestScanResponse(BaseModel):
+    scan_id: str
+    sequence: int
+    observed_at: datetime
+    interface: str
+    duration_ms: float
+    received_at: datetime
+    bsses: list[RfBssObservationPayload] = Field(default_factory=list)
 
 
 class TelemetryPointResponse(BaseModel):

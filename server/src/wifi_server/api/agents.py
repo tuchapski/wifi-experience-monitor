@@ -15,6 +15,7 @@ from wifi_server.schemas import (
     AgentHeartbeatResponse,
     AgentResponse,
     RenameAgentRequest,
+    RfLatestScanResponse,
     RfScanRequest,
     RfScanResponse,
     TelemetryBatchRequest,
@@ -27,6 +28,7 @@ from wifi_server.services.agents import (
     get_agent,
     get_agent_telemetry,
     get_current_state,
+    get_latest_rf_scan,
     ingest_rf_scan,
     ingest_telemetry_batch,
     list_agents,
@@ -139,6 +141,17 @@ def publish_rf_scan(
     token = _bearer_token(authorization)
     agent = authenticate_agent(session, agent_id, token)
     return ingest_rf_scan(session, settings, agent, payload)
+
+
+@router.get(
+    "/{agent_id}/rf/scans/latest",
+    response_model=RfLatestScanResponse,
+)
+def latest_rf_scan(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> RfLatestScanResponse:
+    return get_latest_rf_scan(session, agent_id)
 
 
 @router.get(

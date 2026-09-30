@@ -39,11 +39,13 @@ class PendingRfScan:
     interface: str
     duration_ms: float
     bsses: list[dict[str, Any]]
+    recording_id: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return {
             "scan_id": self.scan_id,
             "sequence": self.sequence,
+            "recording_id": self.recording_id,
             "observed_at": self.observed_at.isoformat(),
             "interface": self.interface,
             "duration_ms": self.duration_ms,
@@ -79,10 +81,14 @@ class RfScanSpool:
                     scan_id TEXT PRIMARY KEY,
                     sequence INTEGER NOT NULL UNIQUE,
                     created_at TEXT NOT NULL,
+                    recording_id TEXT,
                     payload_json TEXT NOT NULL
                 )
                 """
             )
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(rf_scan_outbox)")}
+            if "recording_id" not in columns:
+                connection.execute("ALTER TABLE rf_scan_outbox ADD COLUMN recording_id TEXT")
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS ix_rf_scan_outbox_sequence
@@ -122,13 +128,15 @@ class RfScanSpool:
                     scan_id,
                     sequence,
                     created_at,
+                    recording_id,
                     payload_json
-                ) VALUES (?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     scan_id,
                     sequence,
                     created_at.isoformat(),
+                    result.recording_id,
                     json.dumps(payload),
                 ),
             )
@@ -142,13 +150,14 @@ class RfScanSpool:
             interface=result.interface,
             duration_ms=result.duration_ms,
             bsses=payload["bsses"],
+            recording_id=result.recording_id,
         )
 
     def pending(self, limit: int = 20) -> list[PendingRfScan]:
         with sqlite3.connect(self.database_path) as connection:
             rows = connection.execute(
                 """
-                SELECT scan_id, sequence, created_at, payload_json
+                SELECT scan_id, sequence, created_at, recording_id, payload_json
                 FROM rf_scan_outbox
                 ORDER BY sequence
                 LIMIT ?
@@ -157,7 +166,7 @@ class RfScanSpool:
             ).fetchall()
 
         pending: list[PendingRfScan] = []
-        for scan_id, sequence, created_at, payload_json in rows:
+        for scan_id, sequence, created_at, recording_id, payload_json in rows:
             payload = json.loads(payload_json)
             pending.append(
                 PendingRfScan(
@@ -168,6 +177,7 @@ class RfScanSpool:
                     interface=payload["interface"],
                     duration_ms=float(payload["duration_ms"]),
                     bsses=list(payload["bsses"]),
+                    recording_id=recording_id,
                 )
             )
         return pending
@@ -180,7 +190,10 @@ class RfScanSpool:
     def prune_before(self, cutoff: datetime) -> int:
         with sqlite3.connect(self.database_path) as connection:
             cursor = connection.execute(
-                "DELETE FROM rf_scan_outbox WHERE created_at < ?",
+                """
+                DELETE FROM rf_scan_outbox
+                WHERE created_at < ? AND recording_id IS NULL
+                """,
                 (cutoff.isoformat(),),
             )
             connection.commit()

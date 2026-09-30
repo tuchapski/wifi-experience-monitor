@@ -8,6 +8,7 @@ import httpx
 from wifi_agent.config import AgentSettings
 from wifi_agent.core import Observation, ObservationKind
 from wifi_agent.recording.client import RecordingApiClient
+from wifi_agent.recording.context import set_active_recording_id
 from wifi_agent.recording.counters import CounterDeltaProcessor
 from wifi_agent.recording.store import RecordingStore
 from wifi_agent.recording.survey import SurveyDeltaProcessor
@@ -30,6 +31,8 @@ class RecordingController:
         self.client = RecordingApiClient(settings)
         self.store = RecordingStore(database_path)
         self.store.initialize()
+        active = self.store.active()
+        set_active_recording_id(active.recording_id if active else None)
         self._last_state: dict[str, Any] = {}
         self._counter_delta = CounterDeltaProcessor()
         self._survey_delta = SurveyDeltaProcessor()
@@ -49,6 +52,7 @@ class RecordingController:
         if now < active.deadline_at:
             return False
         self.store.stop(active.recording_id, now)
+        set_active_recording_id(None)
         LOGGER.info("recording duration reached recording_id=%s", active.recording_id)
         return True
 
@@ -231,6 +235,7 @@ class RecordingController:
 
         started_at = datetime.now(UTC)
         recording = self.store.start(recording_id, started_at, max_duration_minutes)
+        set_active_recording_id(recording.recording_id)
         self._last_state.clear()
         self._counter_delta.reset()
         self._survey_delta.reset()
@@ -251,6 +256,7 @@ class RecordingController:
             raise ValueError("recording.stop is missing recording_id")
         ended_at = datetime.now(UTC)
         recording = self.store.stop(recording_id, ended_at)
+        set_active_recording_id(None)
         self.client.acknowledge_command(
             self.identity,
             command_id,

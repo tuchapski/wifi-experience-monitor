@@ -1,12 +1,14 @@
 """Non-blocking scheduler and runtime readiness for Wi-Fi RF scans."""
 
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 from time import monotonic
 
 from wifi_agent.collectors.rf_scan import RfScanCollector
 from wifi_agent.core import Observation, ObservationKind
 from wifi_agent.core.rf import RfScanResult
+from wifi_agent.recording.context import get_active_recording_id
 
 
 class RfScanRuntime:
@@ -30,6 +32,7 @@ class RfScanRuntime:
         self.collector = RfScanCollector(interface, timeout_seconds=timeout_seconds)
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wem-rf-scan")
         self._pending: Future[RfScanResult] | None = None
+        self._pending_recording_id: str | None = None
         self._latest: RfScanResult | None = None
         self._next_scan_at = 0.0
         self._stale_after_seconds = max(interval_seconds * 3, timeout_seconds * 2)
@@ -53,6 +56,7 @@ class RfScanRuntime:
         if self._pending is not None or current < self._next_scan_at:
             return False
 
+        self._pending_recording_id = get_active_recording_id()
         self._pending = self._executor.submit(self.collector.collect)
         self._next_scan_at = current + self.interval_seconds
         return True
@@ -65,6 +69,8 @@ class RfScanRuntime:
             return None
 
         self._pending = None
+        recording_id = self._pending_recording_id
+        self._pending_recording_id = None
         try:
             result = future.result()
         except Exception as exc:  # pragma: no cover - defensive worker boundary
@@ -73,7 +79,11 @@ class RfScanRuntime:
                 observed_at=datetime.now(UTC),
                 duration_ms=0,
                 error=f"rf scan worker failed: {exc}",
+                recording_id=recording_id,
             )
+        else:
+            if recording_id is not None and result.recording_id is None:
+                result = replace(result, recording_id=recording_id)
         self._latest = result
         return result
 

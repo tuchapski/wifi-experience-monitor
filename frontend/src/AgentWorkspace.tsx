@@ -11,6 +11,7 @@ import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
 import GlobalCollectionIndicator from "./GlobalCollectionIndicator";
 import ManagedAgentCard from "./ManagedAgentCard";
 import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
+import RfEnvironmentPanel from "./RfEnvironmentPanel";
 import RecordingDetail from "./RecordingDetail";
 import type {
   AgentCurrentState,
@@ -723,6 +724,8 @@ function AgentDetail({ agentId }: { agentId: string }) {
         score={state?.wifi.link_score ?? null}
         fresh={currentStateFresh}
       />
+
+      <RfEnvironmentPanel agentId={agent.id} wifi={wifi} />
 
       <div className="agent-detail-grid">
         <section className="agent-panel">

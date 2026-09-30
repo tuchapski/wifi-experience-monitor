@@ -57,6 +57,7 @@ class RfScanResult:
     duration_ms: float
     bsses: tuple[BssObservation, ...] = ()
     error: str | None = None
+    recording_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.interface.strip():
@@ -65,6 +66,8 @@ class RfScanResult:
             raise ValueError("observed_at must be timezone-aware")
         if self.duration_ms < 0:
             raise ValueError("duration_ms must not be negative")
+        if self.recording_id is not None and not self.recording_id.strip():
+            raise ValueError("recording_id must not be blank when provided")
 
     @property
     def success(self) -> bool:

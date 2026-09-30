@@ -11,6 +11,7 @@ import type {
   RecordingAnalysis,
   RecordingMetricPoint,
   RecordingMetricOverview,
+  RfScanSnapshot,
   StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
@@ -143,6 +144,12 @@ export function renameAgent(agentId: string, name: string): Promise<AgentSummary
 export function getAgentState(agentId: string): Promise<AgentCurrentState | null> {
   return requestOptional<AgentCurrentState>(
     `/agents/${encodeURIComponent(agentId)}/state`,
+  );
+}
+
+export function getLatestRfScan(agentId: string): Promise<RfScanSnapshot | null> {
+  return requestOptional<RfScanSnapshot>(
+    `/agents/${encodeURIComponent(agentId)}/rf/scans/latest`,
   );
 }
 

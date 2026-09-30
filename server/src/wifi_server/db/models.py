@@ -155,6 +155,11 @@ class AgentRfScan(Base):
         ForeignKey("agents.id", ondelete="CASCADE"),
         nullable=False,
     )
+    recording_id: Mapped[str | None] = mapped_column(
+        ForeignKey("diagnostic_recordings.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     scan_id: Mapped[str] = mapped_column(String(64), nullable=False)
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -1,0 +1,109 @@
+.rf-environment-panel .agent-panel-heading p {
+  margin: 4px 0 0;
+  color: #758194;
+  font-size: 12px;
+}
+
+.rf-environment-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  padding: 18px 22px 10px;
+}
+
+.rf-environment-stats article,
+.rf-environment-focus article {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e5eaf1;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.rf-environment-stats span,
+.rf-environment-focus span {
+  display: block;
+  color: #7b8798;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.rf-environment-stats strong {
+  display: block;
+  margin-top: 6px;
+  color: #213a57;
+  font-size: 24px;
+}
+
+.rf-environment-stats small,
+.rf-environment-focus small {
+  display: block;
+  margin-top: 4px;
+  color: #7a8798;
+  font-size: 10px;
+}
+
+.rf-environment-focus {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 22px 16px;
+}
+
+.rf-environment-focus strong {
+  display: block;
+  margin-top: 7px;
+  color: #263c55;
+  font-size: 14px;
+}
+
+.rf-environment-focus code,
+.rf-environment-inventory code {
+  display: block;
+  margin-top: 4px;
+  color: #536a84;
+  font-size: 10px;
+}
+
+.rf-environment-inventory {
+  margin: 0 22px 16px;
+  border: 1px solid #e5eaf1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rf-environment-inventory summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #3d5775;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rf-environment-table-wrap { overflow-x: auto; border-top: 1px solid #edf1f5; }
+.rf-environment-inventory table { width: 100%; border-collapse: collapse; }
+.rf-environment-inventory th,
+.rf-environment-inventory td { padding: 10px 12px; border-bottom: 1px solid #edf1f5; text-align: left; font-size: 11px; }
+.rf-environment-inventory th { color: #788597; background: #f8fafc; font-size: 9px; text-transform: uppercase; }
+.rf-environment-inventory tr.associated { background: #edf6ff; }
+.rf-environment-inventory td strong { color: #34485f; }
+
+.rf-environment-note {
+  margin: 0;
+  padding: 0 22px 18px;
+  color: #8894a4;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.rf-environment-empty { padding: 28px 22px; color: #7b8798; font-size: 12px; }
+
+@media (max-width: 900px) {
+  .rf-environment-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .rf-environment-focus { grid-template-columns: minmax(0, 1fr); }
+}
