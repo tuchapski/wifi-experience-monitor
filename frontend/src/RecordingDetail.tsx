@@ -7,6 +7,7 @@ import {
   getRecordingEvents,
   getRecordingMetricComparison,
   getRecordingMetricOverviews,
+  getRecordingRfWindows,
   recordingReportUrl,
 } from "./agentApi";
 import type {
@@ -20,10 +21,14 @@ import type {
   DiagnosticWindowComparison,
   RecordingEvent,
   RecordingMetricOverview,
+  RecordingRfScanWindows,
 } from "./agentTypes";
 import { diagnosticsAgentHash } from "./diagnosticRoutes";
 import RecordingAnalysisPanel from "./RecordingAnalysisPanel";
 import RecordingRfTimeline from "./RecordingRfTimeline";
+import RecordingRfScanBands from "./RecordingRfScanBands";
+import RecordingRfScanContext from "./RecordingRfScanContext";
+import { buildRfScanBands, type RfScanBand } from "./recordingRfScanBands";
 import "./RecordingDetail.css";
 
 const RECORDING_METRICS = [
@@ -185,6 +190,7 @@ function RawMetricChart({
   degradedWindows,
   selectedWindow,
   selectedEpisode,
+  rfBands,
 }: {
   label: string;
   unit: string;
@@ -193,6 +199,7 @@ function RawMetricChart({
   degradedWindows: AnalysisDegradedWindow[];
   selectedWindow: AnalysisDegradedWindow | null;
   selectedEpisode: CrossLayerDiagnosticEpisode | null;
+  rfBands: RfScanBand[];
 }) {
   const points = overview?.points ?? [];
 
@@ -239,6 +246,7 @@ function RawMetricChart({
         <small>{(overview?.sample_count ?? 0).toLocaleString()} samples across full recording</small>
       </div>
       <svg viewBox="0 0 720 174" role="img" aria-label={`${label} recording overview chart`}>
+        <RecordingRfScanBands bands={rfBands} left={16} width={688} top={28} height={126} />
         {degradedWindows.map((window) => {
           const startX = xForTime(Date.parse(window.started_at));
           const endX = xForTime(Date.parse(window.ended_at));
@@ -298,12 +306,14 @@ function CompactMetricCard({
   timeline,
   selectedFocus,
   comparison,
+  rfBands,
 }: {
   metric: { key: string; label: string; unit: string };
   overview: RecordingMetricOverview | undefined;
   timeline: TimelineBounds | null;
   selectedFocus: DiagnosticInvestigationFocus | null;
   comparison: DiagnosticWindowComparison | null;
+  rfBands: RfScanBand[];
 }) {
   const points = overview?.points ?? [];
   const latest = points.at(-1)?.value ?? null;
@@ -369,6 +379,7 @@ function CompactMetricCard({
           role="img"
           aria-label={`${metric.label} compact recording chart`}
         >
+          <RecordingRfScanBands bands={rfBands} left={8} width={304} top={8} height={68} />
           {focusBand && (
             <rect
               x={focusBand.x}
@@ -423,6 +434,7 @@ function CompactDiagnosticMetrics({
   comparison,
   comparisonLoading,
   comparisonError,
+  rfBands,
 }: {
   series: Record<string, RecordingMetricOverview>;
   timeline: TimelineBounds | null;
@@ -430,6 +442,7 @@ function CompactDiagnosticMetrics({
   comparison: DiagnosticWindowComparison | null;
   comparisonLoading: boolean;
   comparisonError: string | null;
+  rfBands: RfScanBand[];
 }) {
   const [showAllMetrics, setShowAllMetrics] = useState(false);
   const groups = METRIC_DOMAIN_GROUPS
@@ -510,6 +523,7 @@ function CompactDiagnosticMetrics({
                   timeline={timeline}
                   selectedFocus={selectedFocus}
                   comparison={comparison}
+                  rfBands={rfBands}
                 />
               ))}
             </div>
@@ -529,6 +543,8 @@ function InvestigationTimeline({
   selectedEpisode,
   onSelectWindow,
   onSelectEpisode,
+  rfBands,
+  showRfScans,
 }: {
   timeline: TimelineBounds | null;
   degradedWindows: AnalysisDegradedWindow[];
@@ -538,6 +554,8 @@ function InvestigationTimeline({
   selectedEpisode: CrossLayerDiagnosticEpisode | null;
   onSelectWindow: (window: AnalysisDegradedWindow) => void;
   onSelectEpisode: (episode: CrossLayerDiagnosticEpisode) => void;
+  rfBands: RfScanBand[];
+  showRfScans: boolean;
 }) {
   if (timeline === null) return null;
 
@@ -557,6 +575,7 @@ function InvestigationTimeline({
   const lanes = [
     { key: "episodes", label: "Diagnostic episodes" },
     { key: "degraded", label: "Wi-Fi degraded windows" },
+    { key: "rf_scans", label: "Estimated RF scans" },
     { key: "bssid", label: "BSSID changes" },
     { key: "channel", label: "Channel changes" },
     { key: "state", label: "Other state" },
@@ -586,11 +605,16 @@ function InvestigationTimeline({
           <span>{new Date(timeline.start).toLocaleTimeString()}</span>
           <span>{new Date(timeline.end).toLocaleTimeString()}</span>
         </div>
-        {lanes.map((lane) => (
+        {lanes.filter((lane) => lane.key !== "rf_scans" || showRfScans).map((lane) => (
           <div className="recording-investigation-row" key={lane.key}>
             <strong>{lane.label}</strong>
             <div className="recording-investigation-track">
               <i className="recording-investigation-baseline" aria-hidden="true" />
+              {lane.key === "rf_scans" && (
+                <svg viewBox="0 0 720 24" preserveAspectRatio="none" className="recording-investigation-rf" role="img" aria-label="Estimated RF scan windows">
+                  <RecordingRfScanBands bands={rfBands} left={0} width={720} top={4} height={16} />
+                </svg>
+              )}
               {lane.key === "episodes" && crossLayerEpisodes.map((episode) => {
                 const start = positionForTime(episode.started_at);
                 const end = positionForTime(episode.ended_at);
@@ -662,6 +686,7 @@ function InvestigationTimeline({
           <span><i className="legend-window legend-warning" />Wi-Fi warning</span>
           <span><i className="legend-window legend-critical" />Wi-Fi critical</span>
           <span><i className="legend-marker" />Observed state change</span>
+          {showRfScans && <span><i className="legend-window legend-rf-scan" />Estimated RF scan</span>}
         </div>
       </div>
     </section>
@@ -1127,6 +1152,14 @@ export default function RecordingDetail({
     useState<DiagnosticEvidenceCorrelation | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [showRfScans, setShowRfScans] = useState(true);
+  const [rfContext, setRfContext] = useState<{
+    recordingId: string;
+    data: RecordingRfScanWindows | null;
+    error: string | null;
+  } | null>(null);
+  const rfWindows = rfContext?.recordingId === recordingId ? rfContext.data : null;
+  const rfError = rfContext?.recordingId === recordingId ? rfContext.error : null;
 
   const shouldPoll = recording === null
     || ACTIVE_STATUSES.has(recording.status)
@@ -1159,6 +1192,40 @@ export default function RecordingDetail({
     }
     return { start, end: end > start ? end : start + 1 };
   }, [recording?.ended_at, recording?.started_at, series]);
+
+  const rfBands = useMemo(
+    () => showRfScans ? buildRfScanBands(rfWindows?.windows ?? [], timeline) : [],
+    [showRfScans, rfWindows, timeline],
+  );
+
+  useEffect(() => {
+    let active = true;
+    let pending = false;
+    async function refreshRfWindows(): Promise<void> {
+      if (pending) return;
+      pending = true;
+      try {
+        const data = await getRecordingRfWindows(recordingId);
+        if (active) setRfContext({ recordingId, data, error: null });
+      } catch (err) {
+        if (active) setRfContext({
+          recordingId,
+          data: null,
+          error: err instanceof Error ? err.message : "Unable to load RF scan windows",
+        });
+      } finally {
+        pending = false;
+      }
+    }
+    void refreshRfWindows();
+    const timer = shouldPoll
+      ? window.setInterval(() => void refreshRfWindows(), 30000)
+      : null;
+    return () => {
+      active = false;
+      if (timer !== null) window.clearInterval(timer);
+    };
+  }, [recordingId, shouldPoll]);
 
   const handleWindowsChange = useCallback((windows: AnalysisDegradedWindow[]) => {
     setDegradedWindows(windows);
@@ -1447,6 +1514,13 @@ export default function RecordingDetail({
         onEpisodesChange={handleEpisodesChange}
       />
 
+      <RecordingRfScanContext
+        data={rfWindows}
+        error={rfError}
+        enabled={showRfScans}
+        onToggle={setShowRfScans}
+      />
+
       <InvestigationTimeline
         timeline={timeline}
         degradedWindows={degradedWindows}
@@ -1456,6 +1530,8 @@ export default function RecordingDetail({
         selectedEpisode={selectedEpisode}
         onSelectWindow={handleSelectWindow}
         onSelectEpisode={handleSelectEpisode}
+        rfBands={rfBands}
+        showRfScans={showRfScans}
       />
 
       <RecordingRfTimeline
@@ -1480,6 +1556,7 @@ export default function RecordingDetail({
         comparison={windowComparison}
         comparisonLoading={comparisonLoading}
         comparisonError={comparisonError}
+        rfBands={rfBands}
       />
 
       <details
@@ -1567,6 +1644,7 @@ export default function RecordingDetail({
                       degradedWindows={degradedWindows}
                       selectedWindow={selectedWindow}
                       selectedEpisode={selectedEpisode}
+                      rfBands={rfBands}
                     />
                   ))}
                 </div>

@@ -12,6 +12,22 @@ class RfSampleStatistics(BaseModel):
     maximum: float | None
 
 
+class RecordingRfScanWindow(BaseModel):
+    scan_id: str
+    interface: str
+    started_at: datetime
+    ended_at: datetime
+    duration_ms: float
+
+
+class RecordingRfScanWindows(BaseModel):
+    total_scans: int
+    loaded_scans: int
+    invalid_windows: int
+    truncated: bool
+    windows: list[RecordingRfScanWindow]
+
+
 class RecordingRfSummary(BaseModel):
     scan_count: int
     total_bss_observations: int

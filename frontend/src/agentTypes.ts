@@ -151,6 +151,22 @@ export interface RfSampleStatistics {
   maximum: number | null;
 }
 
+export interface RecordingRfScanWindow {
+  scan_id: string;
+  interface: string;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+}
+
+export interface RecordingRfScanWindows {
+  total_scans: number;
+  loaded_scans: number;
+  invalid_windows: number;
+  truncated: boolean;
+  windows: RecordingRfScanWindow[];
+}
+
 export interface RecordingRfSummary {
   scan_count: number;
   total_bss_observations: number;

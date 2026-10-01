@@ -13,6 +13,7 @@ import type {
   RecordingMetricOverview,
   RfScanSnapshot,
   RecordingRfSummary,
+  RecordingRfScanWindows,
   StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
@@ -222,6 +223,12 @@ export function getRecordingRfScans(
 export function getRecordingRfSummary(recordingId: string): Promise<RecordingRfSummary> {
   return request<RecordingRfSummary>(
     `/recordings/${encodeURIComponent(recordingId)}/rf/summary`,
+  );
+}
+
+export function getRecordingRfWindows(recordingId: string): Promise<RecordingRfScanWindows> {
+  return request<RecordingRfScanWindows>(
+    `/recordings/${encodeURIComponent(recordingId)}/rf/windows`,
   );
 }
 

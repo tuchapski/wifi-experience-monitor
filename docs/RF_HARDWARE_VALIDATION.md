@@ -4,6 +4,32 @@ O P0.1-G foi validado em software. A aprovação do P0.1-H depende de evidência
 coletadas no notebook com AX201/iwlwifi. Os testes automatizados usam tempo
 simulado e não substituem a avaliação da placa, driver ou tráfego real.
 
+## Evidências recebidas — 2026-10-01
+
+Status: **parcialmente validado** em AX201/iwlwifi (`8086:a0f0`), kernel
+`7.0.0-34-generic`, notebook `atuchapski-NB`.
+
+| Ensaio | Probes / respostas | Sem resposta | RTT médio | p95 | Máximo | Scans armazenados |
+| --- | --- | --- | --- | --- | --- | --- |
+| RF, 60 min | 3600 / 3599 | 0,0278% | 7,18 ms | 28,1 ms | 140 ms | 60 |
+| Controle, 1200 probes | 1200 / 1197 | 0,25% | 5,68 ms | 10,3 ms | 717 ms | 0 |
+
+A gravação RF `rec_634868323c674fc0b1cf9afbd45ed470` foi concluída e
+sincronizada, com captura de 3600,00034 segundos, sem interrupção e com cobertura
+completa das janelas dos 60 scans. Os 218 probes sobrepostos às janelas tiveram
+RTT médio de 38,21 ms e p95 de 113 ms, sem ausência de respostas. Os 3314 probes
+fora das janelas, dentro da faixa de evidência, tiveram média de 5,14 ms e p95 de
+14,6 ms; houve uma ausência de resposta. Outros 68 probes ficaram sem classificação.
+
+O controle reiniciado teve zero scans armazenados; o resumo recebido não inclui
+os campos de duração, interrupção ou sincronização. Esses resultados descrevem
+associação temporal e mostram que picos e ausências de resposta também ocorrem
+sem scans. Não demonstram causalidade nem constituem aprovação geral do hardware.
+
+Pendências: execução prolongada de 4 horas **adiada pelo usuário** e recuperação
+real após indisponibilidade do Server. Os primeiros ensaios interrompido (56 probes)
+e de controle com 25 scans não contam como validações completas.
+
 ## Primeiro ensaio: 60 minutos
 
 Mantenha o notebook no mesmo ponto do escritório, ligado à energia, sem VPN.

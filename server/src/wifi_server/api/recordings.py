@@ -22,7 +22,7 @@ from wifi_server.recording_schemas import (
     RecordingResponse,
     StartRecordingRequest,
 )
-from wifi_server.rf_summary_schemas import RecordingRfSummary
+from wifi_server.rf_summary_schemas import RecordingRfScanWindows, RecordingRfSummary
 from wifi_server.schemas import RfLatestScanResponse
 from wifi_server.services.agents import authenticate_agent
 from wifi_server.services.analyses import ensure_recording_analysis
@@ -42,6 +42,7 @@ from wifi_server.services.recordings import (
     request_stop_recording,
 )
 from wifi_server.services.rf_summaries import get_recording_rf_summary
+from wifi_server.services.rf_windows import get_recording_rf_windows
 
 router = APIRouter(prefix="/api/v1", tags=["recordings"])
 logger = logging.getLogger(__name__)
@@ -120,6 +121,15 @@ def recording_rf_summary(
     session: Annotated[Session, Depends(get_session)],
 ) -> RecordingRfSummary:
     return get_recording_rf_summary(session, recording_id)
+
+
+@router.get("/recordings/{recording_id}/rf/windows", response_model=RecordingRfScanWindows)
+def recording_rf_windows(
+    recording_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=2000)] = 2000,
+) -> RecordingRfScanWindows:
+    return get_recording_rf_windows(session, recording_id, limit)
 
 
 @router.get(
