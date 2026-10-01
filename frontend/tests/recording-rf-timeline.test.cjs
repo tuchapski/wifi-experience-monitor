@@ -86,3 +86,23 @@ test("keeps missing association explicit instead of inventing a BSSID", () => {
   assert.equal(data.views[0].associated, null);
   assert.equal(data.views[0].sameSsid, 0);
 });
+
+test("does not count BSSID changes across missing association or interface changes", () => {
+  const scans = [
+    scan("rfs_1", "2026-09-29T20:00:00Z", [bss("aa", "CORP", -60, true)]),
+    scan("rfs_2", "2026-09-29T20:01:00Z", [bss("cc", "CORP", -60)]),
+    scan("rfs_3", "2026-09-29T20:02:00Z", [bss("bb", "CORP", -60, true)]),
+    { ...scan("rfs_4", "2026-09-29T20:03:00Z", [bss("dd", "CORP", -60, true)]), interface: "wlan1" },
+  ];
+  assert.equal(buildRecordingRfTimeline(scans).summary.associatedBssidChanges, 0);
+});
+
+test("multiple association flags remain ambiguous", () => {
+  const data = buildRecordingRfTimeline([
+    scan("rfs_1", "2026-09-29T20:00:00Z", [
+      bss("aa", "CORP", -60, true), bss("bb", "CORP", -65, true),
+    ]),
+  ]);
+  assert.equal(data.views[0].associated, null);
+  assert.equal(data.summary.associationCoveragePercent, 0);
+});

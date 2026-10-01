@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { getRecordingRfScans } from "./agentApi";
-import type { RfBssObservation, RfScanSnapshot } from "./agentTypes";
+import { getRecordingRfScans, getRecordingRfSummary } from "./agentApi";
+import type {
+  RecordingRfSummary, RfBssObservation, RfScanSnapshot,
+} from "./agentTypes";
 import {
   buildRecordingRfTimeline,
   RECORDING_RF_STRONG_NEIGHBOR_DBM,
 } from "./recordingRfTimeline";
 import { rfBandLabel } from "./rfEnvironment";
+import RfDerivedSummary from "./RecordingRfSummary";
 import "./RecordingRfTimeline.css";
 
 const DETAIL_ROWS = 120;
@@ -28,7 +31,7 @@ function bssLabel(bss: RfBssObservation | null): string {
   return `${bss.ssid || "Hidden SSID"} · ${bss.bssid}`;
 }
 
-export default function RecordingRfTimeline({
+function RecordingRfTimelineContent({
   recordingId,
   active,
   startedAt,
@@ -41,22 +44,37 @@ export default function RecordingRfTimeline({
 }) {
   const [scans, setScans] = useState<RfScanSnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<RecordingRfSummary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [scansLoaded, setScansLoaded] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
+    let refreshing = false;
     async function refresh(): Promise<void> {
-      try {
-        const data = await getRecordingRfScans(recordingId);
-        if (mounted) {
-          setScans(data);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : "Unable to load RF recording evidence");
-        }
-      }
+      if (refreshing) return;
+      refreshing = true;
+      await Promise.all([
+        getRecordingRfScans(recordingId).then((data) => {
+          if (mounted) {
+            setScans(data);
+            setScansLoaded(true);
+            setError(null);
+          }
+        }).catch((err: unknown) => {
+          if (mounted) setError(err instanceof Error ? err.message : "Unable to load RF recording evidence");
+        }),
+        getRecordingRfSummary(recordingId).then((value) => {
+          if (mounted) { setSummary(value); setSummaryError(null); }
+        }).catch((err: unknown) => {
+          if (mounted) {
+            setSummary(null);
+            setSummaryError(err instanceof Error ? err.message : "Unable to load RF summary");
+          }
+        }),
+      ]);
+      refreshing = false;
     }
 
     void refresh();
@@ -122,17 +140,27 @@ export default function RecordingRfTimeline({
             recording was active.
           </p>
         </div>
-        <small>{data.summary.scanCount.toLocaleString()} RF scans</small>
+        <small>{summary ? `${summary.scan_count.toLocaleString()} stored RF scans` : "RF evidence"}</small>
       </div>
+
+      {summaryError ? <div className="recording-rf-empty">RF summary: {summaryError}</div>
+        : summary ? (summary.scan_count > 0 ? <RfDerivedSummary summary={summary} /> : null)
+        : <div className="recording-rf-empty">Loading RF summary…</div>}
 
       {error ? (
         <div className="recording-rf-empty">{error}</div>
+      ) : !scansLoaded ? (
+        <div className="recording-rf-empty">Loading RF scan evidence…</div>
       ) : data.summary.scanCount === 0 ? (
         <div className="recording-rf-empty">
           No RF scans were associated with this recording.
         </div>
       ) : (
         <>
+          <p className="recording-rf-note">
+            Timeline and snapshot statistics below cover the latest {data.summary.scanCount} scans
+            (up to 2,000). {summary && "The summary above covers all stored scans."}
+          </p>
           <div className="recording-rf-summary">
             <article>
               <span>RF scans</span>
@@ -297,4 +325,10 @@ export default function RecordingRfTimeline({
       )}
     </section>
   );
+}
+
+export default function RecordingRfTimeline(
+  props: Parameters<typeof RecordingRfTimelineContent>[0],
+) {
+  return <RecordingRfTimelineContent key={props.recordingId} {...props} />;
 }

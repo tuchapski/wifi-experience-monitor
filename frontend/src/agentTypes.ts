@@ -144,6 +144,40 @@ export interface RfScanSnapshot {
   bsses: RfBssObservation[];
 }
 
+export interface RfSampleStatistics {
+  sample_count: number;
+  minimum: number | null;
+  average: number | null;
+  maximum: number | null;
+}
+
+export interface RecordingRfSummary {
+  scan_count: number;
+  total_bss_observations: number;
+  unique_bss: number;
+  unique_ssids: number;
+  first_scan_at: string | null;
+  last_scan_at: string | null;
+  maximum_scan_gap_seconds: number | null;
+  scans_with_association: number;
+  association_coverage_percent: number | null;
+  visible_neighbors: RfSampleStatistics;
+  same_channel_neighbors: RfSampleStatistics;
+  same_ssid_neighbors: RfSampleStatistics;
+  strong_neighbors: RfSampleStatistics;
+  strong_neighbor_threshold_dbm: number;
+  best_same_ssid_delta_db: RfSampleStatistics;
+  stronger_same_ssid_scan_count: number;
+  stronger_same_ssid_percent: number | null;
+  association_transition_pairs: number;
+  associated_bssid_changes: number;
+  associated_frequency_changes: number;
+  neighborhood_transition_pairs: number;
+  neighborhood_changed_pairs: number;
+  visible_bss_additions: number;
+  visible_bss_removals: number;
+}
+
 export interface TelemetryPoint {
   observed_at: string;
   metric: string;

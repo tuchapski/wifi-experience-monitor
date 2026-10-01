@@ -43,11 +43,11 @@ printf '[release-gate] Commit: %s\n' "$(git rev-parse --short HEAD)"
 step "Shell deployment syntax" \
   bash -n "${ROOT_DIR}/scripts/release-gate.sh" "${ROOT_DIR}/agent/install.sh"
 
-step "Python lint — Server + Agent" \
-  "${PYTHON_BIN}" -m ruff check server agent
+step "Python lint — Server + Agent + RF validation" \
+  "${PYTHON_BIN}" -m ruff check server agent scripts/validate_rf_session.py
 
-step "Python formatting — Server + Agent" \
-  "${PYTHON_BIN}" -m ruff format --check server agent
+step "Python formatting — Server + Agent + RF validation" \
+  "${PYTHON_BIN}" -m ruff format --check server agent scripts/validate_rf_session.py
 
 step "Server test suite" \
   "${PYTHON_BIN}" -m pytest server/tests

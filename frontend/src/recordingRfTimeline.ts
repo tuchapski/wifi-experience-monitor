@@ -32,7 +32,8 @@ function normalizeBssid(value: string | null | undefined): string | null {
 }
 
 function associatedBss(scan: RfScanSnapshot): RfBssObservation | null {
-  return scan.bsses.find((bss) => bss.associated) ?? null;
+  const matches = scan.bsses.filter((bss) => bss.associated);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function buildRecordingRfTimeline(
@@ -47,6 +48,7 @@ export function buildRecordingRfTimeline(
   let scansWithAssociation = 0;
   let associatedBssidChanges = 0;
   let previousAssociatedBssid: string | null = null;
+  let previousInterface: string | null = null;
 
   const views = ordered.map((scan) => {
     totalBssObservations += scan.bsses.length;
@@ -57,6 +59,8 @@ export function buildRecordingRfTimeline(
     }
 
     const associated = associatedBss(scan);
+    if (previousInterface !== scan.interface) previousAssociatedBssid = null;
+    previousInterface = scan.interface;
     const associatedBssid = normalizeBssid(associated?.bssid);
     let associatedChanged = false;
     if (associatedBssid) {
@@ -66,6 +70,8 @@ export function buildRecordingRfTimeline(
         associatedChanged = true;
       }
       previousAssociatedBssid = associatedBssid;
+    } else {
+      previousAssociatedBssid = null;
     }
 
     const sameSsidBsses = associated?.ssid

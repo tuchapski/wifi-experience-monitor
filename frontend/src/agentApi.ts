@@ -12,6 +12,7 @@ import type {
   RecordingMetricPoint,
   RecordingMetricOverview,
   RfScanSnapshot,
+  RecordingRfSummary,
   StartRecordingInput,
   TelemetryPoint,
 } from "./agentTypes";
@@ -215,6 +216,12 @@ export function getRecordingRfScans(
   const params = new URLSearchParams({ limit: String(limit) });
   return request<RfScanSnapshot[]>(
     `/recordings/${encodeURIComponent(recordingId)}/rf/scans?${params.toString()}`,
+  );
+}
+
+export function getRecordingRfSummary(recordingId: string): Promise<RecordingRfSummary> {
+  return request<RecordingRfSummary>(
+    `/recordings/${encodeURIComponent(recordingId)}/rf/summary`,
   );
 }
 
