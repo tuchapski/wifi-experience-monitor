@@ -25,6 +25,7 @@ class HeartbeatResult:
     server_time: datetime
     desired_config_revision: int
     commands: list[dict[str, Any]]
+    experience_profile: dict[str, Any] | None = None
 
 
 class AgentApiClient:
@@ -98,6 +99,7 @@ class AgentApiClient:
             server_time=datetime.fromisoformat(payload["server_time"]),
             desired_config_revision=payload["desired_config_revision"],
             commands=payload["commands"],
+            experience_profile=payload.get("experience_profile"),
         )
 
     def publish_state(

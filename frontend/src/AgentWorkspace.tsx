@@ -9,6 +9,7 @@ import {
 } from "./agentApi";
 import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
 import ClientExperiencePanel from "./ClientExperiencePanel";
+import ClientDetectionPanel from "./ClientDetectionPanel";
 import GlobalCollectionIndicator from "./GlobalCollectionIndicator";
 import ManagedAgentCard from "./ManagedAgentCard";
 import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
@@ -622,6 +623,7 @@ function AgentDetail({ agentId }: { agentId: string }) {
       </section>
 
       <ClientExperiencePanel key={agent.id} agentId={agent.id} />
+      <ClientDetectionPanel key={`detection-${agent.id}`} agentId={agent.id} />
 
       <LinkScorePanel
         score={state?.wifi.link_score ?? null}

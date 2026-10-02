@@ -45,6 +45,7 @@ class AgentHeartbeatResponse(BaseModel):
     server_time: datetime
     desired_config_revision: int
     commands: list[dict[str, Any]] = Field(default_factory=list)
+    experience_profile: dict[str, Any] | None = None
 
 
 class AgentCapabilityResponse(BaseModel):

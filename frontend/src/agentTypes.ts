@@ -129,6 +129,84 @@ export interface CurrentMeasurementMetadata {
 export type ClientExperienceStatus = "observed_ok" | "degraded" | "failure" | "partial"
   | "unavailable" | "stale" | "collection_error";
 
+export interface ServiceObjectives {
+  latency_ms: number | null;
+  packet_loss_percent: number | null;
+  jitter_ms: number | null;
+  ttfb_ms: number | null;
+}
+
+export interface ExperienceProfile {
+  enabled: boolean;
+  name: string;
+  location: string;
+  dns_query: string;
+  internet_target: string;
+  https_url: string;
+  interval_seconds: number;
+  timeout_seconds: number;
+  confirm_seconds: number;
+  recover_seconds: number;
+  minimum_samples: number;
+  baseline_min_samples: number;
+  baseline_min_seconds: number;
+  local_network: ServiceObjectives;
+  dns: ServiceObjectives;
+  internet: ServiceObjectives;
+  application: ServiceObjectives;
+}
+
+export interface ExperienceProfileResponse {
+  agent_id: string;
+  version: string | null;
+  applied_version: string | null;
+  profile: ExperienceProfile;
+}
+
+export type FindingStatus = "unknown" | "normal" | "candidate" | "active" | "recovering" | "recovered";
+export interface DetectionFinding {
+  rule_id: string;
+  domain: string;
+  metric: string;
+  label: string;
+  status: FindingStatus;
+  previous_status: string | null;
+  kind: "availability" | "objective" | "relative" | "none";
+  reason: string;
+  target: string | null;
+  value: boolean | number | null;
+  unit: string | null;
+  objective: number | null;
+  observed_at: string | null;
+  since: string | null;
+  observed_duration_seconds: number;
+  consecutive_samples: number;
+  evidence_gap: boolean;
+  context: Record<string, string>;
+  baseline: {
+    status: "forming" | "ready" | "not_applicable";
+    samples: number;
+    median: number | null;
+    mad: number | null;
+    p95: number | null;
+    upper_limit: number | null;
+    established_at: string | null;
+  };
+}
+
+export interface ClientDetection {
+  agent_id: string;
+  detector_version: string;
+  evaluated_at: string;
+  profile_version: string | null;
+  applied_version: string | null;
+  enabled: boolean;
+  status: "disabled" | "pending_profile" | "unknown" | "observed_ok" | "candidate" | "active" | "recovering";
+  active_count: number;
+  findings: DetectionFinding[];
+  limitations: string[];
+}
+
 export interface ExperienceMeasurement {
   metric: string;
   label: string;

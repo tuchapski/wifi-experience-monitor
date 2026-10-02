@@ -1,4 +1,7 @@
 import type {
+  ClientDetection,
+  ExperienceProfile,
+  ExperienceProfileResponse,
   ClientExperience,
   AgentCurrentState,
   AgentSummary,
@@ -20,6 +23,18 @@ import type {
 } from "./agentTypes";
 
 const API_ROOT = import.meta.env.VITE_SERVER_API_URL ?? "/api/v1";
+
+export function getClientDetection(agentId: string): Promise<ClientDetection> {
+  return request<ClientDetection>(`/agents/${encodeURIComponent(agentId)}/experience/detection`);
+}
+
+export function getExperienceProfile(agentId: string): Promise<ExperienceProfileResponse> {
+  return request<ExperienceProfileResponse>(`/agents/${encodeURIComponent(agentId)}/experience/profile`);
+}
+
+export function saveExperienceProfile(agentId: string, version: string | null, profile: ExperienceProfile): Promise<ExperienceProfileResponse> {
+  return mutationRequest<ExperienceProfileResponse>(`/agents/${encodeURIComponent(agentId)}/experience/profile`, "PUT", { expected_version: version, profile });
+}
 
 export function getClientExperience(agentId: string): Promise<ClientExperience> {
   return request<ClientExperience>(`/agents/${encodeURIComponent(agentId)}/experience`);
@@ -87,7 +102,7 @@ async function requestOptional<T>(path: string): Promise<T | null> {
 
 async function mutationRequest<T>(
   path: string,
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "PUT",
   body?: unknown,
 ): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {
@@ -102,9 +117,11 @@ async function mutationRequest<T>(
   if (!response.ok) {
     let detail = `API request failed: ${response.status}`;
     try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
+      const payload = (await response.json()) as { detail?: string | { msg?: string; loc?: (string | number)[] }[] };
+      if (typeof payload.detail === "string") {
         detail = payload.detail;
+      } else if (Array.isArray(payload.detail)) {
+        detail = payload.detail.map(item => `${item.loc?.slice(1).join(".") ?? "Field"}: ${item.msg ?? "Invalid value"}`).join("; ");
       }
     } catch {
       // Response had no JSON body.

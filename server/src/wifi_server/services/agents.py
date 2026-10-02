@@ -263,9 +263,23 @@ def update_current_state(
     session: Session,
     agent: Agent,
     request: AgentCurrentStateRequest,
+    *,
+    monitor_experience: bool = False,
 ) -> AgentCurrentStateResponse:
     current = session.get(AgentCurrentState, agent.id)
-    if current is not None and request.observed_at <= current.observed_at:
+    incoming_time = (
+        request.observed_at.replace(tzinfo=UTC)
+        if request.observed_at.tzinfo is None
+        else request.observed_at
+    )
+    current_time = (
+        current.observed_at.replace(tzinfo=UTC)
+        if current is not None and current.observed_at.tzinfo is None
+        else current.observed_at
+        if current
+        else None
+    )
+    if current_time is not None and incoming_time <= current_time:
         return _current_state_response(current)
 
     now = datetime.now(UTC)
@@ -307,6 +321,10 @@ def update_current_state(
     current.raw_state = raw_state
     current.updated_at = now
 
+    if monitor_experience:
+        from wifi_server.services.client_monitor import ingest_detection
+
+        ingest_detection(session, _current_state_response(current), now)
     session.commit()
     return _current_state_response(current)
 

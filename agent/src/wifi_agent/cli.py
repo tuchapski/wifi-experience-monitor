@@ -20,7 +20,7 @@ from wifi_agent.runtime import (
     RfScanSyncEngine,
     TelemetrySyncEngine,
 )
-from wifi_agent.runtime.synthetic import SyntheticProbeRuntime
+from wifi_agent.runtime.experience_profile import ExperienceProfileRuntime
 from wifi_agent.storage import AgentIdentity, AgentIdentityStore, RfScanSpool, TelemetrySpool
 from wifi_agent.system_info import collect_system_info
 
@@ -244,26 +244,24 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
     sync_engine = TelemetrySyncEngine(settings, identity, spool)
     rf_sync_engine = RfScanSyncEngine(settings, identity, rf_spool)
     recording_controller = RecordingController(settings, identity, _database_path(settings))
-    probe_runtime = (
-        SyntheticProbeRuntime(
-            interface,
-            dns_query=settings.dns_probe_query,
-            internet_target=settings.internet_probe_target,
-            https_url=settings.https_probe_url,
-            timeout_seconds=settings.synthetic_probe_timeout_seconds,
-        )
-        if interface
-        else None
-    )
+    try:
+        profile_runtime = ExperienceProfileRuntime(settings, identity)
+    except (ValueError, OSError, KeyError) as exc:
+        LOGGER.error("invalid saved experience profile: %s", exc)
+        raise SystemExit(
+            "Repair or remove data/agent/experience-profile.json before restarting"
+        ) from exc
+    probe_runtime = profile_runtime.make_probes(interface) if interface else None
     pending_probe_observations: list[Observation] = []
     pending_probe_errors: list[str] = []
     probe_cache: dict[str, Observation] = {}
     probe_cache_ttl_seconds = max(
-        settings.synthetic_probe_interval_seconds * 3,
-        settings.synthetic_probe_timeout_seconds * 2,
+        profile_runtime.interval_seconds * 3,
+        profile_runtime.timeout_seconds * 2,
     )
     last_gateway: str | None = None
     last_ipv4_address: str | None = None
+    last_probe_context: dict[str, str] = {}
 
     LOGGER.info("agent started agent_id=%s server=%s", identity.agent_id, settings.server_url)
     next_heartbeat = 0.0
@@ -293,9 +291,27 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
                     recording_controller.heartbeat_payload(),
                 )
                 recording_controller.handle_commands(heartbeat.commands)
+                try:
+                    profile_runtime.receive(heartbeat.experience_profile)
+                except (ValueError, TypeError) as exc:
+                    LOGGER.warning("experience profile rejected: %s", exc)
             except (httpx.HTTPError, OSError) as exc:
                 LOGGER.warning("heartbeat failed: %s", exc)
             next_heartbeat = now + settings.heartbeat_interval_seconds
+
+        if probe_runtime is not None and profile_runtime.pending and not probe_runtime.running:
+            try:
+                if profile_runtime.apply():
+                    probe_runtime.close()
+                    probe_runtime = profile_runtime.make_probes(interface)
+                    probe_cache.clear()
+                    next_probe = now
+                    probe_cache_ttl_seconds = max(
+                        profile_runtime.interval_seconds * 3, profile_runtime.timeout_seconds * 2
+                    )
+                    LOGGER.info("experience profile applied version=%s", profile_runtime.version)
+            except OSError as exc:
+                LOGGER.warning("experience profile could not be saved: %s", exc)
 
         if runtime is not None and now >= next_collection:
             extra_observations = _fresh_probe_observations(
@@ -313,6 +329,25 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             last_gateway = gateway if isinstance(gateway, str) else None
             ipv4_address = cycle.snapshot.network.get("ipv4_address")
             last_ipv4_address = ipv4_address if isinstance(ipv4_address, str) else None
+            frequency = cycle.snapshot.wifi.get("frequency_mhz")
+            band = (
+                "unknown"
+                if not isinstance(frequency, (float, int))
+                else "2.4ghz"
+                if frequency < 3000
+                else "5ghz"
+                if frequency < 5925
+                else "6ghz"
+            )
+            last_probe_context = {
+                "ssid": cycle.snapshot.wifi.get("ssid") or "",
+                "band": band,
+                "bssid": cycle.snapshot.wifi.get("bssid") or "",
+            }
+            if profile_runtime.version:
+                for metric, metadata in cycle.snapshot.measurement_metadata.items():
+                    if metric.startswith("wifi."):
+                        metadata["profile_version"] = profile_runtime.version
             recording_observations = [*cycle.observations, *pending_probe_observations]
             telemetry_observations = [
                 *cycle.observations,
@@ -348,8 +383,8 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
             next_collection = now + settings.telemetry_sample_interval_seconds
 
         if probe_runtime is not None and now >= next_probe:
-            probe_runtime.start(last_gateway, last_ipv4_address)
-            next_probe = now + settings.synthetic_probe_interval_seconds
+            probe_runtime.start(last_gateway, last_ipv4_address, last_probe_context)
+            next_probe = now + profile_runtime.interval_seconds
 
         if now >= next_sync:
             synced = sync_engine.sync_pending()

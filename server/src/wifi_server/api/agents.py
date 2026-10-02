@@ -5,8 +5,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, s
 from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
+from wifi_server.db.models import Agent
 from wifi_server.dependencies import get_session, get_settings
 from wifi_server.experience_schemas import ClientExperienceResponse
+from wifi_server.monitor_schemas import (
+    ClientDetectionResponse,
+    ExperienceProfileResponse,
+    ExperienceProfileUpdate,
+)
 from wifi_server.schemas import (
     AgentCurrentStateRequest,
     AgentCurrentStateResponse,
@@ -38,6 +44,12 @@ from wifi_server.services.agents import (
     update_current_state,
 )
 from wifi_server.services.client_experience import get_client_experience
+from wifi_server.services.client_monitor import (
+    desired_profile,
+    get_detection,
+    get_profile,
+    update_profile,
+)
 from wifi_server.services.recordings import get_pending_commands
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
@@ -82,7 +94,9 @@ def heartbeat(
     response = process_heartbeat(session, settings, agent, payload, remote_address)
     commands = get_pending_commands(session, agent.id, datetime.now(UTC))
     session.commit()
-    return response.model_copy(update={"commands": commands})
+    return response.model_copy(
+        update={"commands": commands, "experience_profile": desired_profile(session, agent.id)}
+    )
 
 
 @router.get("", response_model=list[AgentResponse])
@@ -102,7 +116,8 @@ def publish_state(
 ) -> AgentCurrentStateResponse:
     token = _bearer_token(authorization)
     agent = authenticate_agent(session, agent_id, token)
-    return update_current_state(session, agent, payload)
+    session.get(Agent, agent.id, with_for_update=True)
+    return update_current_state(session, agent, payload, monitor_experience=True)
 
 
 @router.get("/{agent_id}/state", response_model=AgentCurrentStateResponse)
@@ -136,6 +151,31 @@ def client_experience(
     settings: Annotated[ServerSettings, Depends(get_settings)],
 ) -> ClientExperienceResponse:
     return get_client_experience(session, settings, agent_id)
+
+
+@router.get("/{agent_id}/experience/profile", response_model=ExperienceProfileResponse)
+def experience_profile(
+    agent_id: str, session: Annotated[Session, Depends(get_session)]
+) -> ExperienceProfileResponse:
+    return get_profile(session, agent_id)
+
+
+@router.put("/{agent_id}/experience/profile", response_model=ExperienceProfileResponse)
+def save_experience_profile(
+    agent_id: str,
+    payload: ExperienceProfileUpdate,
+    session: Annotated[Session, Depends(get_session)],
+) -> ExperienceProfileResponse:
+    return update_profile(session, agent_id, payload)
+
+
+@router.get("/{agent_id}/experience/detection", response_model=ClientDetectionResponse)
+def client_detection(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+) -> ClientDetectionResponse:
+    return get_detection(session, settings, agent_id)
 
 
 @router.post(
