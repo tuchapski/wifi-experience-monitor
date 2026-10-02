@@ -137,6 +137,10 @@ export interface ServiceObjectives {
 }
 
 export interface ExperienceProfile {
+  automatic_capture: boolean;
+  capture_pre_seconds: number;
+  capture_post_seconds: number;
+  capture_cooldown_seconds: number;
   enabled: boolean;
   name: string;
   location: string;
@@ -729,4 +733,22 @@ export interface RecordingAnalysis {
   findings: RecordingAnalysisFinding[];
   policy: Record<string, unknown>;
   created_at: string;
+}
+
+
+export interface ClientEpisode {
+  id: string; agent_id: string; domain: string; target: string | null;
+  profile_version: string; detector_version: string; status: string; stored_status: string;
+  started_at: string; confirmed_at: string; last_observed_at: string;
+  recovered_at: string | null; closed_at: string | null; acknowledged_at: string | null;
+  recurrence_count: number; observed_duration_seconds: number; evidence_gap: boolean;
+  reason: string; context: Record<string, string>; opening_findings: DetectionFinding[]; findings: DetectionFinding[];
+  capture: { recording_id: string | null; mode: string; status: string; requested_start: string;
+    requested_end: string; coverage: Record<string, unknown> } | null;
+  transitions: { kind: string; observed_at: string; data: Record<string, unknown> }[];
+  transitions_truncated: boolean;
+}
+export interface ClientEpisodePage {
+  agent_id: string; evaluated_at: string; total: number; offset: number; limit: number;
+  episodes: ClientEpisode[];
 }

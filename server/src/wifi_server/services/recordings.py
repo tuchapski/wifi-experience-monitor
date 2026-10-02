@@ -39,7 +39,7 @@ def create_recording(
     *,
     commit: bool = True,
 ) -> RecordingResponse:
-    agent = session.get(Agent, agent_id)
+    agent = session.get(Agent, agent_id, with_for_update=True)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
@@ -297,6 +297,8 @@ def acknowledge_command(
     command: AgentCommand,
     request: AgentCommandAckRequest,
 ) -> None:
+    session.get(Agent, command.agent_id, with_for_update=True)
+    session.refresh(command)
     if command.status in {"acked", "failed"}:
         return
 
@@ -308,7 +310,22 @@ def acknowledge_command(
     recording_id = str(command.payload.get("recording_id", ""))
     recording = session.get(DiagnosticRecording, recording_id) if recording_id else None
     if recording is not None:
-        if request.status == "failed":
+        if command.command_type == "recording.capture":
+            from wifi_server.services.client_episodes import capture_command_result
+
+            capture_command_result(session, command, request.status, request.data, request.message)
+            if command.payload.get("mode") == "automatic":
+                if request.status == "failed" and recording.status == "created":
+                    recording.status = recording.sync_status = "failed"
+                elif request.status == "acked":
+                    if recording.status == "created":
+                        recording.status = "recording"
+                    recording.started_at = (
+                        recording.started_at
+                        or _datetime_from_data(request.data.get("started_at"))
+                        or now
+                    )
+        elif request.status == "failed":
             recording.status = "failed"
             recording.sync_status = "failed"
         elif command.command_type == "recording.start":
@@ -411,6 +428,8 @@ def finalize_manifest(
     session: Session,
     recording: DiagnosticRecording,
     request: RecordingManifestRequest,
+    *,
+    episode_coverage: bool = False,
 ) -> RecordingManifestResponse:
     sequences = list(
         session.scalars(
@@ -433,6 +452,10 @@ def finalize_manifest(
     recording.ended_at = request.ended_at
     recording.sync_status = "complete" if not missing and counts_match else "incomplete"
     recording.updated_at = datetime.now(UTC)
+    if episode_coverage:
+        from wifi_server.services.client_episodes import finalize_capture_coverage
+
+        finalize_capture_coverage(session, recording)
     session.commit()
 
     return RecordingManifestResponse(

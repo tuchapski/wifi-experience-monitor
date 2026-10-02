@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from wifi_server.config import ServerSettings
 from wifi_server.db.models import Agent
 from wifi_server.dependencies import get_session, get_settings
+from wifi_server.episode_schemas import ClientEpisodePage, ClientEpisodeResponse
 from wifi_server.experience_schemas import ClientExperienceResponse
 from wifi_server.monitor_schemas import (
     ClientDetectionResponse,
@@ -92,6 +93,7 @@ def heartbeat(
     agent = authenticate_agent(session, agent_id, token)
     remote_address = request.client.host if request.client else None
     response = process_heartbeat(session, settings, agent, payload, remote_address)
+    session.get(Agent, agent.id, with_for_update=True)
     commands = get_pending_commands(session, agent.id, datetime.now(UTC))
     session.commit()
     return response.model_copy(
@@ -166,7 +168,7 @@ def save_experience_profile(
     payload: ExperienceProfileUpdate,
     session: Annotated[Session, Depends(get_session)],
 ) -> ExperienceProfileResponse:
-    return update_profile(session, agent_id, payload)
+    return update_profile(session, agent_id, payload, track_episodes=True)
 
 
 @router.get("/{agent_id}/experience/detection", response_model=ClientDetectionResponse)
@@ -237,3 +239,47 @@ def update_agent_name(
     settings: Annotated[ServerSettings, Depends(get_settings)],
 ) -> AgentResponse:
     return rename_agent(session, settings, agent_id, payload)
+
+
+@router.get("/{agent_id}/experience/episodes", response_model=ClientEpisodePage)
+def client_episodes(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    domain: Annotated[
+        str | None, Query(pattern="^(wifi_rf|local_network|dns|internet|application)$")
+    ] = None,
+):
+    from wifi_server.services.client_episodes import list_episodes
+
+    return list_episodes(
+        session,
+        agent_id,
+        settings.agent_offline_after_seconds,
+        offset=offset,
+        limit=limit,
+        domain=domain,
+    )
+
+
+@router.get("/{agent_id}/experience/episodes/{episode_id}", response_model=ClientEpisodeResponse)
+def client_episode(
+    agent_id: str,
+    episode_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+):
+    from wifi_server.services.client_episodes import get_episode
+
+    return get_episode(session, agent_id, episode_id, settings.agent_offline_after_seconds)
+
+
+@router.post("/{agent_id}/experience/episodes/{episode_id}/ack", status_code=204)
+def acknowledge_client_episode(
+    agent_id: str, episode_id: str, session: Annotated[Session, Depends(get_session)]
+) -> None:
+    from wifi_server.services.client_episodes import acknowledge_episode
+
+    acknowledge_episode(session, agent_id, episode_id)

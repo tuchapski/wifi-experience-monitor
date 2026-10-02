@@ -67,6 +67,16 @@ class RuntimeExperienceProfile:
                 or not lower <= value <= upper
             ):
                 raise ValueError("Probe cadence or timeout outside supported range")
+        if type(profile.get("automatic_capture", False)) is not bool:
+            raise ValueError("Automatic capture must be boolean")
+        for key, lower, upper, default in (
+            ("capture_pre_seconds", 0, 300, 120),
+            ("capture_post_seconds", 30, 900, 300),
+            ("capture_cooldown_seconds", 30, 3600, 300),
+        ):
+            value = profile.get(key, default)
+            if type(value) is not int or not lower <= value <= upper:
+                raise ValueError("Capture window outside supported range")
         return cls(
             version,
             enabled,

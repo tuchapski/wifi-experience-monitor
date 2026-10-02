@@ -2,6 +2,7 @@ export interface WorkspaceRoute {
   section: "agents" | "diagnostics";
   agentId: string | null;
   recordingId: string | null;
+  episodeId?: string;
 }
 
 export function diagnosticsAgentHash(agentId: string): string {
@@ -12,7 +13,13 @@ export function diagnosticsRecordingHash(agentId: string, recordingId: string): 
   return `${diagnosticsAgentHash(agentId)}/recordings/${encodeURIComponent(recordingId)}`;
 }
 
+export function clientEpisodeHash(agentId: string, episodeId: string): string {
+  return `#agents/${encodeURIComponent(agentId)}/episodes/${encodeURIComponent(episodeId)}`;
+}
+
 export function parseWorkspaceRoute(hash: string): WorkspaceRoute {
+  const episodeMatch = hash.match(/^#agents\/([^/]+)\/episodes\/([^/]+)$/);
+  if (episodeMatch) return { section: "agents", agentId: decodeURIComponent(episodeMatch[1]), recordingId: null, episodeId: decodeURIComponent(episodeMatch[2]) };
   const recordingMatch = hash.match(
     /^#(?:agents|diagnostics\/agents)\/([^/]+)\/recordings\/([^/]+)$/,
   );

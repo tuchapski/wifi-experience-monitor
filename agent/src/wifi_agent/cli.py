@@ -251,6 +251,9 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
         raise SystemExit(
             "Repair or remove data/agent/experience-profile.json before restarting"
         ) from exc
+    recording_controller.configure_capture(
+        profile_runtime.active.raw if profile_runtime.active else None
+    )
     probe_runtime = profile_runtime.make_probes(interface) if interface else None
     pending_probe_observations: list[Observation] = []
     pending_probe_errors: list[str] = []
@@ -308,6 +311,9 @@ def _run(settings: AgentSettings, store: AgentIdentityStore) -> None:
                     next_probe = now
                     probe_cache_ttl_seconds = max(
                         profile_runtime.interval_seconds * 3, profile_runtime.timeout_seconds * 2
+                    )
+                    recording_controller.configure_capture(
+                        profile_runtime.active.raw if profile_runtime.active else None
                     )
                     LOGGER.info("experience profile applied version=%s", profile_runtime.version)
             except OSError as exc:

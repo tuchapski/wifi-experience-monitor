@@ -38,7 +38,7 @@ export default function ExperienceProfileEditor({ agentId }: { agentId: string }
   function text(key: "name" | "location" | "dns_query" | "internet_target" | "https_url", value: string) {
     setDraft(current => current ? { ...current, [key]: value } : current);
   }
-  function number(key: "interval_seconds" | "timeout_seconds" | "confirm_seconds" | "recover_seconds", value: string) {
+  function number(key: "interval_seconds" | "timeout_seconds" | "confirm_seconds" | "recover_seconds" | "capture_pre_seconds" | "capture_post_seconds" | "capture_cooldown_seconds", value: string) {
     setDraft(current => current ? { ...current, [key]: Number(value) } : current);
   }
   function objective(service: typeof SERVICES[number][0], key: keyof ServiceObjectives, value: string) {
@@ -61,6 +61,13 @@ export default function ExperienceProfileEditor({ agentId }: { agentId: string }
           <label>Confirm degradation after (s)<input required type="number" min={5} max={300} step="any" value={draft.confirm_seconds} onChange={event => number("confirm_seconds", event.target.value)} /></label>
           <label>Confirm recovery after (s)<input required type="number" min={5} max={300} step="any" value={draft.recover_seconds} onChange={event => number("recover_seconds", event.target.value)} /></label>
         </div>
+        <label className="detector-enabled"><input type="checkbox" checked={draft.automatic_capture ?? false} onChange={event => setDraft({ ...draft, automatic_capture: event.target.checked })} />Automatically capture individual episodes</label>
+        <p>One capture per episode. Existing individual collections are reused without extending their deadline. The window ends after the trigger, even if the episode remains active. Before enabling, allow the Agent to build its local buffer.</p>
+        {draft.automatic_capture && <div className="detector-profile-grid">
+          <label>Before episode onset (s)<input required type="number" min={0} max={300} value={draft.capture_pre_seconds} onChange={event => number("capture_pre_seconds", event.target.value)} /></label>
+          <label>After confirmation trigger (s)<input required type="number" min={30} max={900} value={draft.capture_post_seconds} onChange={event => number("capture_post_seconds", event.target.value)} /></label>
+          <label>Minimum time between new captures (s)<input required type="number" min={30} max={3600} value={draft.capture_cooldown_seconds} onChange={event => number("capture_cooldown_seconds", event.target.value)} /></label>
+        </div>}
         <div className="detector-objectives">{SERVICES.map(([key, label]) => <div key={key}><h3>{label}</h3>
           <label>{key === "application" ? "Total HTTP time" : "Latency"} objective (ms)<input type="number" min={0.001} max={60000} step="any" value={draft[key].latency_ms ?? ""} onChange={event => objective(key, "latency_ms", event.target.value)} /></label>
           {["local_network", "internet"].includes(key) && <>

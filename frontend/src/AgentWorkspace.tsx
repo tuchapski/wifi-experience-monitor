@@ -9,6 +9,7 @@ import {
 } from "./agentApi";
 import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
 import ClientExperiencePanel from "./ClientExperiencePanel";
+import ClientEpisodeHistory, { ClientEpisodeDetail } from "./ClientEpisodeHistory";
 import ClientDetectionPanel from "./ClientDetectionPanel";
 import GlobalCollectionIndicator from "./GlobalCollectionIndicator";
 import ManagedAgentCard from "./ManagedAgentCard";
@@ -624,6 +625,7 @@ function AgentDetail({ agentId }: { agentId: string }) {
 
       <ClientExperiencePanel key={agent.id} agentId={agent.id} />
       <ClientDetectionPanel key={`detection-${agent.id}`} agentId={agent.id} />
+      <ClientEpisodeHistory key={`episodes-${agent.id}`} agentId={agent.id} />
 
       <LinkScorePanel
         score={state?.wifi.link_score ?? null}
@@ -776,7 +778,9 @@ export default function AgentWorkspace() {
       </header>
 
       <div className="agent-content">
-        {route.section === "diagnostics" && route.agentId && route.recordingId ? (
+        {route.agentId && route.episodeId ? (
+          <ClientEpisodeDetail key={route.episodeId} agentId={route.agentId} episodeId={route.episodeId} />
+        ) : route.section === "diagnostics" && route.agentId && route.recordingId ? (
           <RecordingDetail agentId={route.agentId} recordingId={route.recordingId} />
         ) : route.section === "diagnostics" ? (
           <DiagnosticsWorkspace key={route.agentId ?? "individual"} agentId={route.agentId} />

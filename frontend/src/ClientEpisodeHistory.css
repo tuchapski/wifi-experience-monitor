@@ -1,0 +1,26 @@
+.episode-panel { background: #fff; border: 1px solid #dce4ed; border-radius: 16px; padding: 24px; margin: 20px 0; color: #243449; }
+.episode-panel header, .episode-panel footer, .episode-card > div { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.episode-panel h1, .episode-panel h2 { margin: 0 0 10px; }
+.episode-panel header p { color: #627187; margin: 0 0 16px; }
+.episode-panel select, .episode-panel button { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #243449; }
+.episode-panel button:disabled { opacity: .55; }
+.episode-list { display: grid; gap: 12px; margin: 16px 0; }
+.episode-card { display: block; text-decoration: none; color: inherit; padding: 18px; border: 1px solid #dce4ed; border-radius: 12px; overflow-wrap: anywhere; }
+.episode-card:hover { border-color: #5d80bd; background: #f8fafc; }
+.episode-card > div { justify-content: flex-start; margin-bottom: 10px; }
+.episode-card > span, .episode-card small { color: #627187; }
+.episode-status, .episode-gap { padding: 4px 9px; border-radius: 20px; font-size: 12px; background: #eef2f7; }
+.episode-active { background: #fee2e2; color: #991b1b; }
+.episode-recovering { background: #fef3c7; color: #92400e; }
+.episode-recovered { background: #dcfce7; color: #166534; }
+.episode-unknown, .episode-gap { background: #e2e8f0; color: #475569; }
+.episode-detail > header { margin-top: 24px; }
+.episode-detail > h2 { margin-top: 28px; }
+.episode-context, .episode-findings { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,250px),1fr)); gap: 16px; }
+.episode-context dt { font-size: 12px; color: #627187; text-transform: capitalize; }
+.episode-context dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+.episode-findings article { border: 1px solid #dce4ed; padding: 16px; border-radius: 10px; }
+.episode-timeline { padding-left: 24px; }
+.episode-timeline li { padding: 10px; }
+.episode-timeline time { display: block; color: #627187; margin-top: 5px; font-size: 13px; }
+@media(max-width:600px) { .episode-panel { padding:16px; } }

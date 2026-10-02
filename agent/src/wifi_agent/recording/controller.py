@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,9 @@ class RecordingController:
         identity: AgentIdentity,
         database_path: Path,
     ):
+        self.capture_scope = None
+        self.server_scope = settings.server_url.rstrip("/")
+        self.capture_retention = 0
         self.identity = identity
         self.sample_interval_seconds = settings.telemetry_sample_interval_seconds
         self.client = RecordingApiClient(settings)
@@ -57,7 +61,17 @@ class RecordingController:
         return True
 
     def handle_commands(self, commands: list[dict[str, Any]]) -> None:
-        for command in commands:
+        def priority(command):
+            if command.get("type") == "recording.start":
+                return 0
+            if (
+                command.get("type") == "recording.capture"
+                and command.get("payload", {}).get("mode") == "automatic"
+            ):
+                return 1
+            return 2
+
+        for command in sorted(commands, key=priority):
             command_id = str(command.get("id", ""))
             command_type = str(command.get("type", ""))
             payload = command.get("payload") or {}
@@ -67,6 +81,8 @@ class RecordingController:
             try:
                 if command_type == "recording.start":
                     self._start(command_id, payload)
+                elif command_type == "recording.capture":
+                    self._capture(command_id, payload)
                 elif command_type == "recording.stop":
                     self._stop(command_id, payload)
                 else:
@@ -93,12 +109,13 @@ class RecordingController:
         collector_errors: list[str] | None = None,
     ) -> None:
         active = self.store.active()
-        if active is None:
+        if active is None and self.capture_scope is None:
             return
 
+        cycle_at = observed_at or datetime.now(UTC)
         metrics: list[dict[str, Any]] = []
         events: list[dict[str, Any]] = []
-        observed_at = observed_at or datetime.now(UTC)
+        observed_at = cycle_at
         metrics.append(
             {
                 "observed_at": observed_at.isoformat(),
@@ -108,6 +125,7 @@ class RecordingController:
                 "labels": {
                     "configured_interval_seconds": self.sample_interval_seconds,
                     "collector_errors_count": len(collector_errors or []),
+                    **({"collector_errors": collector_errors or []} if self.capture_scope else {}),
                 },
             }
         )
@@ -124,13 +142,22 @@ class RecordingController:
                     observation.value, (int, float)
                 ):
                     continue
+                if not math.isfinite(observation.value):
+                    continue
                 metrics.append(
                     {
                         "observed_at": observation.observed_at.isoformat(),
                         "metric": observation.metric,
                         "value": float(observation.value),
                         "unit": observation.unit,
-                        "labels": observation.labels,
+                        "labels": {
+                            **observation.labels,
+                            **(
+                                {"measurement": observation.metadata, "source": observation.source}
+                                if self.capture_scope
+                                else {}
+                            ),
+                        },
                     }
                 )
                 continue
@@ -138,6 +165,21 @@ class RecordingController:
             if observation.kind is not ObservationKind.STATE:
                 continue
 
+            if self.capture_scope:
+                events.append(
+                    {
+                        "observed_at": observation.observed_at.isoformat(),
+                        "event_type": "state.observation",
+                        "severity": "info",
+                        "data": {
+                            "metric": observation.metric,
+                            "current": observation.value,
+                            "unit": observation.unit,
+                            "labels": observation.labels,
+                            "metadata": observation.metadata,
+                        },
+                    }
+                )
             previous = self._last_state.get(observation.metric)
             if observation.metric not in self._last_state:
                 event_type = "state.initial"
@@ -162,6 +204,12 @@ class RecordingController:
             )
             self._last_state[observation.metric] = observation.value
 
+        if self.capture_scope:
+            self.store.buffer_cycle(
+                self.capture_scope, metrics, events, cycle_at, self.capture_retention
+            )
+        if active is None:
+            return
         batch = self.store.enqueue(active.recording_id, metrics, events, observed_at)
         if batch is not None:
             LOGGER.info(
@@ -267,3 +315,59 @@ class RecordingController:
             },
         )
         LOGGER.info("diagnostic recording stopped recording_id=%s", recording.recording_id)
+
+    def configure_capture(self, profile: dict | None) -> None:
+        policy = (profile or {}).get("profile", {})
+        enabled = policy.get("enabled") is True and policy.get("automatic_capture") is True
+        scope = (
+            f"{self.server_scope}:{self.identity.agent_id}:{profile['version']}"
+            if enabled
+            else None
+        )
+        if self.capture_scope is not None and scope != self.capture_scope or not enabled:
+            self.store.clear_buffer()
+        self.capture_scope = scope
+        self.capture_retention = min(
+            630,
+            max(0, int(policy.get("capture_pre_seconds", 120)))
+            + max(0, int(policy.get("confirm_seconds", 15)))
+            + 30,
+        )
+
+    def _capture(self, command_id: str, payload: dict) -> None:
+        expected = f"{self.server_scope}:{self.identity.agent_id}:{payload.get('profile_version')}"
+        # A persisted successful command remains retryable even after a policy edit.
+        if self.capture_scope != expected:
+            import sqlite3
+
+            with sqlite3.connect(self.store.database_path) as connection:
+                saved = connection.execute(
+                    "SELECT result FROM capture_commands WHERE command_id = ?", (command_id,)
+                ).fetchone()
+            if not saved:
+                raise ValueError("Capture profile is disabled or has changed")
+        recording_id = payload.get("recording_id")
+        if (
+            not isinstance(recording_id, str)
+            or not recording_id
+            or payload.get("mode") not in ("automatic", "reused")
+        ):
+            raise ValueError("Invalid capture recording or mode")
+        try:
+            start, end = (
+                datetime.fromisoformat(payload[key]) for key in ("window_start", "window_end")
+            )
+        except (KeyError, TypeError) as exc:
+            raise ValueError("Invalid capture window") from exc
+        if (
+            start.tzinfo is None
+            or end.tzinfo is None
+            or not 0 < (end - start).total_seconds() <= 1500
+        ):
+            raise ValueError("Invalid capture window")
+        result = self.store.capture(
+            command_id, recording_id, expected, start, end, datetime.now(UTC), payload["mode"]
+        )
+        active = self.store.active()
+        set_active_recording_id(active.recording_id if active else None)
+        self.client.acknowledge_command(self.identity, command_id, status="acked", data=result)

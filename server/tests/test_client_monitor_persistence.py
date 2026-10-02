@@ -11,6 +11,7 @@ from test_continuous_detection import NOW, snapshot
 from wifi_server.api.agents import router
 from wifi_server.config import ServerSettings
 from wifi_server.db.base import Base
+from wifi_server.db.episode_models import ClientEpisode, EpisodeCapture, EpisodeEvent
 from wifi_server.db.experience_models import AgentExperienceMonitor
 from wifi_server.db.models import Agent, AgentCurrentState
 from wifi_server.dependencies import get_session, get_settings
@@ -29,7 +30,14 @@ def test_ingestion_persists_rule_state_across_sessions_and_ignores_replays(tmp_p
     engine = create_engine(f"sqlite:///{tmp_path / 'monitor.db'}")
     Base.metadata.create_all(
         engine,
-        tables=[Agent.__table__, AgentCurrentState.__table__, AgentExperienceMonitor.__table__],
+        tables=[
+            Agent.__table__,
+            AgentCurrentState.__table__,
+            AgentExperienceMonitor.__table__,
+            ClientEpisode.__table__,
+            EpisodeCapture.__table__,
+            EpisodeEvent.__table__,
+        ],
     )
     with Session(engine) as session:
         agent = Agent(

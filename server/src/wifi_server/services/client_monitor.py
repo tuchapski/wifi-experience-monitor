@@ -47,7 +47,11 @@ def get_profile(session: Session, agent_id: str) -> ExperienceProfileResponse:
 
 
 def update_profile(
-    session: Session, agent_id: str, payload: ExperienceProfileUpdate
+    session: Session,
+    agent_id: str,
+    payload: ExperienceProfileUpdate,
+    *,
+    track_episodes: bool = False,
 ) -> ExperienceProfileResponse:
     _agent(session, agent_id, lock=True)
     monitor = session.get(AgentExperienceMonitor, agent_id)
@@ -57,7 +61,19 @@ def update_profile(
     if monitor is None:
         monitor = AgentExperienceMonitor(agent_id=agent_id)
         session.add(monitor)
-    if monitor.profile != profile:
+    if (
+        monitor.profile is None
+        or ExperienceProfile.model_validate(monitor.profile).model_dump(mode="json") != profile
+    ):
+        if track_episodes:
+            from wifi_server.services.client_episodes import interrupt_episodes
+
+            interrupt_episodes(
+                session,
+                agent_id,
+                "Detection profile changed; recovery was not confirmed.",
+                datetime.now(UTC),
+            )
         monitor.profile = profile
         monitor.profile_version = f"exp_{uuid4().hex}"
         monitor.detector_state = {}
@@ -84,6 +100,9 @@ def ingest_detection(session: Session, state: AgentCurrentStateResponse, now: da
         monitor.detector_state or {}, state, experience, profile, monitor.profile_version
     )
     monitor.updated_at = now
+    from wifi_server.services.client_episodes import synchronize_episodes
+
+    synchronize_episodes(session, monitor, profile, now)
 
 
 def evaluate_detection(
@@ -160,8 +179,8 @@ def evaluate_detection(
             "is unavailable; late uploads are not replayed here.",
             "Initial references use successful observations under configured objectives. "
             "A frozen reference can still reflect a suboptimal initial environment.",
-            "This delivery stores current rule state and references. "
-            "Episode history and automatic captures belong to P0.4.",
+            "Episodes preserve confirmed observations. Captures use a fixed trigger window; "
+            "missing evidence does not establish recovery or causality.",
         ],
     )
 

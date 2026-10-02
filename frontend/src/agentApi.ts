@@ -1,4 +1,6 @@
 import type {
+  ClientEpisode,
+  ClientEpisodePage,
   ClientDetection,
   ExperienceProfile,
   ExperienceProfileResponse,
@@ -346,4 +348,18 @@ export function runRecordingAnalysis(
     `/recordings/${encodeURIComponent(recordingId)}/analysis`,
     "POST",
   );
+}
+
+
+export function getClientEpisodes(agentId: string, offset = 0, domain = ""): Promise<ClientEpisodePage> {
+  const query = new URLSearchParams({ offset: String(offset), limit: "10" });
+  if (domain) query.set("domain", domain);
+  return request<ClientEpisodePage>(`/agents/${encodeURIComponent(agentId)}/experience/episodes?${query}`);
+}
+export function getClientEpisode(agentId: string, episodeId: string): Promise<ClientEpisode> {
+  return request<ClientEpisode>(`/agents/${encodeURIComponent(agentId)}/experience/episodes/${encodeURIComponent(episodeId)}`);
+}
+export async function acknowledgeClientEpisode(agentId: string, episodeId: string): Promise<void> {
+  const response = await fetch(`${API_ROOT}/agents/${encodeURIComponent(agentId)}/experience/episodes/${encodeURIComponent(episodeId)}/ack`, { method: "POST" });
+  if (!response.ok) throw new Error(`Unable to acknowledge episode: ${response.status}`);
 }

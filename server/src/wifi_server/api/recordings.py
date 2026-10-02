@@ -277,7 +277,7 @@ def recording_manifest(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
     token = _bearer_token(authorization)
     authenticate_agent(session, recording.agent_id, token)
-    result = finalize_manifest(session, recording, payload)
+    result = finalize_manifest(session, recording, payload, episode_coverage=True)
     if result.sync_status == "complete":
         background_tasks.add_task(_analyze_completed_recording, recording_id)
     return result

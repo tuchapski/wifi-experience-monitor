@@ -32,6 +32,10 @@ class ExperienceProfile(BaseModel):
     minimum_samples: int = Field(default=3, ge=2, le=20)
     baseline_min_samples: int = Field(default=30, ge=10, le=120)
     baseline_min_seconds: float = Field(default=120, ge=30, le=3600, allow_inf_nan=False)
+    automatic_capture: bool = False
+    capture_pre_seconds: int = Field(default=120, ge=0, le=300)
+    capture_post_seconds: int = Field(default=300, ge=30, le=900)
+    capture_cooldown_seconds: int = Field(default=300, ge=30, le=3600)
     local_network: ServiceObjectives = Field(
         default_factory=lambda: ServiceObjectives(latency_ms=50, packet_loss_percent=1)
     )

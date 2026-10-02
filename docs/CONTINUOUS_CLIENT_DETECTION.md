@@ -111,8 +111,11 @@ editing, pending application, errors/recovery and responsive findings.
 
 Current State publication can miss a result between snapshots or during Server
 unavailability. Telemetry aggregates are not replayed as individual probe
-outcomes, since doing so would manufacture evidence. There is no episode archive,
-automatic capture, multi-Agent analysis or new Diagnostic Projects workflow.
-Episode lifecycle, pre/post evidence and delayed-upload reconciliation belong to
-P0.4. The four-hour AX201 run remains deferred and real Server-outage recovery
-remains pending.
+outcomes, since doing so would manufacture evidence. Multi-Agent analysis and
+Diagnostic Projects remain outside this roadmap. P0.4 adds a persistent individual
+episode archive and opt-in fixed-window capture. The four-hour AX201 run remains
+deferred and real Server-outage recovery remains pending.
+
+
+Persistent individual history and opt-in trigger-window evidence are now described
+in [CLIENT_EPISODES_AND_CAPTURE.md](CLIENT_EPISODES_AND_CAPTURE.md).
