@@ -335,6 +335,7 @@ def _current_state_response(current: AgentCurrentState) -> AgentCurrentStateResp
         wifi=raw_state.get("wifi", {}),
         network=raw_state.get("network", {}),
         collector_errors=raw_state.get("collector_errors", []),
+        measurement_metadata=raw_state.get("measurement_metadata", {}),
     )
 
 

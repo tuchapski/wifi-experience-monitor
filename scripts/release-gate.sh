@@ -23,9 +23,9 @@ step() {
 
 cd "${ROOT_DIR}"
 
-[[ -d .git ]] || die "run this from a Git checkout"
-[[ -x "${PYTHON_BIN}" ]] || die "Python virtualenv not found at ${PYTHON_BIN}. Create/activate .venv or set PYTHON=/path/to/python."
 command -v git >/dev/null 2>&1 || die "git is required"
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "run this from a Git checkout"
+[[ -x "${PYTHON_BIN}" ]] || die "Python virtualenv not found at ${PYTHON_BIN}. Create/activate .venv or set PYTHON=/path/to/python."
 command -v node >/dev/null 2>&1 || die "node is required"
 command -v npm >/dev/null 2>&1 || die "npm is required"
 [[ -d "${FRONTEND_DIR}/node_modules" ]] || die "frontend/node_modules is missing. Run: (cd frontend && npm ci)"

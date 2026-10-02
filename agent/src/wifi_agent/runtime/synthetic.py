@@ -1,8 +1,10 @@
 """Non-blocking orchestration for synthetic network probes."""
 
 from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import UTC, datetime
 
 from wifi_agent.collectors.connectivity import ProbeResult, probe_dns, probe_https, probe_ping
+from wifi_agent.core import Observation, ObservationKind
 
 
 class SyntheticProbeRuntime:
@@ -22,6 +24,7 @@ class SyntheticProbeRuntime:
         self.timeout_seconds = timeout_seconds
         self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="wem-probe")
         self._pending: dict[str, Future[ProbeResult]] = {}
+        self._targets = {"dns": dns_query, "internet": internet_target, "https": https_url}
 
     @property
     def running(self) -> bool:
@@ -56,6 +59,7 @@ class SyntheticProbeRuntime:
             )
             submitted = True
         if gateway and "gateway" not in self._pending:
+            self._targets["gateway"] = gateway
             self._pending["gateway"] = self._executor.submit(
                 probe_ping,
                 "gateway",
@@ -77,10 +81,26 @@ class SyntheticProbeRuntime:
             try:
                 result = future.result()
             except Exception as exc:  # pragma: no cover - defensive boundary around worker threads
-                errors.append(f"synthetic {name} probe failed: {exc}")
-                continue
+                result = ProbeResult([], [f"synthetic {name} probe failed: {exc}"])
             observations.extend(result.observations)
             errors.extend(result.errors)
+            if not result.observations and not result.errors:
+                continue
+            # An explicit error observation replaces any previously successful cached result.
+            # Cache timestamps remain the probe's own completion time, never the Wi-Fi cycle time.
+            observations.append(
+                Observation(
+                    source="synthetic",
+                    kind=ObservationKind.STATE,
+                    metric=f"network.{name}_collection_error",
+                    value="; ".join(result.errors) or None,
+                    observed_at=max(
+                        (item.observed_at for item in result.observations),
+                        default=datetime.now(UTC),
+                    ),
+                    labels={"interface": self.interface, "target": self._targets.get(name, "")},
+                )
+            )
         return ProbeResult(observations, errors)
 
     def close(self) -> None:

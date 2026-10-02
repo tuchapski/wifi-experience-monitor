@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from wifi_server.config import ServerSettings
 from wifi_server.dependencies import get_session, get_settings
+from wifi_server.experience_schemas import ClientExperienceResponse
 from wifi_server.schemas import (
     AgentCurrentStateRequest,
     AgentCurrentStateResponse,
@@ -36,6 +37,7 @@ from wifi_server.services.agents import (
     rename_agent,
     update_current_state,
 )
+from wifi_server.services.client_experience import get_client_experience
 from wifi_server.services.recordings import get_pending_commands
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
@@ -125,6 +127,15 @@ def publish_telemetry_batch(
     token = _bearer_token(authorization)
     agent = authenticate_agent(session, agent_id, token)
     return ingest_telemetry_batch(session, settings, agent, payload)
+
+
+@router.get("/{agent_id}/experience", response_model=ClientExperienceResponse)
+def client_experience(
+    agent_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[ServerSettings, Depends(get_settings)],
+) -> ClientExperienceResponse:
+    return get_client_experience(session, settings, agent_id)
 
 
 @router.post(

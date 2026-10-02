@@ -1,34 +1,26 @@
 import { useEffect, useState } from "react";
 
-import { getAgentRecordings, getAgents } from "./agentApi";
+import { getAgentRecordings } from "./agentApi";
+import { diagnosticsAgentHash } from "./diagnosticRoutes";
 import "./GlobalCollectionIndicator.css";
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
-export default function GlobalCollectionIndicator() {
-  const [activeCount, setActiveCount] = useState(0);
+export default function GlobalCollectionIndicator({ agentId }: { agentId: string | null }) {
+  const [activity, setActivity] = useState<{ agentId: string; count: number } | null>(null);
+  const activeCount = activity?.agentId === agentId ? activity?.count ?? 0 : 0;
 
   useEffect(() => {
+    if (!agentId) return;
+    const currentAgentId = agentId;
     let mounted = true;
 
     async function refresh(): Promise<void> {
       try {
-        const agents = await getAgents();
-        const results = await Promise.allSettled(
-          agents.map(async (agent) => {
-            const recordings = await getAgentRecordings(agent.id);
-            return recordings.filter((recording) => ACTIVE_STATUSES.has(recording.status)).length;
-          }),
-        );
-
-        if (!mounted || results.some((result) => result.status === "rejected")) return;
-
-        setActiveCount(
-          results.reduce(
-            (total, result) => total + (result.status === "fulfilled" ? result.value : 0),
-            0,
-          ),
-        );
+        const recordings = await getAgentRecordings(currentAgentId);
+        if (!mounted) return;
+        setActivity({ agentId: currentAgentId, count: recordings.filter((recording) =>
+          !recording.project_run_id && ACTIVE_STATUSES.has(recording.status)).length });
       } catch {
         // Keep the last known count when the global activity refresh fails.
       }
@@ -40,12 +32,13 @@ export default function GlobalCollectionIndicator() {
       mounted = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [agentId]);
 
-  if (activeCount === 0) return null;
+  if (!agentId || activeCount === 0) return null;
 
   function openActivity(): void {
-    window.location.hash = "#diagnostics";
+    if (!agentId) return;
+    window.location.hash = diagnosticsAgentHash(agentId);
     window.setTimeout(() => {
       document.getElementById("diagnostics-now-collecting")?.scrollIntoView({
         behavior: "smooth",

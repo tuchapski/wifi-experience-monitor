@@ -8,6 +8,7 @@ import {
   renameAgent,
 } from "./agentApi";
 import DiagnosticsWorkspace from "./DiagnosticsWorkspace";
+import ClientExperiencePanel from "./ClientExperiencePanel";
 import GlobalCollectionIndicator from "./GlobalCollectionIndicator";
 import ManagedAgentCard from "./ManagedAgentCard";
 import { diagnosticsAgentHash, parseWorkspaceRoute } from "./diagnosticRoutes";
@@ -164,101 +165,6 @@ function TelemetryChart({
         <span>{new Date(lastTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
       </div>
     </article>
-  );
-}
-
-type ExperiencePathStatus = "success" | "failure" | "unavailable";
-
-function experienceStatus(
-  outcome: boolean | null | undefined,
-  hasMeasurement: boolean,
-): ExperiencePathStatus {
-  if (outcome === false) return "failure";
-  if (outcome === true || hasMeasurement) return "success";
-  return "unavailable";
-}
-
-function ExperiencePath({
-  state,
-  fresh,
-}: {
-  state: AgentCurrentState | null;
-  fresh: boolean;
-}) {
-  const wifi = fresh ? state?.wifi : null;
-  const network = fresh ? state?.network : null;
-  const steps = [
-    {
-      key: "wifi",
-      label: "Wi-Fi / RF",
-      status: experienceStatus(wifi?.connected, wifi?.rssi_dbm != null),
-      statusLabel: wifi?.connected === false ? "Disconnected" : wifi?.connected ? "Connected" : "Unavailable",
-      primary: formatMetric(wifi?.rssi_dbm, "dBm"),
-      secondary: `SNR ${formatMetric(wifi?.snr_db, "dB")} · Util ${formatMetric(wifi?.channel_utilization_percent, "%")}`,
-    },
-    {
-      key: "gateway",
-      label: "Gateway",
-      status: experienceStatus(network?.gateway_reachable, network?.gateway_latency_ms != null),
-      statusLabel: network?.gateway_reachable === false ? "Unreachable" : network?.gateway_reachable ? "Reachable" : "Unavailable",
-      primary: network?.gateway_reachable === false ? "Failed" : formatMetric(network?.gateway_latency_ms, "ms"),
-      secondary: `Loss ${formatMetric(network?.gateway_packet_loss_percent, "%")} · Jitter ${formatMetric(network?.gateway_jitter_ms, "ms")}`,
-    },
-    {
-      key: "dns",
-      label: "DNS",
-      status: experienceStatus(network?.dns_success, network?.dns_latency_ms != null),
-      statusLabel: network?.dns_success === false ? "Failed" : network?.dns_success ? "Success" : "Unavailable",
-      primary: network?.dns_success === false ? "Failed" : formatMetric(network?.dns_latency_ms, "ms"),
-      secondary: network?.dns_success === true ? "Resolver completed" : "Resolver result unavailable",
-    },
-    {
-      key: "internet",
-      label: "Internet",
-      status: experienceStatus(network?.internet_reachable, network?.internet_latency_ms != null),
-      statusLabel: network?.internet_reachable === false ? "Unreachable" : network?.internet_reachable ? "Reachable" : "Unavailable",
-      primary: network?.internet_reachable === false ? "Failed" : formatMetric(network?.internet_latency_ms, "ms"),
-      secondary: `Loss ${formatMetric(network?.internet_packet_loss_percent, "%")} · Jitter ${formatMetric(network?.internet_jitter_ms, "ms")}`,
-    },
-    {
-      key: "application",
-      label: "Application",
-      status: experienceStatus(network?.https_success, network?.https_total_ms != null),
-      statusLabel: network?.https_success === false ? "Failed" : network?.https_success ? "Success" : "Unavailable",
-      primary: network?.https_success === false ? "Failed" : formatMetric(network?.https_total_ms, "ms"),
-      secondary: network?.https_success === false
-        ? `Observed for ${formatMetric(network?.https_failure_elapsed_ms, "ms")}`
-        : `TTFB ${formatMetric(network?.https_ttfb_ms, "ms")} · HTTP ${network?.https_status_code ?? "—"}`,
-    },
-  ] as const;
-
-  return (
-    <section className="agent-panel agent-experience-path">
-      <div className="agent-panel-heading">
-        <div>
-          <span className="agent-eyebrow">Realtime experience</span>
-          <h2>Experience Path</h2>
-          <p>Current measured path from the Wi-Fi link to the configured application target.</p>
-        </div>
-        <small>{fresh ? "Fresh Current State" : "Waiting for fresh data"}</small>
-      </div>
-      <div className="agent-experience-path-grid">
-        {steps.map((step, index) => (
-          <article className={`agent-path-step path-${step.status}`} key={step.key}>
-            <header>
-              <span>{step.label}</span>
-              <small><i />{step.statusLabel}</small>
-            </header>
-            <strong>{step.primary}</strong>
-            <p>{step.secondary}</p>
-            {index < steps.length - 1 && <b aria-hidden="true">→</b>}
-          </article>
-        ))}
-      </div>
-      <p className="agent-experience-path-note">
-        Values are direct observations from the latest Agent state; this view does not assign root cause.
-      </p>
-    </section>
   );
 }
 
@@ -715,10 +621,7 @@ function AgentDetail({ agentId }: { agentId: string }) {
         </article>
       </section>
 
-      <ExperiencePath
-        state={state}
-        fresh={currentStateFresh}
-      />
+      <ClientExperiencePanel key={agent.id} agentId={agent.id} />
 
       <LinkScorePanel
         score={state?.wifi.link_score ?? null}
@@ -866,7 +769,7 @@ export default function AgentWorkspace() {
             <button type="button" className={route.section === "agents" ? "active" : ""} onClick={navigateToAgents}>Agents</button>
             <button type="button" className={route.section === "diagnostics" ? "active" : ""} onClick={() => { window.location.hash = "#diagnostics"; }}>Diagnostics</button>
           </nav>
-          <GlobalCollectionIndicator />
+          <GlobalCollectionIndicator agentId={route.agentId} />
         </div>
       </header>
 
@@ -874,9 +777,9 @@ export default function AgentWorkspace() {
         {route.section === "diagnostics" && route.agentId && route.recordingId ? (
           <RecordingDetail agentId={route.agentId} recordingId={route.recordingId} />
         ) : route.section === "diagnostics" ? (
-          <DiagnosticsWorkspace agentId={route.agentId} />
+          <DiagnosticsWorkspace key={route.agentId ?? "individual"} agentId={route.agentId} />
         ) : route.agentId ? (
-          <AgentDetail agentId={route.agentId} />
+          <AgentDetail key={route.agentId} agentId={route.agentId} />
         ) : (
           <AgentList />
         )}

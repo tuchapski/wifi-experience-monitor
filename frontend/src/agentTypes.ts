@@ -113,6 +113,61 @@ export interface AgentCurrentState {
   wifi: WifiCurrentState;
   network: NetworkCurrentState;
   collector_errors: string[];
+  measurement_metadata?: Record<string, CurrentMeasurementMetadata>;
+}
+
+export interface CurrentMeasurementMetadata {
+  observed_at: string;
+  source: string;
+  sample_count: number;
+  unit: string | null;
+  interval_seconds: number | null;
+  labels: Record<string, string>;
+  profile_version: string | null;
+}
+
+export type ClientExperienceStatus = "observed_ok" | "degraded" | "failure" | "partial"
+  | "unavailable" | "stale" | "collection_error";
+
+export interface ExperienceMeasurement {
+  metric: string;
+  label: string;
+  value: boolean | number | string | null;
+  unit: string | null;
+  quality: "current" | "legacy" | "stale" | "unavailable" | "invalid";
+  observed_at: string | null;
+  source: string | null;
+  age_seconds: number | null;
+  sample_count: number | null;
+  interval_seconds: number | null;
+  target: string | null;
+  profile_version: string | null;
+}
+
+export interface ClientExperienceDomain {
+  domain: string;
+  label: string;
+  status: ClientExperienceStatus;
+  explanation: string;
+  target: string | null;
+  measurements: ExperienceMeasurement[];
+}
+
+export interface ClientExperience {
+  agent_id: string;
+  version: string;
+  evaluated_at: string;
+  state_observed_at: string | null;
+  state_received_at: string | null;
+  agent_online: boolean;
+  max_measurement_age_seconds: number;
+  status: ClientExperienceStatus;
+  current_outcomes: number;
+  total_outcomes: number;
+  outcome_coverage_percent: number;
+  domains: ClientExperienceDomain[];
+  collector_errors: string[];
+  limitations: string[];
 }
 
 export interface RfBssObservation {

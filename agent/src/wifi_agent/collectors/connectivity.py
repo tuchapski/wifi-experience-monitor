@@ -99,6 +99,16 @@ def probe_ping(
             labels,
         ),
     ]
+    counts = re.search(r"(\d+) packets transmitted,\s*(\d+) (?:packets )?received", result.stdout)
+    if counts:
+        observations.extend(
+            [
+                _state(f"network.{name}_packets_sent", int(counts.group(1)), observed_at, labels),
+                _state(
+                    f"network.{name}_packets_received", int(counts.group(2)), observed_at, labels
+                ),
+            ]
+        )
     latency_match = re.search(
         r"=\s*([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)\s*ms",
         result.stdout,

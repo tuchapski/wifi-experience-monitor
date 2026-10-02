@@ -1,31 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { startAgentRecording } from "./agentApi";
 import type { AgentSummary, DiagnosticRecording, StartRecordingInput } from "./agentTypes";
 import CollectionStartForm from "./CollectionStartForm";
+import { diagnosticsRecordingHash } from "./diagnosticRoutes";
 
 const ACTIVE_STATUSES = new Set(["created", "recording", "stopping"]);
 
 export default function DiagnosticCollectionLauncher({
   agents,
   recordingsByAgent,
-  initialAgentId,
+  selectedAgentId,
+  onSelectedAgentChange,
+  recordingsLoading,
   loading,
   onStarted,
 }: {
   agents: AgentSummary[];
   recordingsByAgent: Record<string, DiagnosticRecording[]>;
-  initialAgentId: string | null;
+  selectedAgentId: string;
+  onSelectedAgentChange: (agentId: string) => void;
+  recordingsLoading: boolean;
   loading: boolean;
   onStarted: (agent: AgentSummary, recording: DiagnosticRecording) => void;
 }) {
-  const [selectedAgentId, setSelectedAgentId] = useState(initialAgentId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (initialAgentId) setSelectedAgentId(initialAgentId);
-  }, [initialAgentId]);
 
   const selected = agents.find((agent) => agent.id === selectedAgentId) ?? null;
   const recordings = selected ? recordingsByAgent[selected.id] ?? [] : [];
@@ -33,7 +33,7 @@ export default function DiagnosticCollectionLauncher({
     () => recordings.find((recording) => ACTIVE_STATUSES.has(recording.status)) ?? null,
     [recordings],
   );
-  const blocked = !selected || selected.status !== "online" || Boolean(activeRecording);
+  const blocked = loading || recordingsLoading || !selected || selected.status !== "online" || Boolean(activeRecording);
 
   async function handleStart(input: StartRecordingInput): Promise<boolean> {
     if (!selected || blocked || busy) return false;
@@ -65,7 +65,7 @@ export default function DiagnosticCollectionLauncher({
             id="diagnostics-agent-picker"
             value={selectedAgentId}
             onChange={(event) => {
-              setSelectedAgentId(event.target.value);
+              onSelectedAgentChange(event.target.value);
               setError(null);
             }}
             disabled={loading || agents.length === 0}
@@ -103,13 +103,13 @@ export default function DiagnosticCollectionLauncher({
                     ? "This Agent is collecting for a diagnostic project."
                     : "This Agent already has an active individual collection."}
                 </strong>
-                <span>Monitor progress or stop it from the Now collecting section.</span>
+                <span>Open the recording to monitor progress or stop it.</span>
               </div>
-              <a href="#diagnostics-now-collecting">View active collection</a>
+              <a href={diagnosticsRecordingHash(selected.id, activeRecording.id)}>View active collection</a>
             </div>
           ) : (
             <CollectionStartForm
-              disabled={selected.status !== "online"}
+              disabled={blocked}
               busy={busy}
               onSubmit={handleStart}
             />

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 
 class CapabilityPayload(BaseModel):
@@ -107,11 +107,22 @@ class NetworkCurrentStatePayload(BaseModel):
     internet_latency_ms: float | None = None
 
 
+class CurrentMeasurementMetadata(BaseModel):
+    observed_at: AwareDatetime
+    source: str = Field(min_length=1, max_length=128)
+    sample_count: int = Field(default=1, ge=1)
+    unit: str | None = Field(default=None, max_length=32)
+    interval_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    labels: dict[str, str] = Field(default_factory=dict)
+    profile_version: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 class AgentCurrentStateRequest(BaseModel):
     observed_at: datetime
     wifi: WifiCurrentStatePayload = Field(default_factory=WifiCurrentStatePayload)
     network: NetworkCurrentStatePayload = Field(default_factory=NetworkCurrentStatePayload)
     collector_errors: list[str] = Field(default_factory=list)
+    measurement_metadata: dict[str, CurrentMeasurementMetadata] = Field(default_factory=dict)
 
 
 class AgentCurrentStateResponse(AgentCurrentStateRequest):

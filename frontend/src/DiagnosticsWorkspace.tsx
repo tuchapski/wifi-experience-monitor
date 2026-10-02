@@ -4,7 +4,6 @@ import { deleteRecording, getAgentRecordings, getAgents } from "./agentApi";
 import type { AgentSummary, DiagnosticRecording } from "./agentTypes";
 import { CollectionActivityRow, DatasetCollectionControls } from "./CollectionActivity";
 import DiagnosticCollectionLauncher from "./DiagnosticCollectionLauncher";
-import DiagnosticProjectsPanel from "./DiagnosticProjectsPanel";
 import "./DiagnosticsWorkspace.css";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -57,7 +56,6 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const [datasetsLoading, setDatasetsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [datasetError, setDatasetError] = useState<string | null>(null);
-  const [datasetView, setDatasetView] = useState<"individual" | "projects">("individual");
   const [datasetAgentFilter, setDatasetAgentFilter] = useState(agentId ?? "");
   const [datasetStatusFilter, setDatasetStatusFilter] = useState("");
   const [datasetSearch, setDatasetSearch] = useState("");
@@ -65,6 +63,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const [selectedDatasetIds, setSelectedDatasetIds] = useState<Set<string>>(new Set());
   const [deletingDatasets, setDeletingDatasets] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(Boolean(agentId));
+  const selectedClientId = datasetAgentFilter || agentId || (agents.length === 1 ? agents[0].id : "");
 
   useEffect(() => {
     if (agentId) {
@@ -76,7 +75,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   useEffect(() => {
     setDatasetPage(1);
     setSelectedDatasetIds(new Set());
-  }, [datasetAgentFilter, datasetSearch, datasetStatusFilter, datasetView]);
+  }, [datasetAgentFilter, datasetSearch, datasetStatusFilter]);
 
   useEffect(() => {
     let active = true;
@@ -105,17 +104,12 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
     };
   }, []);
 
-  const agentIdsKey = useMemo(
-    () => agents.map((agent) => agent.id).sort().join("|"),
-    [agents],
-  );
-
   useEffect(() => {
     if (loading) return;
 
     let active = true;
     async function refreshDatasets(): Promise<void> {
-      const currentAgents = agentsRef.current;
+      const currentAgents = agentsRef.current.filter((agent) => agent.id === selectedClientId);
       if (currentAgents.length === 0) {
         setDatasets([]);
         setRecordingsByAgent({});
@@ -155,14 +149,14 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       active = false;
       window.clearInterval(timer);
     };
-  }, [agentIdsKey, loading]);
+  }, [selectedClientId, loading]);
 
   const activeCollections = useMemo(
-    () => agents.flatMap((agent) =>
+    () => agents.filter((agent) => agent.id === selectedClientId).flatMap((agent) =>
       (recordingsByAgent[agent.id] ?? [])
-        .filter((recording) => ACTIVE_STATUSES.has(recording.status))
+        .filter((recording) => !recording.project_run_id && ACTIVE_STATUSES.has(recording.status))
         .map((recording) => ({ agent, recording }))),
-    [agents, recordingsByAgent],
+    [agents, recordingsByAgent, selectedClientId],
   );
   const historicalDatasets = useMemo(
     () => datasets.filter(({ recording }) => !ACTIVE_STATUSES.has(recording.status)),
@@ -175,7 +169,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
   const filteredDatasets = useMemo(() => {
     const search = datasetSearch.trim().toLowerCase();
     return historicalDatasets
-      .filter(({ agent }) => !datasetAgentFilter || agent.id === datasetAgentFilter)
+      .filter(({ agent }) => agent.id === selectedClientId)
       .filter(({ recording }) => !datasetStatusFilter || recording.status === datasetStatusFilter)
       .filter(({ agent, recording }) => !search || [
         recording.name,
@@ -187,7 +181,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       ].some((value) => value?.toLowerCase().includes(search)))
       .sort((left, right) => Date.parse(right.recording.started_at ?? right.recording.created_at)
         - Date.parse(left.recording.started_at ?? left.recording.created_at));
-  }, [datasetAgentFilter, datasetSearch, datasetStatusFilter, datasets]);
+  }, [selectedClientId, datasetSearch, datasetStatusFilter, historicalDatasets]);
 
   const pageCount = Math.max(1, Math.ceil(filteredDatasets.length / DATASETS_PER_PAGE));
   const currentPage = Math.min(datasetPage, pageCount);
@@ -292,7 +286,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
       <section className="agent-page-heading diagnostics-page-heading">
         <div>
           <span className="agent-eyebrow">Diagnostics</span>
-          <h1>Datasets and analysis</h1>
+          <h1>Client recordings and analysis</h1>
           <p>Investigate captured evidence and start an individual collection when needed.</p>
         </div>
         <button
@@ -309,9 +303,12 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
 
       {launcherOpen && (
         <DiagnosticCollectionLauncher
+          key={selectedClientId}
           agents={agents}
           recordingsByAgent={recordingsByAgent}
-          initialAgentId={agentId}
+          selectedAgentId={selectedClientId}
+          onSelectedAgentChange={setDatasetAgentFilter}
+          recordingsLoading={!(selectedClientId in recordingsByAgent)}
           loading={loading}
           onStarted={handleCollectionStarted}
         />
@@ -327,7 +324,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
             <div>
               <span className="agent-eyebrow">Live activity</span>
               <h2 id="now-collecting-title">Now collecting</h2>
-              <p>Active collections stay visible here regardless of where they were started.</p>
+              <p>Active individual collections for the selected client appear here.</p>
             </div>
             <span>{activeCollections.length} active</span>
           </div>
@@ -347,30 +344,14 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
         <div className="diagnostics-datasets-heading">
           <div>
             <span className="agent-eyebrow">Recorded evidence</span>
-            <h2 id="datasets-title">Datasets</h2>
-            <p>Browse collected evidence independently from the Agent used to capture it.</p>
+            <h2 id="datasets-title">Individual recordings</h2>
+            <p>Select a client to browse its captured evidence and compare recordings over time.</p>
           </div>
-          <nav className="diagnostics-dataset-tabs" aria-label="Dataset type">
-            <button type="button" className={datasetView === "individual" ? "active" : ""}
-              aria-pressed={datasetView === "individual"} onClick={() => setDatasetView("individual")}>
-              Individual
-            </button>
-            <button type="button" className={datasetView === "projects" ? "active" : ""}
-              aria-pressed={datasetView === "projects"} onClick={() => setDatasetView("projects")}>
-              Projects
-            </button>
-          </nav>
         </div>
-
-        {datasetView === "projects" ? (
-          loading ? <div className="agent-empty">Loading collection Agents…</div>
-            : <DiagnosticProjectsPanel agents={agents} />
-        ) : (
-          <>
             <div className="diagnostics-dataset-filters">
-              <label>Agent
-                <select value={datasetAgentFilter} onChange={(event) => setDatasetAgentFilter(event.target.value)}>
-                  <option value="">All agents</option>
+              <label>Client
+                <select value={selectedClientId} onChange={(event) => setDatasetAgentFilter(event.target.value)}>
+                  <option value="">Choose a client</option>
                   {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
                 </select>
               </label>
@@ -402,7 +383,7 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
             {datasetsLoading ? (
               <div className="agent-empty">Loading individual datasets…</div>
             ) : filteredDatasets.length === 0 ? (
-              <div className="agent-empty">No individual datasets match the current filters.</div>
+              <div className="agent-empty">No individual recordings match the selected client and filters.</div>
             ) : (
               <>
                 <div className="diagnostics-dataset-table-wrap">
@@ -478,8 +459,6 @@ export default function DiagnosticsWorkspace({ agentId }: { agentId: string | nu
                 </div>
               </>
             )}
-          </>
-        )}
       </section>
     </>
   );

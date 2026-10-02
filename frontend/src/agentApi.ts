@@ -1,4 +1,5 @@
 import type {
+  ClientExperience,
   AgentCurrentState,
   AgentSummary,
   CreateDiagnosticProjectInput,
@@ -19,6 +20,10 @@ import type {
 } from "./agentTypes";
 
 const API_ROOT = import.meta.env.VITE_SERVER_API_URL ?? "/api/v1";
+
+export function getClientExperience(agentId: string): Promise<ClientExperience> {
+  return request<ClientExperience>(`/agents/${encodeURIComponent(agentId)}/experience`);
+}
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {

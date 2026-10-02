@@ -1,0 +1,35 @@
+.client-experience { margin-bottom: 20px; }
+.client-experience-status { border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.client-experience-coverage { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 14px 22px; background: #f5f8fc; color: #66778c; font-size: 12px; }
+.client-experience-coverage strong { color: #364e69; }
+.client-experience-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 20px; }
+.client-experience-domain { border: 1px solid #dce5ef; border-top: 3px solid #9baabd; border-radius: 10px; padding: 14px; min-width: 0; }
+.client-experience-domain header { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+.client-experience-domain h3 { margin: 0; color: #263e5a; font-size: 13px; }
+.client-experience-domain header span { font-size: 11px; font-weight: 700; }
+.client-experience-reading { display: block; font-size: 24px; color: #263e5a; }
+.client-experience-domain p { font-size: 11px; line-height: 1.6; color: #66778c; }
+.client-experience-target { overflow-wrap: anywhere; min-height: 18px; }
+.client-experience-domain details { margin-top: 16px; border-top: 1px solid #e3eaf2; padding-top: 12px; }
+.client-experience-domain summary, .client-experience-warnings summary { font-size: 12px; font-weight: 700; color: #3265a5; cursor: pointer; }
+.client-experience-domain dl { font-size: 11px; margin-bottom: 0; }
+.client-experience-domain dl > div { padding: 8px 0; border-bottom: 1px solid #edf1f6; }
+.client-experience-domain dt { color: #6d7c90; }
+.client-experience-domain dd { margin: 5px 0 0; overflow-wrap: anywhere; }
+.client-experience-domain dd small, .client-experience-domain time { display: block; color: #6d7c90; font-size: 10px; line-height: 1.5; }
+.client-experience-note, .client-experience-loading { padding: 0 22px 18px; font-size: 12px; line-height: 1.6; color: #66778c; margin: 0; }
+.client-experience-warnings { padding: 0 22px 20px; font-size: 12px; color: #66778c; }
+.client-experience-status.experience-observed_ok { background: #e9f7f1; color: #16775b; }
+.client-experience-domain.experience-observed_ok { border-top-color: #2f9c7d; }
+.experience-observed_ok header span { color: #16775b; }
+.client-experience-status.experience-failure { background: #fff0ef; color: #b2443c; }
+.client-experience-domain.experience-failure { border-top-color: #c5574f; }
+.experience-failure header span { color: #b2443c; }
+.client-experience-status.experience-degraded { background: #fff7e7; color: #9b6b17; }
+.client-experience-domain.experience-degraded { border-top-color: #c29335; }
+.experience-degraded header span { color: #9b6b17; }
+.client-experience-status.experience-partial, .client-experience-status.experience-unavailable, .client-experience-status.experience-stale { background: #edf1f7; color: #63748a; }
+.client-experience-domain.experience-collection_error { border-top-color: #9a7ac1; }
+.experience-collection_error header span { color: #79539e; }
+@media (max-width: 1100px) { .client-experience-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .client-experience-grid { grid-template-columns: 1fr; padding: 14px; } .client-experience .agent-panel-heading { align-items: flex-start; gap: 12px; flex-direction: column; } }
